@@ -8,8 +8,8 @@ import matplotlib.pyplot as pl
 testdata = np.loadtxt("test_bessel.txt")
 
 refx = np.linspace(0.05, 100.0, 2000)
-refj = special.spherical_jn(1, refx + 1.0j * refx)
-refdj = special.spherical_jn(1, refx + 1.0j * refx, derivative=True)
+refj = special.spherical_jn(10, refx + 1.0j * refx)
+refdj = special.spherical_jn(10, refx + 1.0j * refx, derivative=True)
 
 fig, ax = pl.subplots(2, 2)
 

@@ -1,7 +1,7 @@
 #include <cinttypes>
 #include <cmath>
 
-#define BESSELFUNCTIONS_NMAX 5000u
+#define BESSELFUNCTIONS_NMAX 800u
 
 class BesselFunctions {
 
@@ -140,7 +140,7 @@ public:
       const double rho_denom =
           1. / (rhoinv_real * rhoinv_real + rhoinv_imag * rhoinv_imag);
       rho_real[index - 1] = rhoinv_real * rho_denom;
-      rho_imag[index - 1] = -rhoinv_real * rho_denom;
+      rho_imag[index - 1] = -rhoinv_imag * rho_denom;
     }
     //    const double sinz_real = std::sin(xreal) * std::cosh(ximag);
     //    const double sinz_imag = std::cos(xreal) * std::sinh(ximag);
