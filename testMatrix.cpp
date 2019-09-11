@@ -1,9 +1,24 @@
+/**
+ * @file testMatrix.cpp
+ *
+ * @brief Unit test for the Matrix class and its member functions.
+ *
+ * @author Bert Vandenbroucke (bert.vandenbroucke@ugent.be)
+ */
+
 #include "Matrix.hpp"
 #include <iostream>
 
+/**
+ * @brief Unit test for the Matrix class and its member functions.
+ *
+ * @param argc Number of command line arguments (ignored).
+ * @param argv Command line arguments (ignored).
+ * @return Exit code: 0 on success.
+ */
 int main(int argc, char **argv) {
 
-  Matrix A(3);
+  Matrix<std::complex<double>> A(3);
   A(0, 0) = 1.;
   A(0, 0).imag(1.);
   A(0, 1) = 2.;

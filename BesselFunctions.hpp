@@ -68,18 +68,19 @@ public:
    * @param z Input values.
    * @param y Array to store the Bessel function values in (of size nmax).
    * @param dy Array to store the first derivatives in (of size nmax).
+   * @tparam DATA_TYPE Data type of input and output values.
    */
-  template <typename _type_>
+  template <typename DATA_TYPE>
   static inline void spherical_y_ydy_array(const uint_fast32_t nmax,
-                                           const _type_ z, _type_ *y,
-                                           _type_ *dy) {
+                                           const DATA_TYPE z, DATA_TYPE *y,
+                                           DATA_TYPE *dy) {
 
     // compute the 1st and 2nd order functions manually
-    const _type_ cosz = std::cos(z);
-    const _type_ sinz = std::sin(z);
-    const _type_ zinv = 1. / z;
-    const _type_ zinv2 = zinv * zinv;
-    const _type_ zinv3 = zinv2 * zinv;
+    const DATA_TYPE cosz = std::cos(z);
+    const DATA_TYPE sinz = std::sin(z);
+    const DATA_TYPE zinv = 1. / z;
+    const DATA_TYPE zinv2 = zinv * zinv;
+    const DATA_TYPE zinv3 = zinv2 * zinv;
     y[0] = -cosz * zinv2 - sinz * zinv;
     y[1] = (-3. * zinv3 + zinv) * cosz - 3. * zinv2 * sinz;
     // same for the derivatives (this implicitly uses the recursion relation)
@@ -129,7 +130,7 @@ public:
    * @f[
    *    \frac{j_n(z)}{j_{n-1}(z)} = \rho_n(z) \sim{} \frac{z}{2n+1},
    * @f]
-   * after which we use the recursion relation for @$f\rho{}_n(z)@f$ to find
+   * after which we use the recursion relation for @f$\rho{}_n(z)@f$ to find
    * the ratio for lower values of @f$n@f$.
    *
    * After this, we use a forward algorithm to determine all values of
@@ -149,16 +150,17 @@ public:
    * @param z Input value.
    * @param j Array to store the Bessel function values in (of size nmax).
    * @param dj Array to store the first derivatives in (of size nmax).
+   * @tparam DATA_TYPE Data type of input and output values.
    */
-  template <typename _type_>
+  template <typename DATA_TYPE>
   static inline void spherical_j_jdj_array(const uint_fast32_t nmax,
-                                           const _type_ z, _type_ *j,
-                                           _type_ *dj) {
+                                           const DATA_TYPE z, DATA_TYPE *j,
+                                           DATA_TYPE *dj) {
 
     // set up and compute the array of ratios using a backward recursion
     // algorithm
-    _type_ rho[BESSELFUNCTIONS_NMAX];
-    const _type_ zinv = 1. / z;
+    DATA_TYPE rho[BESSELFUNCTIONS_NMAX];
+    const DATA_TYPE zinv = 1. / z;
     // we assume that for high enough order, the ratio tends to the
     // asymptotic value
     rho[BESSELFUNCTIONS_NMAX - 1] = z / (2. * BESSELFUNCTIONS_NMAX + 1.);
@@ -168,8 +170,8 @@ public:
       rho[index - 1] = 1. / ((2. * index + 1.) * zinv - rho[index]);
     }
     // compute the zeroth order Bessel function of the first kind
-    const _type_ sinz = std::sin(z);
-    const _type_ j0 = sinz * zinv;
+    const DATA_TYPE sinz = std::sin(z);
+    const DATA_TYPE j0 = sinz * zinv;
     // use the ratio and recursion relation to find the 1st order function and
     // derivative expression
     j[0] = rho[0] * j0;
