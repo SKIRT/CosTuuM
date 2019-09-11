@@ -1,59 +1,101 @@
+/**
+ * @file BesselFunctions.hpp
+ *
+ * @brief Class namespace that contains template functions to compute general
+ * spherical Bessel functions of the first and second kind and a variant of
+ * their derivatives, for real and complex input values.
+ *
+ * @author Bert Vandenbroucke (bert.vandenbroucke@ugent.be)
+ */
+
 #include <cinttypes>
 #include <cmath>
+#include <complex>
 
+/*! @brief Starting order for the backwards recurrence algorithm for the
+ *  spherical Bessel functions of the first kind. The higher this number, the
+ *  higher the accuracy of the Bessel functions of the first kind, but also
+ *  the slower the function becomes. */
 #define BESSELFUNCTIONS_NMAX 800u
 
+/**
+ * @brief Class namespace that contains template functions to compute general
+ * spherical Bessel functions of the first and second kind and a variant of
+ * their derivatives, for real and complex input values.
+ */
 class BesselFunctions {
 
 public:
-  static inline double spherical_j(const uint_fast32_t n, const double x) {
-    return std::sph_bessel(n, x);
-  }
+  /**
+   * @brief Spherical Bessel function of the second kind for general real or
+   * complex numbers that returns all spherical Bessel functions and a special
+   * form of their first derivatives up to the given maximum order.
+   *
+   * Since this method is not part of the standard C++ library, we have to
+   * implement it ourselves. We make use of the following two recursion
+   * relations for spherical Bessel functions:
+   * @f[
+   *    y_{n-1}(z) + y_{n+1}(z) = \frac{2n + 1}{z} y_n(z),
+   * @f]
+   * and
+   * @f[
+   *    \frac{d}{dz} y_n(z) = y_{n-1}(z) - \frac{n+1}{z} y_n(z),
+   * @f]
+   * combined with our knowledge of the first and second order spherical Bessel
+   * function of the second kind:
+   * @f[
+   *    y_1(z) = -\frac{\cos(z)}{z^2} - \frac{\sin(z)}{z},
+   * @f]
+   * and
+   * @f[
+   *    y_2(z) = \left(-\frac{3}{z^2} + 1\right) \frac{\cos(z)}{z}
+   *             - 3 \frac{\sin(z)}{z^2}.
+   * @f]
+   *
+   * We use a forward recursion algorithm to determine all values of
+   * @f$y_n(z)@f$ and its derivative.
+   *
+   * Since we do not require the actual derivative, but rather the expression
+   * @f[
+   *    \frac{(zy_n(z))'}{z} = y_n'(z) + \frac{y_n(z)}{z},
+   * @f]
+   * we make use of the fact that this expression can be computed very easily
+   * during the recursion step and skip the explicit computation of the actual
+   * derivative.
+   *
+   * @param nmax Maximum order to compute (we compute all @f$y_n(z)@f$ for
+   * @f$n\in{}[1,n_{max}]@f$).
+   * @param z Input values.
+   * @param y Array to store the Bessel function values in (of size nmax).
+   * @param dy Array to store the first derivatives in (of size nmax).
+   */
+  template <typename _type_>
+  static inline void spherical_y_ydy_array(const uint_fast32_t nmax,
+                                           const _type_ z, _type_ *y,
+                                           _type_ *dy) {
 
-  static inline double spherical_dj(const uint_fast32_t n, const double x) {
-    const double jnm1 = std::sph_bessel(n - 1, x);
-    const double jn = std::sph_bessel(n, x);
-    return jnm1 - (n + 1.) * jn / x;
-  }
-
-  static inline void spherical_j_dj_array(const uint_fast32_t nmax,
-                                          const double x, double *j,
-                                          double *dj) {
-    j[0] = std::sph_bessel(1, x);
-    const double xinv = 1. / x;
-    dj[0] = std::sph_bessel(0, x) - 2. * xinv * j[0];
-    for (uint_fast32_t i = 1; i < nmax; ++i) {
-      j[i] = std::sph_bessel(i + 1, x);
-      dj[i] = j[i - 1] - (i + 2.) * xinv * j[i];
-    }
-  }
-
-  inline static double spherical_y(const uint_fast32_t n, const double x) {
-    return std::sph_neumann(n, x);
-  }
-
-  inline static double spherical_dy(const uint_fast32_t n, const double x) {
-    const double ynm1 = std::sph_neumann(n - 1, x);
-    const double yn = std::sph_neumann(n, x);
-    return ynm1 - (n + 1.) * yn / x;
-  }
-
-  static inline void spherical_y_dy_array(const uint_fast32_t nmax,
-                                          const double x, double *y,
-                                          double *dy) {
-    y[0] = std::sph_neumann(1, x);
-    const double xinv = 1. / x;
-    dy[0] = std::sph_neumann(0, x) - 2. * xinv * y[0];
-    for (uint_fast32_t i = 1; i < nmax; ++i) {
-      y[i] = std::sph_neumann(i + 1, x);
-      dy[i] = y[i - 1] - (i + 2.) * xinv * y[i];
+    // compute the 1st and 2nd order functions manually
+    const _type_ cosz = std::cos(z);
+    const _type_ sinz = std::sin(z);
+    const _type_ zinv = 1. / z;
+    const _type_ zinv2 = zinv * zinv;
+    const _type_ zinv3 = zinv2 * zinv;
+    y[0] = -cosz * zinv2 - sinz * zinv;
+    y[1] = (-3. * zinv3 + zinv) * cosz - 3. * zinv2 * sinz;
+    // same for the derivatives (this implicitly uses the recursion relation)
+    dy[0] = -zinv * (cosz + y[0]);
+    dy[1] = y[0] - zinv * y[1];
+    // now apply the recursion relations for the rest
+    for (uint_fast32_t i = 2; i < nmax; ++i) {
+      y[i] = (2. * i + 1.) * zinv * y[i - 1] - y[i - 2];
+      dy[i] = y[i - 1] - (i + 1.) * zinv * y[i];
     }
   }
 
   /**
-   * @brief Spherical Bessel function of the first kind for complex numbers
-   * that returns all spherical Bessel functions and their first derivatives
-   * up to the given maximum order.
+   * @brief Spherical Bessel function of the first kind for general real or
+   * complex numbers that returns all spherical Bessel functions and a special
+   * form of their first derivatives up to the given maximum order.
    *
    * Since this method is not part of the standard C++ library, we have to
    * implement it ourselves. We make use of the following two recursion
@@ -83,7 +125,7 @@ public:
    * individual Bessel functions for the whole domain.
    *
    * We use a backward recursion algorithm for @f$\rho_n(z)@f$ that exploits
-   * the following relation for large @f$n@f$ (we use @f$n = 1000@f$):
+   * the following relation for large @f$n@f$ (we use @f$n = 800@f$):
    * @f[
    *    \frac{j_n(z)}{j_{n-1}(z)} = \rho_n(z) \sim{} \frac{z}{2n+1},
    * @f]
@@ -94,83 +136,49 @@ public:
    * @f$j_n(z)@f$ and we determine the first derivatives using the second
    * recursion relation.
    *
-   * Throughout the function, we repeatedly need to compute the inverse of
-   * a complex number, @$fz = x + iy@f$, using the relation
+   * Since we do not require the actual derivative, but rather the expression
    * @f[
-   *    \frac{1}{x + iy} = \frac{x - iy}{x^2 + y^2}.
+   *    \frac{(zj_n(z))'}{z} = j_n'(z) + \frac{j_n(z)}{z},
    * @f]
-   * We also use
-   * @f[
-   *    \sin(x+iy) = \sin(x) \cosh(y) + i \cos(x) \sinh(y).
-   * @f]
+   * we make use of the fact that this expression can be computed very easily
+   * during the recursion step and skip the explicit computation of the actual
+   * derivative.
    *
    * @param nmax Maximum order to compute (we compute all @f$j_n(z)@f$ for
    * @f$n\in{}[1,n_{max}]@f$).
-   * @param xreal Real parts of the input values (@f$x@f$ in @f$z = x + iy@f$).
-   * @param ximag Imaginary parts of the input values (@f$y@f$ in
-   * @f$z = x + iy@f$).
-   * @param jreal Array to store the real parts of the Bessel function values
-   * in (of size nmax, @f$j_r@f$ in @f$j = j_r + ij_i@f$).
-   * @param jimag Array to store the imaginary parts of the Bessel function
-   * values in (of size nmax, @f$j_i@f$ in @f$j = j_r + ij_i@f$).
-   * @param djreal Array to store the real parts of the first derivatives in (of
-   * size nmax, @f$dj_r@f$ in @f$dj = dj_r + idj_i@f$).
-   * @param djreal Array to store the imaginary parts of the first derivatives
-   * in (of size nmax, @f$dj_i@f$ in @f$dj = dj_r + idj_i@f$).
+   * @param z Input value.
+   * @param j Array to store the Bessel function values in (of size nmax).
+   * @param dj Array to store the first derivatives in (of size nmax).
    */
-  static inline void
-  spherical_j_dj_complex_array(const uint_fast32_t nmax, const double xreal,
-                               const double ximag, double *jreal, double *jimag,
-                               double *djreal, double *djimag) {
+  template <typename _type_>
+  static inline void spherical_j_jdj_array(const uint_fast32_t nmax,
+                                           const _type_ z, _type_ *j,
+                                           _type_ *dj) {
 
-    double rho_real[BESSELFUNCTIONS_NMAX];
-    double rho_imag[BESSELFUNCTIONS_NMAX];
-
-    const double zinv_denom = 1. / (xreal * xreal + ximag * ximag);
-    const double zinv_real = xreal * zinv_denom;
-    const double zinv_imag = -ximag * zinv_denom;
-    const double proportionality_factor = 1. / (2. * BESSELFUNCTIONS_NMAX + 1.);
-    rho_real[BESSELFUNCTIONS_NMAX - 1] = xreal * proportionality_factor;
-    rho_imag[BESSELFUNCTIONS_NMAX - 1] = ximag * proportionality_factor;
+    // set up and compute the array of ratios using a backward recursion
+    // algorithm
+    _type_ rho[BESSELFUNCTIONS_NMAX];
+    const _type_ zinv = 1. / z;
+    // we assume that for high enough order, the ratio tends to the
+    // asymptotic value
+    rho[BESSELFUNCTIONS_NMAX - 1] = z / (2. * BESSELFUNCTIONS_NMAX + 1.);
+    // now recurse down to get the ratio for lower orders
     for (uint_fast32_t i = 1; i < BESSELFUNCTIONS_NMAX; ++i) {
       const uint_fast32_t index = BESSELFUNCTIONS_NMAX - i;
-      const double recursion_factor = 2. * index + 1.;
-      const double rhoinv_real = zinv_real * recursion_factor - rho_real[index];
-      const double rhoinv_imag = zinv_imag * recursion_factor - rho_imag[index];
-      const double rho_denom =
-          1. / (rhoinv_real * rhoinv_real + rhoinv_imag * rhoinv_imag);
-      rho_real[index - 1] = rhoinv_real * rho_denom;
-      rho_imag[index - 1] = -rhoinv_imag * rho_denom;
+      rho[index - 1] = 1. / ((2. * index + 1.) * zinv - rho[index]);
     }
-    //    const double sinz_real = std::sin(xreal) * std::cosh(ximag);
-    //    const double sinz_imag = std::cos(xreal) * std::sinh(ximag);
-    //    const double j0real = zinv_real * sinz_real - zinv_imag * sinz_imag;
-    //    const double j0imag = zinv_imag * sinz_real + zinv_real * sinz_imag;
-    const double rho0real_inv = zinv_real - rho_real[0];
-    const double rho0imag_inv = zinv_imag - rho_imag[0];
-    const double rho0_denom =
-        1. / (rho0real_inv * rho0real_inv + rho0imag_inv * rho0imag_inv);
-    const double rho0real = rho0real_inv * rho0_denom;
-    const double rho0imag = -rho0imag_inv * rho0_denom;
-    const double cosz_real = std::cos(xreal) * std::cosh(ximag);
-    const double cosz_imag = -std::sin(xreal) * std::sinh(ximag);
-    const double jm1real = cosz_real * zinv_real - cosz_imag * zinv_imag;
-    const double jm1imag = cosz_imag * zinv_real + cosz_real * zinv_imag;
-    const double j0real = rho0real * jm1real - rho0imag * jm1imag;
-    const double j0imag = rho0imag * jm1real + rho0real * jm1imag;
-    // remember: j[0] is actually j_1!!
-    jreal[0] = rho_real[0] * j0real - rho_imag[0] * j0imag;
-    jimag[0] = rho_imag[0] * j0real + rho_real[0] * j0imag;
-    djreal[0] = j0real - 2. * (zinv_real * jreal[0] - zinv_imag * jimag[0]);
-    djimag[0] = j0imag - 2. * (zinv_imag * jreal[0] + zinv_real * jimag[0]);
-    // now recurse until nmax
+    // compute the zeroth order Bessel function of the first kind
+    const _type_ sinz = std::sin(z);
+    const _type_ j0 = sinz * zinv;
+    // use the ratio and recursion relation to find the 1st order function and
+    // derivative expression
+    j[0] = rho[0] * j0;
+    dj[0] = j0 - j[0] * zinv;
+    // now recurse forward to find the rest
     for (uint_fast32_t i = 1; i < nmax; ++i) {
-      jreal[i] = rho_real[i] * jreal[i - 1] - rho_imag[i] * jimag[i - 1];
-      jimag[i] = rho_imag[i] * jreal[i - 1] + rho_real[i] * jimag[i - 1];
-      djreal[i] = jreal[i - 1] -
-                  (i + 2.) * (zinv_real * jreal[i] - zinv_imag * jimag[i]);
-      djimag[i] = jimag[i - 1] -
-                  (i + 2.) * (zinv_imag * jreal[i] + zinv_real * jimag[i]);
+      j[i] = rho[i] * j[i - 1];
+      dj[i] = j[i - 1] - (i + 1.) * zinv * j[i];
     }
+    return;
   }
 };
