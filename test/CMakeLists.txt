@@ -14,7 +14,7 @@ macro(add_unit_test)
     message(STATUS "generating ${TEST_NAME}")
     add_executable(${TEST_NAME} EXCLUDE_FROM_ALL ${TEST_SOURCES})
     set_target_properties(${TEST_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY
-                          ${PROJECT_BINARY_DIR}/rundir/test)
+                          ${PROJECT_BINARY_DIR}/bin/test)
     target_link_libraries(${TEST_NAME} ${TEST_LIBS})
 
     if(TEST_PARALLEL AND HAVE_MPI)
@@ -41,6 +41,9 @@ set(TESTSPECIALFUNCTIONS_SOURCES
 )
 add_unit_test(NAME testSpecialFunctions
               SOURCES ${TESTSPECIALFUNCTIONS_SOURCES})
+configure_file(${PROJECT_SOURCE_DIR}/test/plot_test_special_functions.py
+               ${PROJECT_BINARY_DIR}/bin/test/plot_test_special_functions.py
+               COPYONLY)
 
 ## Unit test for Matrix
 set(TESTMATRIX_SOURCES
