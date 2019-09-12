@@ -1,9 +1,9 @@
 /**
- * @file BesselFunctions.hpp
+ * @file SpecialFunctions.hpp
  *
- * @brief Class namespace that contains template functions to compute general
- * spherical Bessel functions of the first and second kind and a variant of
- * their derivatives, for real and complex input values.
+ * @brief Class namespace that contains a number of special mathematical
+ * functions that are used by the T-matrix code: spherical Bessel functions of
+ * the first and second kind, and Wigner D functions.
  *
  * @author Bert Vandenbroucke (bert.vandenbroucke@ugent.be)
  */
@@ -16,14 +16,14 @@
  *  spherical Bessel functions of the first kind. The higher this number, the
  *  higher the accuracy of the Bessel functions of the first kind, but also
  *  the slower the function becomes. */
-#define BESSELFUNCTIONS_NMAX 800u
+#define SPECIALFUNCTIONS_BESSEL_NMAX 800u
 
 /**
  * @brief Class namespace that contains template functions to compute general
  * spherical Bessel functions of the first and second kind and a variant of
  * their derivatives, for real and complex input values.
  */
-class BesselFunctions {
+class SpecialFunctions {
 
 public:
   /**
@@ -159,14 +159,15 @@ public:
 
     // set up and compute the array of ratios using a backward recursion
     // algorithm
-    DATA_TYPE rho[BESSELFUNCTIONS_NMAX];
+    DATA_TYPE rho[SPECIALFUNCTIONS_BESSEL_NMAX];
     const DATA_TYPE zinv = 1. / z;
     // we assume that for high enough order, the ratio tends to the
     // asymptotic value
-    rho[BESSELFUNCTIONS_NMAX - 1] = z / (2. * BESSELFUNCTIONS_NMAX + 1.);
+    rho[SPECIALFUNCTIONS_BESSEL_NMAX - 1] =
+        z / (2. * SPECIALFUNCTIONS_BESSEL_NMAX + 1.);
     // now recurse down to get the ratio for lower orders
-    for (uint_fast32_t i = 1; i < BESSELFUNCTIONS_NMAX; ++i) {
-      const uint_fast32_t index = BESSELFUNCTIONS_NMAX - i;
+    for (uint_fast32_t i = 1; i < SPECIALFUNCTIONS_BESSEL_NMAX; ++i) {
+      const uint_fast32_t index = SPECIALFUNCTIONS_BESSEL_NMAX - i;
       rho[index - 1] = 1. / ((2. * index + 1.) * zinv - rho[index]);
     }
     // compute the zeroth order Bessel function of the first kind

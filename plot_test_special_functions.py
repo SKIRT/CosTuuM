@@ -1,7 +1,7 @@
 ##
-# @file plot_test_bessel.py
+# @file plot_test_special_functions.py
 #
-# @brief Script to plot the output from the testBesselFunctions unit test.
+# @brief Script to plot the output from the testSpecialFunctions unit test.
 #
 # @author Bert Vandenbroucke (bert.vandenbroucke@ugent.be)
 ##
