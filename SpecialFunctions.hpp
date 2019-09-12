@@ -184,4 +184,127 @@ public:
     }
     return;
   }
+
+  /**
+   * @brief Compute the Wigner D functions and derivatives for the given quantum
+   * number @f$m@f$ and up to the given order @f$n_{max}@f$.
+   *
+   * This function returns
+   * @f[
+   *    d^n_{0m}(x) = (-1)^{-m} \sqrt{\frac{(n-m)!}{(n+m)!}} P^m_n(\cos(x)),
+   * @f]
+   * where @f$n \in{} [1, n_{max}]@f$, @f$m \in{} [-n, n]@f$ and
+   * @f$P^m_n(x)@f$ is the associated Legendre polynomial of degree @f$n@f$ and
+   * order @f$m@f$ (see
+   * https://en.wikipedia.org/wiki/Associated_Legendre_polynomials).
+   *
+   * We compute the function using a forward recursion algorithm:
+   * @f[
+   *    d^{n+1}_{0m}(x) = \frac{1}{\sqrt{(n+1)^2 - m^2}} \left(
+   *      (2n + 1) \cos(x) d^n_{0m}(x) - \sqrt{n^2 - m^2} d^{n-1}_{0m}(x)
+   *      \right)
+   * @f]
+   * and
+   * @f[
+   *    \frac{d}{dx} d^n_{0m}(x) = \frac{1}{(2n+1)\sin(x)} \left(
+   *      -(n+1)\sqrt{n^2 - m^2} d^{n-1}_{0m}(x)
+   *      + n \sqrt{(n+1)^2 - m^2} d^{n+1}_{0m}(x) \right).
+   * @f]
+   * As initial conditions, we use
+   * @f[
+   *    d^{m-1}_{0m} (x) = 0
+   * @f]
+   * and
+   * @f[
+   *    d^m_{0m} (x) = A_m \sin^m(x),
+   * @f]
+   * with
+   * @f[
+   *    A_{m+1} = A_m \sqrt{\frac{2m + 1}{2(m+1)}},
+   * @f]
+   * and @f$A_0 = 1@f$. These equations can be found in Mishchenko, M. I., 2000,
+   * Applied Optics, 39, 1026 (https://doi.org/10.1364/AO.39.001026). They can
+   * also be derived from the recursion relations for the associated Legendre
+   * polynomials that can be found on Wikipedia. Note that there is a missing
+   * @f$n@f$ factor in the second term of the second recursion relation in the
+   * Mishchenko paper.
+   *
+   * Note that we set all @f$d^{m}_{0n}(x)@f$ with @f$n < m-1@f$ equal to zero
+   * in the return arrays. Also note that the code for @f$m = 0@f$ differs from
+   * the code for general @f$m > 0@f$, since we require a different starting
+   * point for the recursion algorithm.
+   *
+   * @param cosx Cosine of the input value @f$x@f$ (should be in the interval
+   * @f$[-1,1]@f$).
+   * @param nmax Maximum order @f$n_{max}@f$.
+   * @param m Absolute value of the quantum number @f$m@f$
+   * (@f$m \in{} [0,n_{max}]@f$).
+   * @param y Array to store the functions @f$d^{n}_{0m}(x)@f$ in (of size
+   * nmax).
+   * @param dy Array to store the derivatives
+   * @f$d/dx\left(d^n_{0m}(x)\right)@f$ in (of size nmax).
+   */
+  static inline void wigner_dn_0m(const double cosx, const uint_fast32_t nmax,
+                                  const uint_fast32_t m, double *y,
+                                  double *dy) {
+
+    // precompute sin(x) and its inverse
+    const double sinx = std::sqrt(1. - cosx * cosx);
+    const double sinxinv = 1. / sinx;
+    // branch out depending on the m value
+    if (m == 0) {
+      // manually set the starting point for the recursion algorithm by
+      // applying the recursion formula once
+      double d1 = 1.;
+      double d2 = cosx;
+      // now recurse for the other values
+      for (uint_fast32_t n = 0; n < nmax; ++n) {
+        const double np1 = n + 1.;
+        const double np2 = n + 2.;
+        const double np12p1 = 2. * np1 + 1.;
+        const double dnp1 = (np12p1 * cosx * d2 - np1 * d1) / np2;
+        const double ddn = sinxinv * np1 * np2 * (dnp1 - d1) / np12p1;
+        // note that we computed d^{n+1}_{0m}; d^n_{0m} was computed in the
+        // previous iteration
+        y[n] = d2;
+        dy[n] = ddn;
+        d1 = d2;
+        d2 = dnp1;
+      }
+    } else {
+      // precompute m^2
+      const double m2 = m * m;
+      double d1 = 0.;
+      double d2 = 1.;
+      // compute the factor A_m sin^m(x)
+      for (uint_fast32_t i = 0; i < m; ++i) {
+        const double i2 = 2. * (i + 1.);
+        d2 *= std::sqrt((i2 - 1.) / i2) * sinx;
+      }
+      // zero out n < m-1 elements in the array
+      for (uint_fast32_t n = 0; n < m - 1; ++n) {
+        y[n] = 0.;
+        dy[n] = 0.;
+      }
+      // now recurse to find all other values
+      for (uint_fast32_t n = m - 1; n < nmax; ++n) {
+        const double np1 = n + 1.;
+        const double np2 = n + 2.;
+        const double np12p1 = 2. * np1 + 1.;
+        const double sqrtnp12mm2 = std::sqrt(np1 * np1 - m2);
+        const double sqrtnp22mm2 = std::sqrt(np2 * np2 - m2);
+        const double dnp1 =
+            (np12p1 * cosx * d2 - sqrtnp12mm2 * d1) / sqrtnp22mm2;
+        const double ddn = sinxinv *
+                           (np1 * sqrtnp22mm2 * dnp1 - np2 * sqrtnp12mm2 * d1) /
+                           np12p1;
+        // note that we computed d^{n+1}_{0m}; d^n_{0m} was computed in the
+        // previous iteration
+        y[n] = d2;
+        dy[n] = ddn;
+        d1 = d2;
+        d2 = dnp1;
+      }
+    }
+  }
 };
