@@ -112,7 +112,7 @@ public:
    * @f]
    * while the upper triangular elements are
    * @f[
-   *    U^{-1}_{ij} = -\frac{1}{U_{jj}} \sum_{k=i}{j} U^{-1}_{ik} R_{kj}.
+   *    U^{-1}_{ij} = -\frac{1}{U_{jj}} \sum_{k=i}^j U^{-1}_{ik} U_{kj}.
    * @f]
    *
    * We then solve the equation
