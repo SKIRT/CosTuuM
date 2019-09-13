@@ -447,4 +447,72 @@ public:
       }
     }
   }
+
+  /**
+   * @brief Get the radius (squared) and derivative w.r.t. azimuthal angle
+   * divided by the radius for an spheroid with the given equal volume sphere
+   * radius and axis ratio, for the given input azimuthal angles.
+   *
+   * The equation of a spheroid is
+   * @f[
+   *    \frac{x^2}{a^2} + \frac{y^2}{a^2} + \frac{z^2}{b^2} = 1.
+   * @f]
+   * If we substitute the axis ratio @f$d = \frac{a}{b}@f$ and use the
+   * expressions for @f$x, y, z@f$ in spherical coordinates, we get the
+   * following equation for the spheroid:
+   * @f[
+   *    r^2 = \frac{a^2}{\sin^2(\theta{}) + d^2 \cos^2(\theta{})}.
+   * @f]
+   * The horizontal axis @f$a@f$ can be found from the definition of the equal
+   * volume sphere radius:
+   * @f[
+   *    V_S = \frac{4\pi{}}{3}R_V^2 = \frac{4\pi{}}{3}a^2b
+   *        = \frac{4\pi{}}{3} \frac{a^3}{d} = V_{sph},
+   * @f]
+   * hence
+   * @f[
+   *    a = R_V d^{\frac{1}{3}}.
+   * @f]
+   *
+   * If we take the square root of the expression for @f$r^2@f$ and derive
+   * w.r.t. the azimuthal angle @f$\theta{}@f$, we get
+   * @f[
+   *    \frac{dr}{d\theta{}} = \frac{d}{d\theta{}} \left(
+   *        \frac{a}{\sqrt{\sin^2(\theta{}) + d^2\cos^2(\theta{})}}\right)
+   *      = \frac{a\sin(\theta{})\cos(\theta{})(d^2-1)}{
+   *        \left(\sin^2(\theta{}) + d^2\cos^2(\theta{})\right)^{\frac{3}{2}}}
+   *      = r \frac{\sin(\theta{})\cos(\theta{})(d^2-1)}{
+   *        \sin^2(\theta{}) + d^2\cos^2(\theta{})}
+   * @f]
+   *
+   * @param costheta Cosine of the azimuthal angles, @f$\cos(\theta{})@f$.
+   * @param R_V Equal volume sphere radius, @f$R_V@f$.
+   * @param axis_ratio Ratio of horizontal to vertical axis,
+   * @f$d = \frac{a}{b}@f$.
+   * @param r2 Output radii squared, @f$r^2(\theta{})@f$.
+   * @param dr_over_r Derivative over radius,
+   * @f$\frac{1}{r(\theta{})}\frac{dr(\theta{})}{d\theta{}}@f$.
+   */
+  static inline void get_r_dr_spheroid(const std::vector<double> costheta,
+                                       const double R_V,
+                                       const double axis_ratio,
+                                       std::vector<double> &r2,
+                                       std::vector<double> &dr_over_r) {
+
+    // compute the horizontal axis length
+    const double a = R_V * std::cbrt(axis_ratio);
+    const double a2 = a * a;
+    const double axis_ratio2 = axis_ratio * axis_ratio;
+    const double axis_ratio2m1 = axis_ratio2 - 1.;
+    for (uint_fast32_t i = 0; i < costheta.size() / 2; ++i) {
+      const double costheta2 = costheta[i] * costheta[i];
+      const double sintheta2 = 1. - costheta2;
+      const double sintheta = std::sqrt(sintheta2);
+      const double r2_over_a2 = 1. / (sintheta2 + axis_ratio2 * costheta2);
+      r2[i] = a2 * r2_over_a2;
+      r2[costheta.size() - i - 1] = r2[i];
+      dr_over_r[i] = r2_over_a2 * costheta[i] * sintheta * axis_ratio2m1;
+      dr_over_r[costheta.size() - i - 1] = -dr_over_r[i];
+    }
+  }
 };
