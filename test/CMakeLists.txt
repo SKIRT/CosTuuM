@@ -26,7 +26,7 @@ macro(add_unit_test)
       set(TESTCOMMAND ${TEST_NAME})
     endif(TEST_PARALLEL AND HAVE_MPI)
     add_test(NAME ${TEST_NAME}
-             WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/test
+             WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/bin/test
              COMMAND ${TESTCOMMAND})
 
     set(TESTNAMES ${TESTNAMES} ${TEST_NAME})

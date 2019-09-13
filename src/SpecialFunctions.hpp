@@ -11,6 +11,7 @@
 #include <cinttypes>
 #include <cmath>
 #include <complex>
+#include <vector>
 
 /*! @brief Starting order for the backwards recurrence algorithm for the
  *  spherical Bessel functions of the first kind. The higher this number, the
@@ -304,6 +305,145 @@ public:
         dy[n] = ddn;
         d1 = d2;
         d2 = dnp1;
+      }
+    }
+  }
+
+  /**
+   * @brief Calculates the ratio of the radii of an equal volume and an equal
+   * surface area sphere for the spheroid with the given axis ratio.
+   *
+   * Assume a general spheroid with equation
+   * @f[
+   *    \frac{x^2}{a^2} + \frac{y^2}{a^2} + \frac{z^2}{b^2} = 1.
+   * @f]
+   * If @f$a > b@f$, we call this spheroid oblate. In this case, the
+   * eccentricity is defined as @f$e^2 = 1 - \frac{b^2}{a^2}@f$, and the surface
+   * area of the spheroid is given by
+   * @f[
+   *    S_{obl} = 2\pi{} a^2
+   *              + \frac{\pi{}b^2}{e}\ln\left(\frac{1+e}{1-e}\right).
+   * @f]
+   * If @f$a < b@f$, the spheroid is prolate, its eccentricity is
+   * @f$e^2 = 1 - \frac{a^2}{b^2}@f$, and the surface area is given by
+   * @f[
+   *    S_{prol} = 2\pi{}a^2 + \frac{2\pi{}ab}{e}\arcsin(e).
+   * @f]
+   * In both cases, the volume of the spheroid is given by
+   * @f[
+   *    V_{sph} = \frac{4\pi{}}{3}a^2 b.
+   * @f]
+   *
+   * We want to find the two equivalent sphere radii @f$R_V@f$ and @f$R_S@f$,
+   * defined by imposing that either @f$V = \frac{4\pi{}}{3}R_V^3@f$ or
+   * @f$S = 4\pi{}R_S^2@f$ equals its spheroid counterpart. This means that the
+   * equivalent sphere radius @f$R_V@f$ is simply given by
+   * @f[
+   *    R_V = a^{\frac{2}{3}}b^{\frac{1}{3}}.
+   * @f]
+   * Depending on the type of spheroid, the equivalent sphere radius @f$R_S@f$
+   * is either
+   * @f[
+   *    R_{S,obl} = \sqrt{\frac{a^2}{2}
+   *                + \frac{b^2}{4e}\ln\left(\frac{1+e}{1-e}\right)},
+   * @f]
+   * or
+   * @f[
+   *    R_{S,prol} = \sqrt{\frac{a^2}{2} + \frac{ab}{2e}\arcsin(e)}.
+   * @f]
+   * The ratio @f$\frac{R_V}{R_S}@f$ is then either
+   * @f[
+   *    \frac{R_V}{R_{S,obl}} = \left(\sqrt{\frac{d^{\frac{2}{3}}}{2}
+   *  + \frac{d^{-\frac{4}{3}}}{4e}\ln\left(\frac{1+e}{1-e}\right)}\right)^{-1},
+   * @f]
+   * or
+   * @f[
+   *    \frac{R_V}{R_{S,prol}} = \left(\sqrt{\frac{d^{\frac{2}{3}}}{2}
+   *  + \frac{d^{-\frac{1}{3}}}{2e}\arcsin(e)}\right)^{-1},
+   * @f]
+   * where we substituted @f$d = \frac{a}{b}@f$.
+   *
+   * @param axis_ratio Ratio of the horizontal and vertical axis of the
+   * spheroid, @f$d = \frac{a}{b}@f$.
+   * @return Ratio of the radii of the equal volume and equal surface area
+   * sphere, @f$\frac{R_V}{R_S}@f$.
+   */
+  static inline double
+  get_equal_volume_to_equal_surface_area_sphere_ratio(const double axis_ratio) {
+    if (axis_ratio > 1.) {
+      const double axis_ratio2 = axis_ratio * axis_ratio;
+      const double e = std::sqrt(1. - 1. / axis_ratio2);
+      const double cbrtaxis_ratio2 = std::cbrt(axis_ratio2);
+      return 1. /
+             std::sqrt(0.25 * (2. * cbrtaxis_ratio2 +
+                               std::log((1. + e) / (1. - e)) /
+                                   (e * cbrtaxis_ratio2 * cbrtaxis_ratio2)));
+    } else if (axis_ratio < 1.) {
+      const double cbrtaxis_ratio = std::cbrt(axis_ratio);
+      const double e = std::sqrt(1. - axis_ratio * axis_ratio);
+      return 1. / std::sqrt(0.5 * (cbrtaxis_ratio * cbrtaxis_ratio +
+                                   std::asin(e) / (e * cbrtaxis_ratio)));
+    } else {
+      // the spheroid is in fact as sphere, so the ratio is trivially 1
+      return 1.;
+    }
+  }
+
+  /**
+   * @brief Get the coordinates and weights for a 1D Gauss-Legendre quadrature
+   * on the interval @f$[-1,1]@f$.
+   *
+   * Needs to be properly documented!
+   *
+   * @param order Order of the quadrature.
+   * @param points Vector to store the resulting coordinates in (of size order).
+   * @param weights Vector to store the resulting weights in (of size order).
+   */
+  static inline void
+  get_gauss_legendre_points_and_weigths(const uint_fast32_t order,
+                                        std::vector<double> &points,
+                                        std::vector<double> &weights) {
+    const uint_fast32_t ind = order % 2;
+    const uint_fast32_t k = order / 2 + ind;
+    for (uint_fast32_t i = 0; i < k; ++i) {
+      const uint_fast32_t m = order - i - 1;
+      double x;
+      if (i == 0) {
+        x = 1. - 2. / ((order + 1.) * order);
+      } else if (i == 1) {
+        x = 4. * (points[order - 1] - 1.) + points[order - 1];
+      } else if (i == 2) {
+        x = 1.6 * (points[order - 2] - points[order - 1]) + points[order - 2];
+      } else if (i == k - 1 && ind == 1) {
+        x = 0.;
+      } else {
+        x = 3. * (points[m + 1] - points[m + 2]) + points[m + 3];
+      }
+      uint_fast32_t niter = 0;
+      double check = 1.e-16;
+      double pa;
+      double pb;
+      do {
+        pb = 1.;
+        ++niter;
+        if (niter > 100) {
+          check *= 10.;
+        }
+        double pc = x;
+        for (uint_fast32_t j = 1; j < order; ++j) {
+          pa = pb;
+          pb = pc;
+          pc = x * pb + (x * pb - pa) * j / (j + 1.);
+        }
+        pa = 1. / ((pb - x * pc) * order);
+        pb = pa * pc * (1. - x * x);
+        x = x - pb;
+      } while (std::abs(pb) > check * std::abs(x));
+      points[m] = x;
+      weights[m] = 2. * pa * pa * (1. - x * x);
+      if (i != k - 1 || ind != 1) {
+        points[i] = -points[m];
+        weights[i] = weights[m];
       }
     }
   }

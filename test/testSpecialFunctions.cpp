@@ -6,12 +6,16 @@
  * @author Bert Vandenbroucke (bert.vandenbroucke@ugent.be)
  */
 
+#include "Assert.hpp"
 #include "SpecialFunctions.hpp"
 #include <fstream>
 
 /*! @brief Maximum order to test for Bessel and Wigner D functions,
  *  @f$n_{max}@f$. */
 #define TESTSPECIALFUNCTIONS_NMAX 80u
+
+/*! @brief Order of Gauss-Legendre quadrature to test. */
+#define TESTSPECIALFUNCTIONS_NGAUSS 100u
 
 /**
  * @brief Unit test for the special functions in SpecialFunctions.hpp.
@@ -35,6 +39,11 @@
  * Legendre polynomials. It then plots both versions and the relative
  * difference between the two. We test both @f$m = 0@f$ and @f$m = n_{max}@f$
  * to cover all possible paths through the code.
+ *
+ * We then test
+ * SpecialFunctions::get_equal_volume_to_equal_surface_area_sphere_ratio() by
+ * calling it with 3 different axis ratios (1, <1, >1) and comparing with
+ * results obtained with Python.
  *
  * @param argc Number of command line arguments (ignored).
  * @param argv Command line arguments (ignored).
@@ -108,6 +117,92 @@ int main(int argc, char **argv) {
     // write an output line
     dfile << d[TESTSPECIALFUNCTIONS_NMAX - 1] << "\t"
           << dd[TESTSPECIALFUNCTIONS_NMAX - 1] << "\n";
+  }
+
+  /// Equal volume sphere to equal surface area sphere radius ratio
+
+  assert_condition(
+      SpecialFunctions::get_equal_volume_to_equal_surface_area_sphere_ratio(
+          1.) == 1.);
+  assert_values_equal_rel(
+      SpecialFunctions::get_equal_volume_to_equal_surface_area_sphere_ratio(
+          0.5),
+      0.9637112829756893, 1.e-10);
+  assert_values_equal_rel(
+      SpecialFunctions::get_equal_volume_to_equal_surface_area_sphere_ratio(2.),
+      0.955443263377723, 1.e-10);
+
+  /// Gauss-Legendre quadrature
+
+  std::vector<double> x(TESTSPECIALFUNCTIONS_NGAUSS),
+      w(TESTSPECIALFUNCTIONS_NGAUSS);
+  // first test against the values on Wikipedia
+  {
+    // n = 1
+    SpecialFunctions::get_gauss_legendre_points_and_weigths(1, x, w);
+    assert_condition(x[0] == 0.);
+    assert_condition(w[0] == 2.);
+  }
+  {
+    // n = 2
+    SpecialFunctions::get_gauss_legendre_points_and_weigths(2, x, w);
+    assert_values_equal_rel(x[0], -1. / std::sqrt(3.), 1.e-10);
+    assert_values_equal_rel(w[0], 1., 1.e-10);
+    assert_values_equal_rel(x[1], 1. / std::sqrt(3.), 1.e-10);
+    assert_values_equal_rel(w[1], 1., 1.e-10);
+  }
+  {
+    // n = 3
+    SpecialFunctions::get_gauss_legendre_points_and_weigths(3, x, w);
+    assert_values_equal_rel(x[0], -std::sqrt(3. / 5.), 1.e-10);
+    assert_values_equal_rel(w[0], 5. / 9., 1.e-10);
+    assert_condition(x[1] == 0.);
+    assert_values_equal_rel(w[1], 8. / 9., 1.e-10);
+    assert_values_equal_rel(x[2], std::sqrt(3. / 5.), 1.e-10);
+    assert_values_equal_rel(w[2], 5. / 9., 1.e-10);
+  }
+  {
+    // n = 4
+    SpecialFunctions::get_gauss_legendre_points_and_weigths(4, x, w);
+    assert_values_equal_rel(
+        x[0], -std::sqrt(3. / 7. + 2. / 7. * std::sqrt(6. / 5.)), 1.e-10);
+    assert_values_equal_rel(w[0], (18 - std::sqrt(30.)) / 36., 1.e-10);
+    assert_values_equal_rel(
+        x[1], -std::sqrt(3. / 7. - 2. / 7. * std::sqrt(6. / 5.)), 1.e-10);
+    assert_values_equal_rel(w[1], (18. + std::sqrt(30.)) / 36., 1.e-10);
+    assert_values_equal_rel(
+        x[2], std::sqrt(3. / 7. - 2. / 7. * std::sqrt(6. / 5.)), 1.e-10);
+    assert_values_equal_rel(w[2], (18. + std::sqrt(30.)) / 36., 1.e-10);
+    assert_values_equal_rel(
+        x[3], std::sqrt(3. / 7. + 2. / 7. * std::sqrt(6. / 5.)), 1.e-10);
+    assert_values_equal_rel(w[3], (18 - std::sqrt(30.)) / 36., 1.e-10);
+  }
+  {
+    // n = 5
+    SpecialFunctions::get_gauss_legendre_points_and_weigths(5, x, w);
+    assert_values_equal_rel(
+        x[0], -1. / 3. * std::sqrt(5. + 2. * std::sqrt(10. / 7.)), 1.e-10);
+    assert_values_equal_rel(w[0], (322. - 13. * std::sqrt(70.)) / 900., 1.e-10);
+    assert_values_equal_rel(
+        x[1], -1. / 3. * std::sqrt(5. - 2. * std::sqrt(10. / 7.)), 1.e-10);
+    assert_values_equal_rel(w[1], (322. + 13. * std::sqrt(70.)) / 900., 1.e-10);
+    assert_condition(x[2] == 0.);
+    assert_values_equal_rel(w[2], 128. / 225., 1.e-10);
+    assert_values_equal_rel(
+        x[3], 1. / 3. * std::sqrt(5. - 2. * std::sqrt(10. / 7.)), 1.e-10);
+    assert_values_equal_rel(w[3], (322. + 13. * std::sqrt(70.)) / 900., 1.e-10);
+    assert_values_equal_rel(
+        x[4], 1. / 3. * std::sqrt(5. + 2. * std::sqrt(10. / 7.)), 1.e-10);
+    assert_values_equal_rel(w[4], (322. - 13. * std::sqrt(70.)) / 900., 1.e-10);
+  }
+
+  // now print additional values for a much higher order to analyse with the
+  // script
+  SpecialFunctions::get_gauss_legendre_points_and_weigths(
+      TESTSPECIALFUNCTIONS_NGAUSS, x, w);
+  std::ofstream gfile("test_gauss_legendre_quadrature.txt");
+  for (uint_fast32_t i = 0; i < TESTSPECIALFUNCTIONS_NGAUSS; ++i) {
+    gfile << x[i] << "\t" << w[i] << "\n";
   }
 
   return 0;

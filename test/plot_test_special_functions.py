@@ -221,3 +221,19 @@ ax[1][1].semilogy(refcosx, abs(refddmn - testddmn) / abs(refddmn + testddmn))
 # save the figure
 pl.tight_layout()
 pl.savefig("test_wigner_d.png", dpi=300)
+pl.close()
+
+testdata = np.loadtxt("test_gauss_legendre_quadrature.txt")
+
+refx, refw = np.polynomial.legendre.leggauss(100)
+
+fig, ax = pl.subplots(2, 1)
+
+ax[0].plot(testdata[:, 0], testdata[:, -1], ".")
+ax[0].plot(refx, refw)
+
+ax[1].plot(refx, abs(refx - testdata[:, 0]) / abs(refx + testdata[:, 0]))
+ax[1].plot(refx, abs(refw - testdata[:, 1]) / abs(refw + testdata[:, 1]))
+
+pl.tight_layout()
+pl.savefig("test_gauss_legendre_quadrature.png", dpi=300)
