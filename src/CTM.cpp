@@ -78,7 +78,7 @@ int main(int argc, char **argv) {
 
     // this is basically func_const() in the Python version
     std::vector<double> an(nmax);
-    Matrix<double> ann(nmax);
+    Matrix<double> ann(nmax, nmax);
     std::vector<double> dd(nmax);
     std::vector<double> sinthetainv(ngauss2);
     std::vector<double> sintheta2inv(ngauss2);
@@ -125,11 +125,16 @@ int main(int argc, char **argv) {
       krinv[i] = 1. / kr[i];
       krmrinv[i] = mrinv * krinv[i];
     }
-    std::vector<double> jkr(ngauss2), djkr(ngauss2), ykr(ngauss2),
-        dykr(ngauss2);
-    std::vector<std::complex<double>> jkrmr(ngauss2), djkrmr(ngauss2);
+    Matrix<double> jkr(ngauss2, nmax), djkr(ngauss2, nmax), ykr(ngauss2, nmax),
+        dykr(ngauss2, nmax);
+    Matrix<std::complex<double>> jkrmr(ngauss2, nmax), djkrmr(ngauss2, nmax);
     for (uint_fast32_t ig = 0; ig < ngauss2; ++ig) {
-      //        SpecialFunctions::spherical_j_jdj_array(nmax, kr[ig], jkr[ig])
+      SpecialFunctions::spherical_j_jdj_array(nmax, kr[ig], jkr.get_row(ig),
+                                              djkr.get_row(ig));
+      SpecialFunctions::spherical_y_ydy_array(nmax, kr[ig], ykr.get_row(ig),
+                                              dykr.get_row(ig));
+      SpecialFunctions::spherical_j_jdj_array(nmax, krmr[ig], jkrmr.get_row(ig),
+                                              djkrmr.get_row(ig));
     }
 
     (void)wavenumber2;

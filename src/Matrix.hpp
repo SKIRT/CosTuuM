@@ -6,6 +6,8 @@
  * @author Bert Vandenbroucke (bert.vandenbroucke@ugent.be)
  */
 
+#include "Error.hpp"
+
 #include <cinttypes>
 #include <complex>
 #include <vector>
@@ -13,15 +15,18 @@
 /**
  * @brief Matrix class.
  *
- * Used to represent a square 2D matrix of fixed size (size can be set during
- * construction).
+ * Used to represent a 2D matrix of fixed dimensions (dimensions can be set
+ * during construction).
  *
  * @tparam DATA_TYPE Data type of the matrix elements.
  */
 template <typename DATA_TYPE> class Matrix {
 private:
-  /*! @brief Size of the square 2D matrix in 1 dimension. */
-  const uint_fast32_t _size;
+  /*! @brief Number of rows in the matrix. */
+  const uint_fast32_t _number_of_rows;
+
+  /*! @brief Number of columns in the matrix. */
+  const uint_fast32_t _number_of_columns;
 
   /*! @brief Flat array containing the matrix elements. */
   std::vector<DATA_TYPE> _array;
@@ -30,10 +35,13 @@ public:
   /**
    * @brief Constructor.
    *
-   * @param size Size of the square 2D matrix in 1 dimension.
+   * @param number_of_rows Number of rows in the matrix.
+   * @param number_of_columns Number of columns in the matrix.
    */
-  inline Matrix(const uint_fast32_t size) : _size(size) {
-    _array.resize(size * size);
+  inline Matrix(const uint_fast32_t number_of_rows,
+                const uint_fast32_t number_of_columns)
+      : _number_of_rows(number_of_rows), _number_of_columns(number_of_columns) {
+    _array.resize(_number_of_rows * _number_of_columns);
   }
 
   /**
@@ -53,11 +61,24 @@ public:
    * @return Reference to the corresponding matrix element.
    */
   inline DATA_TYPE &operator()(const uint_fast32_t i, const uint_fast32_t j) {
-    return _array[i * _size + j];
+    return _array[i * _number_of_columns + j];
+  }
+
+  /**
+   * @brief Get the row with the given index as a pointer that can be accessed
+   * like an array.
+   *
+   * @param i Row index.
+   * @return Pointer to the beginning of that row.
+   */
+  inline DATA_TYPE *get_row(const uint_fast32_t i) {
+    return &_array[i * _number_of_columns];
   }
 
   /**
    * @brief Invert the matrix using an auxiliary PLU decomposition.
+   *
+   * This only works if the matrix is square. If not, an error is thrown.
    *
    * This is a 4 step algorithm. For what follows, we will use the symbol
    * @f$A@f$ to represent the matrix, and @f$A_{ij}@f$ (@f$i,j \in{} [0, N[@f$),
@@ -136,21 +157,25 @@ public:
    */
   inline void plu_inverse() {
 
+    if (_number_of_rows != _number_of_columns) {
+      ctm_error("Trying to invert a non-square matrix!");
+    }
+
     // allocate the pivot array
-    std::vector<uint_fast32_t> pivot_array(_size, 0);
+    std::vector<uint_fast32_t> pivot_array(_number_of_columns, 0);
     // alias the object using the label A (to be consistent with the notation
     // in the function documentation)
     Matrix &A = *this;
 
     // step 1: PLU decomposition of the original matrix
-    for (uint_fast32_t i = 0; i < _size; ++i) {
+    for (uint_fast32_t i = 0; i < _number_of_columns; ++i) {
       // find the next pivot
       uint_fast32_t imax = i;
       // note that we always use a double to store the element absolute value,
       // independent of the element type (std::abs() returns a double when
       // applied to a std::complex<double>)
       double Smax = std::abs(A(imax, i));
-      for (uint_fast32_t j = i + 1; j < _size; ++j) {
+      for (uint_fast32_t j = i + 1; j < _number_of_columns; ++j) {
         const double this_Smax = std::abs(A(j, i));
         if (this_Smax > Smax) {
           Smax = this_Smax;
@@ -161,7 +186,7 @@ public:
       pivot_array[i] = imax;
       // swap rows if necessary
       if (i != imax) {
-        for (uint_fast32_t j = 0; j < _size; ++j) {
+        for (uint_fast32_t j = 0; j < _number_of_columns; ++j) {
           // we need a temporary variable to now overwrite the original A_ij
           const DATA_TYPE temp = A(i, j);
           A(i, j) = A(imax, j);
@@ -171,26 +196,26 @@ public:
       // compute the inverse of A_ii to save on divisions
       const DATA_TYPE Aii_inv = 1. / A(i, i);
       // now multiply all elements below row i in column i with this value
-      for (uint_fast32_t j = i + 1; j < _size; ++j) {
+      for (uint_fast32_t j = i + 1; j < _number_of_columns; ++j) {
         A(j, i) *= Aii_inv;
       }
       // eliminate lower triangular elements in column i from the future U
       // matrix
-      for (uint_fast32_t j = i + 1; j < _size; ++j) {
+      for (uint_fast32_t j = i + 1; j < _number_of_columns; ++j) {
         // since we store the L matrix in the lower diagonal part of the matrix,
         // we only update columns k > i
-        for (uint_fast32_t k = i + 1; k < _size; ++k) {
+        for (uint_fast32_t k = i + 1; k < _number_of_columns; ++k) {
           A(j, k) -= A(j, i) * A(i, k);
         }
       }
     }
 
     // step 2: inversion of the U part of A
-    for (uint_fast32_t i = 0; i < _size; ++i) {
+    for (uint_fast32_t i = 0; i < _number_of_columns; ++i) {
       // compute the diagonal element of the inverse matrix for row i
       A(i, i) = 1. / A(i, i);
       // now use forward substitution to compute the other elements in this row
-      for (uint_fast32_t j = i + 1; j < _size; ++j) {
+      for (uint_fast32_t j = i + 1; j < _number_of_columns; ++j) {
         // we need a temporary variable, as A_ij also features in the loop below
         DATA_TYPE Aij = 0.;
         for (uint_fast32_t k = i; k < j; ++k) {
@@ -204,9 +229,9 @@ public:
 
     // step 3: solve inv(A)*L = inv(U)
     // we need a temporary array to store the new columns while we update them
-    std::vector<DATA_TYPE> work(_size);
+    std::vector<DATA_TYPE> work(_number_of_columns);
     // note that we need to iterate backwards for this algorithm
-    for (uint_fast32_t jp1 = _size; jp1 > 0; --jp1) {
+    for (uint_fast32_t jp1 = _number_of_columns; jp1 > 0; --jp1) {
       // unsigned counters overflow when you decrement them below 0, so we
       // need a second variable to handle j = 0 in the loop condition
       const uint_fast32_t j = jp1 - 1;
@@ -216,17 +241,17 @@ public:
         work[i] = A(i, j);
       }
       // zero out the other elements in the new column
-      for (uint_fast32_t i = jp1; i < _size; ++i) {
+      for (uint_fast32_t i = jp1; i < _number_of_columns; ++i) {
         work[i] = 0.;
       }
       // now apply the summation to eliminate unknowns in the column
-      for (uint_fast32_t k = jp1; k < _size; ++k) {
-        for (uint_fast32_t i = 0; i < _size; ++i) {
+      for (uint_fast32_t k = jp1; k < _number_of_columns; ++k) {
+        for (uint_fast32_t i = 0; i < _number_of_columns; ++i) {
           work[i] -= A(i, k) * A(k, j);
         }
       }
       // we are done with the old column, overwrite it with the new column
-      for (uint_fast32_t i = 0; i < _size; ++i) {
+      for (uint_fast32_t i = 0; i < _number_of_columns; ++i) {
         A(i, j) = work[i];
       }
     }
@@ -235,13 +260,13 @@ public:
     // again, this is a backward iteration
     // note that we swap columns, since we multiply the inverse permutation
     // matrix on the other side
-    for (uint_fast32_t jp1 = _size; jp1 > 0; --jp1) {
+    for (uint_fast32_t jp1 = _number_of_columns; jp1 > 0; --jp1) {
       // again, we need a second variable to handle unsigned integer overflow
       const uint_fast32_t j = jp1 - 1;
       const uint_fast32_t jp = pivot_array[j];
       // only swap columns if the pivot index is different
       if (jp != j) {
-        for (uint_fast32_t i = 0; i < _size; ++i) {
+        for (uint_fast32_t i = 0; i < _number_of_columns; ++i) {
           const DATA_TYPE temp = A(i, j);
           A(i, j) = A(i, jp);
           A(i, jp) = temp;

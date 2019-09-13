@@ -18,7 +18,7 @@
  */
 int main(int argc, char **argv) {
 
-  Matrix<std::complex<double>> A(3);
+  Matrix<std::complex<double>> A(3, 3);
   A(0, 0) = 1.;
   A(0, 0).imag(1.);
   A(0, 1) = 2.;
