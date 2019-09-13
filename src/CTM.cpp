@@ -137,6 +137,43 @@ int main(int argc, char **argv) {
                                               djkrmr.get_row(ig));
     }
 
+    // func_tmatr0()
+    const uint_fast32_t nmax2 = 2 * nmax;
+
+    std::vector<int_fast8_t> signs(nmax2);
+    Matrix<double> werner_d(ngauss2, nmax);
+    Matrix<double> dwerner_d(ngauss2, nmax);
+    std::vector<double> wr2(ngauss);
+    Matrix<std::complex<double>> J12(nmax, nmax);
+    Matrix<std::complex<double>> J21(nmax, nmax);
+    Matrix<std::complex<double>> RgJ12(nmax, nmax);
+    Matrix<std::complex<double>> RgJ21(nmax, nmax);
+    Matrix<std::complex<double>> Q(nmax2, nmax2);
+    Matrix<std::complex<double>> RgQ(nmax2, nmax2);
+
+    int_fast8_t si = 1;
+    for (uint_fast32_t m = 0; m < nmax2; ++m) {
+      si = -si;
+      signs[m] = si;
+    }
+    for (uint_fast32_t ig = 1; ig < ngauss + 1; ++ig) {
+      const uint_fast32_t i1 = ngauss + ig;
+      const uint_fast32_t i2 = ngauss - ig + 1;
+      std::vector<double> dv1(nmax), dv2(nmax);
+      SpecialFunctions::wigner_dn_0m(costheta[ig], nmax, 0, &dv1[0], &dv2[0]);
+      for (uint_fast32_t n = 0; n < nmax; ++n) {
+        si = signs[n];
+        werner_d(i1 - 1, n) = dv1[n];
+        werner_d(i2 - 1, n) = si * dv1[n];
+        dwerner_d(i1 - 1, n) = dv2[n];
+        dwerner_d(i2 - 1, n) = -si * dv2[n];
+      }
+    }
+    for (uint_fast32_t ig = 0; ig < ngauss; ++ig) {
+      wr2[ig] = wgauss[ig] * r2[ig];
+    }
+    // compute J and RgJ components...
+
     (void)wavenumber2;
     (void)wavenumber2_mr;
     (void)old_qext;
