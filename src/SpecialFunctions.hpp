@@ -391,11 +391,59 @@ public:
 
   /**
    * @brief Get the coordinates and weights for a 1D Gauss-Legendre quadrature
-   * on the interval @f$[-1,1]@f$.
+   * on the interval @f$[-1,1]@f$ with the given order.
    *
-   * Needs to be properly documented!
+   * We are looking for the roots @f$x_i@f$ of the Legendre polynomial of order
+   * @f$n@f$, defined via the recursion relation
+   * @f[
+   *    P_n(x) = \frac{2n-1}{n}xP_{n-1}(x) - \frac{n-1}{n}P_{n-2}(x)
+   *           = xP_{n-1}(x) + \frac{n-1}{n}
+   *                \left(xP_{n-1}(x) - P_{n-2}(x)\right),
+   * @f]
+   * with
+   * @f[
+   *    P_0(x) = 1
+   * @f]
+   * and
+   * @f[
+   *    P_1(x) = x.
+   * @f]
+   * For each of these roots, the associated Gauss-Legendre weight is given by
+   * @f[
+   *    w_i = \frac{2}{(1-x_i^2)P_n'^2(x_i)},
+   * @f]
+   * where the derivative of the Legendre polynomial of order @f$n@f$ satisfies
+   * @f[
+   *    P_n'(x) = \frac{n}{x^2-1}\left(xP_n(x) - P_{n-1}(x)\right).
+   * @f]
    *
-   * @param order Order of the quadrature.
+   * The weights are chosen such that an approximate quadrature rule
+   * @f[
+   *    \int_{-1}^{1} f(x) dx \approx{} \sum_{i=1}^{n} w_i f(x_i),
+   * @f]
+   * is exact for polynomials of up to degree @f$2n-1@f$, this is called
+   * Gauss-Legendre quadrature.
+   *
+   * To compute the roots, we use a Newton-Raphson iterative scheme. We start
+   * with a suitable initial guess for each zero point @f$x_i@f$, and then use
+   * the two recursion relations to update this initial guess:
+   * @f[
+   *    x_i \rightarrow{} x_i - \frac{P_n(x_i)}{P_n'{x_i}}
+   * @f]
+   * until the value @f$P_n(x_i)@f$ becomes very small. As initial guess, we
+   * use
+   * @f[
+   *    x_i = \left[1 - \frac{1}{8}\frac{1}{n^2} + \frac{5}{38}\frac{1}{n^3}
+   *                - \frac{2}{25}\frac{1}{n^4}
+   *                    \left(1 - \frac{14}{39}\frac{1}{\theta_{n,i}^2} \right)
+   *          \right] \cos\left( \theta_{n,i} \right),
+   * @f]
+   * where @f$i = 1...n@f$ and @f$\theta_{n,i}=\pi{}
+   * \frac{i-\frac{1}{4}}{n + \frac{1}{2}}@f$; this expression is based on
+   * Lether & Wenston, 1995, Journal of Computational and Applied Mathematics,
+   * 59, 245 (https://doi.org/10.1016/0377-0427(94)00030-5).
+   *
+   * @param order Order of the quadrature, @f$n@f$.
    * @param points Vector to store the resulting coordinates in (of size order).
    * @param weights Vector to store the resulting weights in (of size order).
    */
@@ -403,44 +451,58 @@ public:
   get_gauss_legendre_points_and_weigths(const uint_fast32_t order,
                                         std::vector<double> &points,
                                         std::vector<double> &weights) {
+
+    // we know that the roots are symmetric around 0 in the interval [-1,1]
+    // this means we only need to compute half of them (+1 for odd n)
     const uint_fast32_t ind = order % 2;
     const uint_fast32_t k = order / 2 + ind;
     for (uint_fast32_t i = 0; i < k; ++i) {
-      const uint_fast32_t m = order - i - 1;
-      double x;
-      if (i == 0) {
-        x = 1. - 2. / ((order + 1.) * order);
-      } else if (i == 1) {
-        x = 4. * (points[order - 1] - 1.) + points[order - 1];
-      } else if (i == 2) {
-        x = 1.6 * (points[order - 2] - points[order - 1]) + points[order - 2];
-      } else if (i == k - 1 && ind == 1) {
-        x = 0.;
-      } else {
-        x = 3. * (points[m + 1] - points[m + 2]) + points[m + 3];
-      }
+
+      // compute the initial guess for x_i (note that our i is i-1)
+      const double theta_n_k = M_PI * (i + 0.75) / (order + 0.5);
+      const double orderinv = 1. / order;
+      const double orderinv2 = orderinv * orderinv;
+      double x_i = (1. - 0.125 * orderinv2 + (5. / 38.) * orderinv * orderinv2 -
+                    (2. / 25.) * orderinv2 * orderinv2 *
+                        (1. - (14. / 39.) / (theta_n_k * theta_n_k))) *
+                   std::cos(theta_n_k);
+
+      // Newton-Raphson scheme
       uint_fast32_t niter = 0;
+      // we aim for a precision of 1.e-16, and relax this if we cannot obtain
+      // an accurate result after many iterations
       double check = 1.e-16;
       double pa;
       double pb;
       do {
-        pb = 1.;
         ++niter;
+        // relax the tolerance after many iterations
         if (niter > 100) {
           check *= 10.;
         }
-        double pc = x;
+        // initial values for the recursion relation
+        pb = 1.;
+        double pc = x_i;
+        // now recurse until we reach the desired order
         for (uint_fast32_t j = 1; j < order; ++j) {
           pa = pb;
           pb = pc;
-          pc = x * pb + (x * pb - pa) * j / (j + 1.);
+          pc = x_i * pb + (x_i * pb - pa) * j / (j + 1.);
         }
-        pa = 1. / ((pb - x * pc) * order);
-        pb = pa * pc * (1. - x * x);
-        x = x - pb;
-      } while (std::abs(pb) > check * std::abs(x));
-      points[m] = x;
-      weights[m] = 2. * pa * pa * (1. - x * x);
+        // pc now contains P_n(x)
+        pa = 1. / ((pb - x_i * pc) * order);
+        // pa now contains 1/[(1-x^2)P_n'(x)]
+        pb = pa * pc * (1. - x_i * x_i);
+        // pb is P_n(x)/P_n'(x)
+        x_i = x_i - pb;
+      } while (std::abs(pb) > check * std::abs(x_i));
+
+      // we set the element n - i - 1
+      const uint_fast32_t m = order - i - 1;
+      points[m] = x_i;
+      weights[m] = 2. * pa * pa * (1. - x_i * x_i);
+      // if this is not the final root in an odd n calculation, we also set
+      // element i
       if (i != k - 1 || ind != 1) {
         points[i] = -points[m];
         weights[i] = weights[m];

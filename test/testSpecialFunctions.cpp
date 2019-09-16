@@ -15,7 +15,7 @@
 #define TESTSPECIALFUNCTIONS_NMAX 80u
 
 /*! @brief Order of Gauss-Legendre quadrature to test. */
-#define TESTSPECIALFUNCTIONS_NGAUSS 100u
+#define TESTSPECIALFUNCTIONS_NGAUSS 200u
 
 /**
  * @brief Unit test for the special functions in SpecialFunctions.hpp.
@@ -140,12 +140,14 @@ int main(int argc, char **argv) {
   {
     // n = 1
     SpecialFunctions::get_gauss_legendre_points_and_weigths(1, x, w);
+    ctm_warning("x: [%g], w: [%g]", x[0], w[0]);
     assert_condition(x[0] == 0.);
     assert_condition(w[0] == 2.);
   }
   {
     // n = 2
     SpecialFunctions::get_gauss_legendre_points_and_weigths(2, x, w);
+    ctm_warning("x: [%g, %g], w: [%g, %g]", x[0], x[1], w[0], w[1]);
     assert_values_equal_rel(x[0], -1. / std::sqrt(3.), 1.e-10);
     assert_values_equal_rel(w[0], 1., 1.e-10);
     assert_values_equal_rel(x[1], 1. / std::sqrt(3.), 1.e-10);
@@ -154,6 +156,8 @@ int main(int argc, char **argv) {
   {
     // n = 3
     SpecialFunctions::get_gauss_legendre_points_and_weigths(3, x, w);
+    ctm_warning("x: [%g, %g, %g], w: [%g, %g, %g]", x[0], x[1], x[2], w[0],
+                w[1], w[2]);
     assert_values_equal_rel(x[0], -std::sqrt(3. / 5.), 1.e-10);
     assert_values_equal_rel(w[0], 5. / 9., 1.e-10);
     assert_condition(x[1] == 0.);
@@ -164,6 +168,8 @@ int main(int argc, char **argv) {
   {
     // n = 4
     SpecialFunctions::get_gauss_legendre_points_and_weigths(4, x, w);
+    ctm_warning("x: [%g, %g, %g, %g], w: [%g, %g, %g, %g]", x[0], x[1], x[2],
+                x[3], w[0], w[1], w[2], w[3]);
     assert_values_equal_rel(
         x[0], -std::sqrt(3. / 7. + 2. / 7. * std::sqrt(6. / 5.)), 1.e-10);
     assert_values_equal_rel(w[0], (18 - std::sqrt(30.)) / 36., 1.e-10);
@@ -180,6 +186,8 @@ int main(int argc, char **argv) {
   {
     // n = 5
     SpecialFunctions::get_gauss_legendre_points_and_weigths(5, x, w);
+    ctm_warning("x: [%g, %g, %g, %g, %g], w: [%g, %g, %g, %g, %g]", x[0], x[1],
+                x[2], x[3], x[4], w[0], w[1], w[2], w[3], w[4]);
     assert_values_equal_rel(
         x[0], -1. / 3. * std::sqrt(5. + 2. * std::sqrt(10. / 7.)), 1.e-10);
     assert_values_equal_rel(w[0], (322. - 13. * std::sqrt(70.)) / 900., 1.e-10);
