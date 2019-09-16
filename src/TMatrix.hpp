@@ -103,7 +103,8 @@ private:
    *  matrix). */
   Matrix<std::complex<double>> _djkrmr;
 
-  /*! @brief T-matrix itself (@f$2n_{max}\times{}2n_{max}@f$ matrix). */
+  /*! @brief T-matrix itself
+   *  (@f$2n_{max}(n_{max}+2)\times{}2n_{max}(n_{max}+2)@f$ matrix). */
   Matrix<std::complex<double>> _T;
 
 public:

@@ -81,8 +81,8 @@ int main(int argc, char **argv) {
     for (uint_fast32_t n = 0; n < nmax; ++n) {
       const uint_fast32_t n1 = n + nmax;
       const double dn1 = 2. * (n + 1.) + 1.;
-      qsca += dn1 * (std::norm(T(n - 1, n - 1)) + std::norm(T(n1 - 1, n1 - 1)));
-      qext += dn1 * (T(n - 1, n - 1).real() + T(n1 - 1, n1 - 1).real());
+      qsca += dn1 * (std::norm(T(n, n)) + std::norm(T(n1, n1)));
+      qext += dn1 * (T(n, n).real() + T(n1, n1).real());
     }
     dsca = std::abs((old_qsca - qsca) / qsca);
     dext = std::abs((old_qext - qext) / qext);
@@ -114,8 +114,8 @@ int main(int argc, char **argv) {
     for (uint_fast32_t n = 0; n < nmax; ++n) {
       const uint_fast32_t n1 = n + nmax;
       const double dn1 = 2. * (n + 1.) + 1.;
-      qsca += dn1 * (std::norm(T(n - 1, n - 1)) + std::norm(T(n1 - 1, n1 - 1)));
-      qext += dn1 * (T(n - 1, n - 1).real() + T(n1 - 1, n1 - 1).real());
+      qsca += dn1 * (std::norm(T(n, n)) + std::norm(T(n1, n1)));
+      qext += dn1 * (T(n, n).real() + T(n1, n1).real());
     }
     dsca = std::abs((old_qsca - qsca) / qsca);
     dext = std::abs((old_qext - qext) / qext);
@@ -129,6 +129,10 @@ int main(int argc, char **argv) {
 
   if (ngauss == maximum_ngauss) {
     ctm_error("Unable to converge!");
+  } else {
+    // correct for overshoot in final iteration
+    --ngauss;
+    ctm_warning("Converged for ngauss = %" PRIuFAST32, ngauss);
   }
 
   return 0;
