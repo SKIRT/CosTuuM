@@ -7,6 +7,8 @@
  *
  * @author Bert Vandenbroucke (bert.vandenbroucke@ugent.be)
  */
+#ifndef SPECIALFUNCTIONS_HPP
+#define SPECIALFUNCTIONS_HPP
 
 #include <cinttypes>
 #include <cmath>
@@ -578,3 +580,5 @@ public:
     }
   }
 };
+
+#endif // SPECIALFUNCTIONS_HPP

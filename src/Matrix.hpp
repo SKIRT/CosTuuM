@@ -5,6 +5,8 @@
  *
  * @author Bert Vandenbroucke (bert.vandenbroucke@ugent.be)
  */
+#ifndef MATRIX_HPP
+#define MATRIX_HPP
 
 #include "Error.hpp"
 
@@ -41,7 +43,7 @@ public:
   inline Matrix(const uint_fast32_t number_of_rows,
                 const uint_fast32_t number_of_columns)
       : _number_of_rows(number_of_rows), _number_of_columns(number_of_columns) {
-    _array.resize(_number_of_rows * _number_of_columns);
+    _array.resize(_number_of_rows * _number_of_columns, 0.);
   }
 
   /**
@@ -61,6 +63,27 @@ public:
    * @return Reference to the corresponding matrix element.
    */
   inline DATA_TYPE &operator()(const uint_fast32_t i, const uint_fast32_t j) {
+    return _array[i * _number_of_columns + j];
+  }
+
+  /**
+   * @brief Access operator.
+   *
+   * This function performs the bookkeeping required to figure out where in the
+   * flat data array the element is stored.
+   *
+   * We store the elements per row, i.e. first all columns of the first row,
+   * then all the columns of the second row...
+   *
+   * Note that if all access to the matrix elements goes through this function,
+   * we can in principle change this order very quickly.
+   *
+   * @param i Row index.
+   * @param j Column index.
+   * @return Reference to the corresponding matrix element (read only).
+   */
+  inline const DATA_TYPE &operator()(const uint_fast32_t i,
+                                     const uint_fast32_t j) const {
     return _array[i * _number_of_columns + j];
   }
 
@@ -275,3 +298,5 @@ public:
     }
   }
 };
+
+#endif // MATRIX_HPP
