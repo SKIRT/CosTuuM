@@ -19,6 +19,10 @@
  */
 class TMatrix {
 private:
+  /*! @brief Number of components in one quarter of the T-matrix,
+   *  @f$L_{max} = n_{max} (n_{max} + 2) @f$. */
+  const uint_fast32_t _Lmax;
+
   /*! @brief Precomputed factors @f$n(n+1)@f$ (array of size @f$n_{max}@f$). */
   std::vector<double> _an;
 
@@ -122,15 +126,16 @@ public:
                  const std::complex<double> refractive_index, const double R_V,
                  const double axis_ratio, const uint_fast32_t nmax,
                  const uint_fast32_t ngauss)
-      : _an(nmax, 0.), _dd(nmax, 0.), _ann(nmax, nmax),
-        _costheta(2 * ngauss, 0.), _sinthetainv(2 * ngauss, 0.),
-        _sintheta2inv(2 * ngauss, 0.), _weights(2 * ngauss, 0.),
-        _r2(2 * ngauss, 0.), _dr_over_r(2 * ngauss, 0.), _kr(2 * ngauss, 0.),
-        _krinv(2 * ngauss, 0.), _krmr(2 * ngauss, 0.), _krmrinv(2 * ngauss, 0.),
+      : _Lmax(nmax * (nmax + 2)), _an(nmax, 0.), _dd(nmax, 0.),
+        _ann(nmax, nmax), _costheta(2 * ngauss, 0.),
+        _sinthetainv(2 * ngauss, 0.), _sintheta2inv(2 * ngauss, 0.),
+        _weights(2 * ngauss, 0.), _r2(2 * ngauss, 0.),
+        _dr_over_r(2 * ngauss, 0.), _kr(2 * ngauss, 0.), _krinv(2 * ngauss, 0.),
+        _krmr(2 * ngauss, 0.), _krmrinv(2 * ngauss, 0.),
         _k(2. * M_PI / wavelength), _k2(_k * _k), _k2mr(refractive_index * _k2),
         _jkr(2 * ngauss, nmax), _ykr(2 * ngauss, nmax), _djkr(2 * ngauss, nmax),
         _dykr(2 * ngauss, nmax), _jkrmr(2 * ngauss, nmax),
-        _djkrmr(2 * ngauss, nmax), _T(2 * nmax, 2 * nmax) {
+        _djkrmr(2 * ngauss, nmax), _T(2 * _Lmax, 2 * _Lmax) {
 
     for (uint_fast32_t ni = 0; ni < nmax; ++ni) {
       const double nn = (ni + 2.) * (ni + 1.);
@@ -296,25 +301,57 @@ public:
 
     // func_TT
     Q.plu_inverse();
-    for (uint_fast32_t i = 0; i < nmax2; ++i) {
-      for (uint_fast32_t j = 0; j < nmax2; ++j) {
+    for (uint_fast32_t i = 0; i < nmax; ++i) {
+      const uint_fast32_t li = (i + 1) * (i + 2) - 1;
+      for (uint_fast32_t j = 0; j < nmax; ++j) {
+        const uint_fast32_t lj = (j + 1) * (j + 2) - 1;
         for (uint_fast32_t k = 0; k < nmax2; ++k) {
-          _T(i, j) -= RgQ(i, k) * Q(k, j);
+          _T(li, lj) -= RgQ(i, k) * Q(k, j);
+          _T(_Lmax + li, lj) -= RgQ(nmax + i, k) * Q(k, j);
+          _T(li, _Lmax + lj) -= RgQ(i, k) * Q(k, nmax + j);
+          _T(_Lmax + li, _Lmax + lj) -= RgQ(nmax + i, k) * Q(k, nmax + j);
         }
       }
     }
   }
 
   /**
-   * @brief Get the requested element of the T-matrix.
+   * @brief Get a specific element of the T-matrix.
    *
-   * @param i Row index.
-   * @param j Column index.
-   * @return Corresponding element in the T-matrix.
+   * The T-matrix consists of four blocks:
+   * @f[
+   *    T = \begin{pmatrix}
+   *      T^{(11)} & T^{(12)} \\
+   *      T^{(21)} & T^{(22)}
+   *    \end{pmatrix}.
+   * @f]
+   * Each of these blocks is an @f$L_{max}\times{}L_{max}@f$ matrix indexed
+   * using the combined index
+   * @f[
+   *    l = n (n+1) + m,
+   * @f]
+   * where @f$n = 1...n_{max}@f$ and @f$m=-n...n@f$. This notation is based on
+   * Tsang, Kong & Shin, 1984, Radio Science, 19, 629
+   * (https://doi.org/10.1029/RS019i002p00629).
+   *
+   * This function returns the element @f$T^{(i_1i_2)}_{n_1n_2m_1m_2}@f$.
+   *
+   * @param i1 Row index of the desired T-matrix quarter, @f$i_1@f$.
+   * @param n1 Order of the row index of the element, @f$n_1@f$.
+   * @param m1 Degree of the row index of the element, @f$m_1@f$.
+   * @param i2 Column index of the desired T-matrix quarter, @f$i_2@f$.
+   * @param n2 Order of the column index of the element, @f$n_2@f$.
+   * @param m2 Degree of the column index of the element, @f$m_2@f$.
+   * @return Corresponding element, @f$T^{(i_1i_2)}_{n_1n_2m_1m_2}@f$.
    */
-  inline const std::complex<double> &operator()(const uint_fast32_t i,
-                                                const uint_fast32_t j) const {
-    return _T(i, j);
+  inline const std::complex<double> &
+  operator()(const uint_fast8_t i1, const uint_fast32_t n1,
+             const int_fast32_t m1, const uint_fast8_t i2,
+             const uint_fast32_t n2, const int_fast32_t m2) const {
+
+    const uint_fast32_t l1 = i1 * _Lmax + n1 * (n1 + 1) + m1 - 1;
+    const uint_fast32_t l2 = i2 * _Lmax + n2 * (n2 + 1) + m2 - 1;
+    return _T(l1, l2);
   }
 };
 

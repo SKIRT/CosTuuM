@@ -78,11 +78,11 @@ int main(int argc, char **argv) {
 
     double qsca = 0.;
     double qext = 0.;
-    for (uint_fast32_t n = 0; n < nmax; ++n) {
-      const uint_fast32_t n1 = n + nmax;
-      const double dn1 = 2. * (n + 1.) + 1.;
-      qsca += dn1 * (std::norm(T(n, n)) + std::norm(T(n1, n1)));
-      qext += dn1 * (T(n, n).real() + T(n1, n1).real());
+    for (uint_fast32_t n = 1; n < nmax + 1; ++n) {
+      const double dn1 = 2. * n + 1.;
+      qsca += dn1 *
+              (std::norm(T(0, n, 0, 0, n, 0)) + std::norm(T(1, n, 0, 1, n, 0)));
+      qext += dn1 * (T(0, n, 0, 0, n, 0).real() + T(1, n, 0, 1, n, 0).real());
     }
     dsca = std::abs((old_qsca - qsca) / qsca);
     dext = std::abs((old_qext - qext) / qext);
@@ -111,11 +111,11 @@ int main(int argc, char **argv) {
 
     double qsca = 0.;
     double qext = 0.;
-    for (uint_fast32_t n = 0; n < nmax; ++n) {
-      const uint_fast32_t n1 = n + nmax;
-      const double dn1 = 2. * (n + 1.) + 1.;
-      qsca += dn1 * (std::norm(T(n, n)) + std::norm(T(n1, n1)));
-      qext += dn1 * (T(n, n).real() + T(n1, n1).real());
+    for (uint_fast32_t n = 1; n < nmax + 1; ++n) {
+      const double dn1 = 2. * n + 1.;
+      qsca += dn1 *
+              (std::norm(T(0, n, 0, 0, n, 0)) + std::norm(T(1, n, 0, 1, n, 0)));
+      qext += dn1 * (T(0, n, 0, 0, n, 0).real() + T(1, n, 0, 1, n, 0).real());
     }
     dsca = std::abs((old_qsca - qsca) / qsca);
     dext = std::abs((old_qext - qext) / qext);
