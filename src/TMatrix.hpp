@@ -16,6 +16,153 @@
 
 /**
  * @brief T-matrix and auxiliary variables required to compute it.
+ *
+ * The T-matrix formalism is based on rewriting the incoming @f$(i)@f$, local
+ * @f$(l)@f$ and scattered @f$(s)@f$ electromagnetic waves (photons) in terms of
+ * spherical wave function expansions:
+ * @f[
+ *    \vec{E}^{(i)}(r, \theta{}, \phi{}) = \sum_{n=1}^{n_{max}} \sum_{m=-n}^{n}
+ *        \left( a_{mn} Rg\vec{M}_{mn}(kr, \theta{}, \phi{}) +
+ *               b_{mn} Rg\vec{N}_{mn}(kr, \theta{}, \phi{}) \right),
+ * @f]
+ * @f[
+ *    \vec{E}^{(l)}(r, \theta{}, \phi{}) = \sum_{n=1}^{n_{max}} \sum_{m=-n}^{n}
+ *        \left( c_{mn} Rg\vec{M}_{mn}(km_rr, \theta{}, \phi{}) +
+ *               b_{mn} Rg\vec{N}_{mn}(km_rr, \theta{}, \phi{}) \right),
+ * @f]
+ * and
+ * @f[
+ *     \vec{E}^{(s)}(r, \theta{}, \phi{}) = \sum_{n=1}^{n_{max}} \sum_{m=-n}^{n}
+ *        \left( p_{mn} \vec{M}_{mn}(kr, \theta{}, \phi{}) +
+ *               q_{mn} \vec{N}_{mn}(kr, \theta{}, \phi{}) \right).
+ * @f]
+ * In these expressions, all spatial coordinates are expressed in spherical
+ * coordinates, @f$r, \theta{}, \phi{}@f$, and the spherical wave function
+ * expansions are assumed to converge for some finite order
+ * @f$n_{max} \geq{} 1@f$. @f$k = \frac{2\pi{}}{\lambda{}}@f$ is the wave number
+ * of the incident and outgoing radiation (assuming Rayleigh scattering), and
+ * @f$m_r@f$ is the refractive index of the dust grain that causes the
+ * scattering.
+ *
+ * The spherical basis functions for the expansion differ for different authors.
+ * We follow Mishchenko, Travis & Mackowski, 1996, J. Quant. Spectrosc.
+ * Radiat. Transfer, 55, 535 (https://doi.org/10.1016/0022-4073(96)00002-7) and
+ * use the following expressions:
+ * @f[
+ *    \vec{M}_{mn}(kr, \theta{}, \phi{}) =
+ *      (-1)^m \frac{1}{\sqrt{4\pi{}}} \sqrt{\frac{2n+1}{n(n+1)}} e^{im\phi{}}
+ *      h^{(1)}_n(kr) \left[
+ *        \frac{im}{\sin(\theta)} d^n_{0m}(\theta{}) \hat{\theta{}}
+ *        - \frac{d}{d\theta{}} d^n_{0m}(\theta{}) \hat{\phi{}}
+ *      \right] \\ = (-1)^m \frac{1}{\sqrt{4\pi{}}} \sqrt{\frac{2n+1}{n(n+1)}}
+ *        h^{(1)}_n(kr) r \vec{\nabla{}} \times{} \left(
+ *          e^{im\phi{}} d^n_{0m}(\theta{}) \hat{r}
+ *        \right),
+ * @f]
+ * and
+ * @f[
+ *    \vec{N}_{mn}(kr, \theta{}, \phi{}) =
+ *      (-1)^m \frac{1}{\sqrt{4\pi{}}} \sqrt{\frac{2n+1}{n(n+1)}} e^{im\phi{}}
+ *      \left[
+ *        \frac{n(n+1)}{kr} h^{(1)}_n(kr) d^n_{0m}(\theta{}) \hat{r}
+ *        + \frac{[kr h^{(1)}_n(kr)]'}{kr} \left(
+ *          \frac{d}{d\theta{}} d^n_{0m}(\theta{}) \hat{\theta{}}
+ *          + \frac{im}{\sin(\theta{})} d^n_{0m}(\theta{}) \hat{\phi{}}
+ *        \right)
+ *      \right].
+ * @f]
+ * In these expressions, @f$\hat{r}, \hat{\theta{}}@f$ and @f$\hat{\phi{}}@f$
+ * represent the unit vectors in spherical coordinates, @f$h^{(1)}_n(x)@f$ are
+ * the spherical Hankel functions of the first kind, defined as
+ * @f[
+ *    h^{(1)}_n(x) = j_n(x) + i y_n(x),
+ * @f]
+ * where @f$j_n(x)@f$ and @f$y_n(x)@f$ are the spherical Bessel functions of
+ * respectively the first and second kind, and @f$d^n_{0m}(\theta{})@f$ are
+ * called Wigner @f$d@f$-functions (see SpecialFunctions::wigner_dn_0m()).
+ *
+ * The expressions for @f$Rg\vec{M}_{mn}@f$ and @f$Rg\vec{N}_{mn}@f$ are the
+ * same as for @f$\vec{M}_{mn}@f$ and @f$\vec{N}_{mn}@f$, except that all
+ * occurences of the spherical Hankel functions of the first kind are replaced
+ * by spherical Bessel functions of the first kind (as the incoming field is
+ * assumed to be real). Note that the coordinate @f$m_rkr@f$ that appears in
+ * the expansion for the internal field can be a complex number (since @f$m_r@f$
+ * is generally a complex number), so that we require spherical Bessel functions
+ * of the first kind for complex arguments.
+ *
+ * The expansion coefficients @f$a_{mn}@f$ and @f$b_{mn}@f$ are assumed to be
+ * known, while the expansion coefficients @f$c_{mn}, d_{mn}, p_{mn}@f$ and
+ * @f$q_{mn}@f$ are not. The T-matrix, or transition matrix, is a matrix that
+ * links the expansion coefficients of the incoming field to those of the
+ * scattered field:
+ * @f[
+ *    p_{mn} = \sum_{n'=1}^{n_{max}} \sum_{m'=-n'}^{n'}
+ *      \left(
+ *        T^{(11)}_{mnm'n'} a_{m'n'} + T^{(12)}_{mnm'n'} b_{m'n'}
+ *      \right),
+ * @f]
+ * and
+ * @f[
+ *    q_{mn} = \sum_{n'=1}^{n_{max}} \sum_{m'=-n'}^{n'}
+ *      \left(
+ *        T^{(21)}_{mnm'n'} a_{m'n'} + T^{(22)}_{mnm'n'} b_{m'n'}
+ *      \right).
+ * @f]
+ * The T-matrix only depends on the wavelength of the radiation and the
+ * material properties (refractive index) and geometry of the dust. It can be
+ * computed numerically by assuming that the expansions for the incoming and
+ * scattered waves are valid far from the dust particle, and by assuming that
+ * the Maxwell equations hold throughout the scattering process. This technique
+ * is called the Extended Boundary Condition Method (EBCM), and was introduced
+ * by Waterman, 1971, Physical Review D, 3, 825
+ * (https://doi.org/10.1103/PhysRevD.3.825).
+ *
+ * Skipping the detailed derivation, it can be shown that the transition matrix
+ * can be computed from
+ * @f[
+ *    T = -RgQ Q^{-1},
+ * @f]
+ * where the matrix Q is given by
+ * @f[
+ *    Q_{mnm'n'} = \frac{k}{\pi{}} \int{} d\vec{\sigma{}} .
+ *      \left[
+ *        \frac{1}{m_r} \left(
+ *          \vec{\nabla{}} \times{} \left(
+ *            Rg\vec{M}_{mn}(km_rr, \theta{}, \phi{})
+ *            + Rg\vec{N}_{mn}(km_rr, \theta{}, \phi{})
+ *          \right)
+ *        \right) \times{} \left(
+ *          \vec{M}_{m'n'}(kr, \theta{}, \phi{})
+ *          + \vec{N}_{m'n'}(kr, \theta{}, \phi{})
+ *        \right) - \\ \left(
+ *          Rg\vec{M}_{mn}(km_rr, \theta{}, \phi{})
+ *          + Rg\vec{N}_{mn}(km_rr, \theta{}, \phi{})
+ *        \right) \times{} \left(
+ *          \vec{\nabla{}} \times{} \left(
+ *            \vec{M}_{m'n'}(kr, \theta{}, \phi{})
+ *          + \vec{N}_{m'n'}(kr, \theta{}, \phi{})
+ *          \right)
+ *        \right)
+ *      \right],
+ * @f]
+ * and the @f$RgQ@f$ matrix is given by the same expression where @f$M_{m'n'}@f$
+ * and @f$N_{m'n'}@f$ are replaced with @f$RgM_{m'n'}@f$ and @f$RgN_{m'n'}@f$
+ * respectively. The surface element @f$d\vec{\sigma{}}@f$ is given by
+ * @f[
+ *    d\vec{\sigma{}} = r^2 \sin(\theta{}) d\theta{} d\phi{} \left(
+ *      \hat{r}
+ *      - \frac{1}{r}\frac{\partial{}}{\partial{}\theta{}}
+ *          r(\theta{}, \phi{}) \hat{\theta{}}
+ *      - \sin(\theta{}) \frac{1}{r}\frac{\partial{}}{\partial{}\phi{}}
+ *          r(\theta{}, \phi{}) \hat{\phi{}}
+ *    \right),
+ * @f]
+ * which for a spheroid (@f$r(\theta{},\phi{}) = r(\theta{})@f$) reduces to
+ * @f[
+ *    d\vec{\sigma{}} = r^2 \sin(\theta{}) d\theta{} d\phi{} \left(
+ *      \hat{r} - \frac{1}{r}\frac{d}{d\theta{}} r(\theta{}) \hat{\theta{}}
+ *    \right).
+ * @f]
  */
 class TMatrix {
 private:
