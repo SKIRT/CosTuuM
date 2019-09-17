@@ -19,9 +19,15 @@
  */
 class TMatrix {
 private:
+  /*! @brief Maximum order of the spherical basis functions, @f$n_{max}@f$. */
+  const uint_fast32_t _nmax;
+
   /*! @brief Number of components in one quarter of the T-matrix,
    *  @f$L_{max} = n_{max} (n_{max} + 2) @f$. */
   const uint_fast32_t _Lmax;
+
+  /*! @brief Number of Gauss-Legendre quadrature points, @f$n_{GL}@f$. */
+  const uint_fast32_t _ngauss;
 
   /*! @brief Precomputed factors @f$n(n+1)@f$ (array of size @f$n_{max}@f$). */
   std::vector<double> _an;
@@ -126,8 +132,8 @@ public:
                  const std::complex<double> refractive_index, const double R_V,
                  const double axis_ratio, const uint_fast32_t nmax,
                  const uint_fast32_t ngauss)
-      : _Lmax(nmax * (nmax + 2)), _an(nmax, 0.), _dd(nmax, 0.),
-        _ann(nmax, nmax), _costheta(2 * ngauss, 0.),
+      : _nmax(nmax), _Lmax(nmax * (nmax + 2)), _ngauss(ngauss), _an(nmax, 0.),
+        _dd(nmax, 0.), _ann(nmax, nmax), _costheta(2 * ngauss, 0.),
         _sinthetainv(2 * ngauss, 0.), _sintheta2inv(2 * ngauss, 0.),
         _weights(2 * ngauss, 0.), _r2(2 * ngauss, 0.),
         _dr_over_r(2 * ngauss, 0.), _kr(2 * ngauss, 0.), _krinv(2 * ngauss, 0.),
@@ -310,6 +316,209 @@ public:
           _T(_Lmax + li, lj) -= RgQ(nmax + i, k) * Q(k, j);
           _T(li, _Lmax + lj) -= RgQ(i, k) * Q(k, nmax + j);
           _T(_Lmax + li, _Lmax + lj) -= RgQ(nmax + i, k) * Q(k, nmax + j);
+        }
+      }
+    }
+  }
+
+  /**
+   * @brief Compute the missing elements of the T-matrix.
+   */
+  inline void compute_additional_elements() {
+
+    for (uint_fast32_t m = 1; m < _nmax; ++m) {
+
+      const double m2 = m * m;
+      const uint_fast32_t nmax2 = 2 * _nmax;
+      const uint_fast32_t nm = _nmax - m + 1;
+      const uint_fast32_t nm2 = 2 * nm;
+
+      std::vector<int_fast8_t> signs(nmax2);
+      Matrix<double> wigner_d(2 * _ngauss, _nmax);
+      Matrix<double> dwigner_d(2 * _ngauss, _nmax);
+      std::vector<double> wr2(_ngauss);
+      Matrix<std::complex<double>> J11(_nmax, _nmax);
+      Matrix<std::complex<double>> J12(_nmax, _nmax);
+      Matrix<std::complex<double>> J21(_nmax, _nmax);
+      Matrix<std::complex<double>> J22(_nmax, _nmax);
+      Matrix<std::complex<double>> RgJ11(_nmax, _nmax);
+      Matrix<std::complex<double>> RgJ12(_nmax, _nmax);
+      Matrix<std::complex<double>> RgJ21(_nmax, _nmax);
+      Matrix<std::complex<double>> RgJ22(_nmax, _nmax);
+      Matrix<std::complex<double>> Q(nm2, nm2);
+      Matrix<std::complex<double>> RgQ(nm2, nm2);
+      std::vector<double> ds(_ngauss);
+      std::vector<double> dss(_ngauss);
+
+      int_fast8_t si = 1;
+      for (uint_fast32_t m = 0; m < nmax2; ++m) {
+        si = -si;
+        signs[m] = si;
+      }
+      for (uint_fast32_t ig = 1; ig < _ngauss + 1; ++ig) {
+        const uint_fast32_t i1 = _ngauss + ig;
+        const uint_fast32_t i2 = _ngauss - ig + 1;
+        std::vector<double> dv1(_nmax), dv2(_nmax);
+        SpecialFunctions::wigner_dn_0m(_costheta[i1 - 1], _nmax, m, &dv1[0],
+                                       &dv2[0]);
+        for (uint_fast32_t n = 0; n < _nmax; ++n) {
+          si = signs[n];
+          wigner_d(i1 - 1, n) = dv1[n];
+          wigner_d(i2 - 1, n) = si * dv1[n];
+          dwigner_d(i1 - 1, n) = dv2[n];
+          dwigner_d(i2 - 1, n) = -si * dv2[n];
+        }
+      }
+      for (uint_fast32_t ig = 0; ig < _ngauss; ++ig) {
+        // move to class member
+        wr2[ig] = _weights[ig] * _r2[ig];
+        ds[ig] = _sinthetainv[ig] * m * wr2[ig];
+        dss[ig] = _sintheta2inv[ig] * m2;
+      }
+      for (uint_fast32_t n1 = m; n1 < _nmax + 1; ++n1) {
+        const double an1 = _an[n1 - 1];
+        for (uint_fast32_t n2 = m; n2 < _nmax + 1; ++n2) {
+          const double an2 = _an[n2 - 1];
+
+          std::complex<double> this_J11, this_J12, this_J21, this_J22,
+              this_RgJ11, this_RgJ12, this_RgJ21, this_RgJ22;
+          const int_fast8_t si = signs[n1 + n2 - 1];
+          for (uint_fast32_t ig = 0; ig < _ngauss; ++ig) {
+            const double wigner_n1 = wigner_d(ig, n1 - 1);
+            const double dwigner_n1 = dwigner_d(ig, n1 - 1);
+            const double wigner_n2 = wigner_d(ig, n2 - 1);
+            const double dwigner_n2 = dwigner_d(ig, n2 - 1);
+
+            const double a11 = wigner_n1 * wigner_n2;
+            const double a12 = wigner_n1 * dwigner_n2;
+            const double a21 = dwigner_n1 * wigner_n2;
+
+            const double jkrn1 = _jkr(ig, n1 - 1);
+            const double ykrn1 = _ykr(ig, n1 - 1);
+            // spherical Hankel function of the first kind
+            const std::complex<double> hkrn1(jkrn1, ykrn1);
+            const double djkrn1 = _djkr(ig, n1 - 1);
+            const double dykrn1 = _dykr(ig, n1 - 1);
+            const std::complex<double> dhkrn1(djkrn1, dykrn1);
+            const std::complex<double> jkrmrn2 = _jkrmr(ig, n2 - 1);
+            const std::complex<double> djkrmrn2 = _djkrmr(ig, n2 - 1);
+
+            const std::complex<double> c1 = jkrmrn2 * jkrn1;
+            const std::complex<double> b1 = jkrmrn2 * hkrn1;
+
+            const std::complex<double> c2 = jkrmrn2 * djkrn1;
+            const std::complex<double> b2 = jkrmrn2 * dhkrn1;
+
+            const double krinvi = _krinv[ig];
+
+            const std::complex<double> c4 = djkrmrn2 * jkrn1;
+            const std::complex<double> b4 = djkrmrn2 * hkrn1;
+
+            const std::complex<double> krmrinvi = _krmrinv[ig];
+
+            const double dr_over_ri = _dr_over_r[ig];
+
+            if (si < 0) {
+              const double dsi = ds[ig];
+              const double aa1 = a12 + a21;
+
+              const std::complex<double> c6 = djkrmrn2 * djkrn1;
+              const std::complex<double> b6 = djkrmrn2 * dhkrn1;
+
+              const std::complex<double> c7 = c4 * krinvi;
+              const std::complex<double> b7 = b4 * krinvi;
+
+              const std::complex<double> c8 = c2 * krmrinvi;
+              const std::complex<double> b8 = b2 * krmrinvi;
+              const double e1 = dsi * aa1;
+              this_J11 += e1 * b1;
+              this_RgJ11 += e1 * c1;
+
+              const double e2 = dsi * dr_over_ri * a11 * an1;
+              const double e3 = dsi * dr_over_ri * a11 * an2;
+              this_J22 += e1 * b6 + e2 * b7 + e3 * b8;
+              this_RgJ22 += e1 * c6 + e2 * c7 + e3 * c8;
+            } else {
+              const double wr2i = wr2[ig];
+              const double a22 = dwigner_n1 * dwigner_n2;
+              const double aa2 = a11 * dss[ig] + a22;
+              const std::complex<double> c3 = krinvi * c1;
+              const std::complex<double> b3 = krinvi * b1;
+              const std::complex<double> c5 = c1 * krmrinvi;
+              const std::complex<double> b5 = b1 * krmrinvi;
+
+              const double f1 = wr2i * aa2;
+              const double f2 = wr2i * dr_over_ri * an1 * a12;
+              this_J12 += f1 * b2 + f2 * b3;
+              this_RgJ12 += f1 * c2 + f2 * c3;
+
+              const double f3 = wr2i * dr_over_ri * an2 * a21;
+              this_J21 += f1 * b4 + f3 * b5;
+              this_RgJ21 += f1 * c4 + f3 * c5;
+            }
+          }
+          const double an12 = 2 * _ann(n1 - 1, n2 - 1);
+          J11(n1 - 1, n2 - 1) = this_J11 * an12;
+          J12(n1 - 1, n2 - 1) = this_J12 * an12;
+          J21(n1 - 1, n2 - 1) = this_J21 * an12;
+          J22(n1 - 1, n2 - 1) = this_J22 * an12;
+          RgJ11(n1 - 1, n2 - 1) = this_RgJ11 * an12;
+          RgJ12(n1 - 1, n2 - 1) = this_RgJ12 * an12;
+          RgJ21(n1 - 1, n2 - 1) = this_RgJ21 * an12;
+          RgJ22(n1 - 1, n2 - 1) = this_RgJ22 * an12;
+        }
+      }
+      for (uint_fast32_t n1 = m; n1 < _nmax + 1; ++n1) {
+        const uint_fast32_t k1 = n1 - m + 1;
+        const uint_fast32_t kk1 = k1 + nm;
+        for (uint_fast32_t n2 = m; n2 < _nmax + 1; ++n2) {
+          const uint_fast32_t k2 = n2 - m + 1;
+          const uint_fast32_t kk2 = k2 + nm;
+
+          const std::complex<double> icompl(0., 1.);
+          const std::complex<double> this_J11 = -J11(n1 - 1, n2 - 1);
+          const std::complex<double> this_RgJ11 = -RgJ11(n1 - 1, n2 - 1);
+          const std::complex<double> this_J12 = -icompl * J12(n1 - 1, n2 - 1);
+          const std::complex<double> this_RgJ12 =
+              -icompl * RgJ12(n1 - 1, n2 - 1);
+          const std::complex<double> this_J21 = icompl * J21(n1 - 1, n2 - 1);
+          const std::complex<double> this_RgJ21 =
+              icompl * RgJ21(n1 - 1, n2 - 1);
+          const std::complex<double> this_J22 = -J22(n1 - 1, n2 - 1);
+          const std::complex<double> this_RgJ22 = -RgJ22(n1 - 1, n2 - 1);
+
+          Q(k1 - 1, k2 - 1) = _k2mr * this_J21 + _k2 * this_J12;
+          RgQ(k1 - 1, k2 - 1) = _k2mr * this_RgJ21 + _k2 * this_RgJ12;
+
+          Q(k1 - 1, kk2 - 1) = _k2mr * this_J11 + _k2 * this_J22;
+          RgQ(k1 - 1, kk2 - 1) = _k2mr * this_RgJ11 + _k2 * this_RgJ22;
+
+          Q(kk1 - 1, k2 - 1) = _k2mr * this_J22 + _k2 * this_J11;
+          RgQ(kk1 - 1, k2 - 1) = _k2mr * this_RgJ22 + _k2 * this_RgJ11;
+
+          Q(kk1 - 1, kk2 - 1) = _k2mr * this_J12 + _k2 * this_J21;
+          RgQ(kk1 - 1, kk2 - 1) = _k2mr * this_RgJ12 + _k2 * this_RgJ21;
+        }
+      }
+
+      Q.plu_inverse();
+      for (uint_fast32_t i = 0; i < nm; ++i) {
+        const uint_fast32_t lip = (m + i) * (m + i + 1) + m - 1;
+        const uint_fast32_t lim = (m + i) * (m + i + 1) - m - 1;
+        for (uint_fast32_t j = 0; j < nm; ++j) {
+          const uint_fast32_t ljp = (m + j) * (m + j + 1) + m - 1;
+          const uint_fast32_t ljm = (m + j) * (m + j + 1) - m - 1;
+          for (uint_fast32_t k = 0; k < nm2; ++k) {
+            _T(lip, ljp) -= RgQ(i, k) * Q(k, j);
+            _T(_Lmax + lip, ljp) -= RgQ(nm + i, k) * Q(k, j);
+            _T(lip, _Lmax + ljp) -= RgQ(i, k) * Q(k, nm + j);
+            _T(_Lmax + lip, _Lmax + ljp) -= RgQ(nm + i, k) * Q(k, nm + j);
+
+            _T(lim, ljm) -= RgQ(i, k) * Q(k, j);
+            _T(_Lmax + lim, ljm) -= RgQ(nm + i, k) * Q(k, j);
+            _T(lim, _Lmax + ljm) -= RgQ(i, k) * Q(k, nm + j);
+            _T(_Lmax + lim, _Lmax + ljm) -= RgQ(nm + i, k) * Q(k, nm + j);
+          }
         }
       }
     }

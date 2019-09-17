@@ -66,6 +66,8 @@ int main(int argc, char **argv) {
   const double xev = 2. * M_PI * R_V / wavelength;
   uint_fast32_t nmax = std::max(4., xev + 4.05 * std::cbrt(xev));
 
+  TMatrix *active_Tmatrix = nullptr;
+
   // loop control variables
   double old_qext = 0.;
   double old_qsca = 0.;
@@ -74,7 +76,9 @@ int main(int argc, char **argv) {
   while (nmax < maximum_order && (dext > tolerance || dsca > tolerance)) {
     const uint_fast32_t ngauss = ndgs * nmax;
 
-    TMatrix T(wavelength, mr, R_V, axis_ratio, nmax, ngauss);
+    delete active_Tmatrix;
+    active_Tmatrix = new TMatrix(wavelength, mr, R_V, axis_ratio, nmax, ngauss);
+    TMatrix &T = *active_Tmatrix;
 
     double qsca = 0.;
     double qext = 0.;
@@ -107,7 +111,9 @@ int main(int argc, char **argv) {
   dsca = tolerance + 1.;
   while (ngauss < maximum_ngauss && (dext > tolerance || dsca > tolerance)) {
 
-    TMatrix T(wavelength, mr, R_V, axis_ratio, nmax, ngauss);
+    delete active_Tmatrix;
+    active_Tmatrix = new TMatrix(wavelength, mr, R_V, axis_ratio, nmax, ngauss);
+    TMatrix &T = *active_Tmatrix;
 
     double qsca = 0.;
     double qext = 0.;
@@ -134,6 +140,38 @@ int main(int argc, char **argv) {
     --ngauss;
     ctm_warning("Converged for ngauss = %" PRIuFAST32, ngauss);
   }
+
+  active_Tmatrix->compute_additional_elements();
+  TMatrix &T = *active_Tmatrix;
+  old_qsca = 0.;
+  old_qext = 0.;
+  for (uint_fast32_t n1 = 1; n1 < nmax + 1; ++n1) {
+    for (uint_fast32_t n2 = 1; n2 < nmax + 1; ++n2) {
+      for (int_fast32_t m1 = -n1; m1 < static_cast<int_fast32_t>(n1 + 1);
+           ++m1) {
+        for (int_fast32_t m2 = -n2; m2 < static_cast<int_fast32_t>(n2 + 1);
+             ++m2) {
+          old_qsca += std::norm(T(0, n1, m1, 0, n2, m2));
+          old_qsca += std::norm(T(0, n1, m1, 1, n2, m2));
+          old_qsca += std::norm(T(1, n1, m1, 0, n2, m2));
+          old_qsca += std::norm(T(1, n1, m1, 1, n2, m2));
+        }
+      }
+    }
+  }
+  for (uint_fast32_t n1 = 1; n1 < nmax + 1; ++n1) {
+    for (int_fast32_t m1 = -n1; m1 < static_cast<int_fast32_t>(n1 + 1); ++m1) {
+      old_qext += T(0, n1, m1, 0, n1, m1).real();
+      old_qext += T(0, n1, m1, 1, n1, m1).real();
+      old_qext += T(1, n1, m1, 0, n1, m1).real();
+      old_qext += T(1, n1, m1, 1, n1, m1).real();
+    }
+  }
+  ctm_warning("qsca: %g", old_qsca);
+  ctm_warning("qext: %g", old_qext);
+  ctm_warning("walb: %g", -old_qsca / old_qext);
+
+  delete active_Tmatrix;
 
   return 0;
 }
