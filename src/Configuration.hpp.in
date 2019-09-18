@@ -23,6 +23,16 @@
 /*! @brief If defined, this is a Windows system. */
 #cmakedefine HAVE_WINDOWS
 
+/*! @brief If defined, the system has Boost multiprecision available. */
+#cmakedefine HAVE_MULTIPRECISION
+
+#ifdef HAVE_MULTIPRECISION
+#include <boost/multiprecision/cpp_bin_float.hpp>
+typedef boost::multiprecision::cpp_bin_float_quad float_type;
+#else
+typedef double float_type;
+#endif
+
 /*! @brief Maximum number of shared memory threads that can be used on this
  *  system. */
 // clang-format off

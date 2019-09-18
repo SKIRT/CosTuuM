@@ -161,6 +161,17 @@ else(MAX_NUM_THREADS GREATER 1)
   message(WARNING "Only 1 core available, so not enabling OpenMP support.")
 endif(MAX_NUM_THREADS GREATER 1)
 
+find_package(Boost 1.53.0)
+if(Boost_FOUND)
+  message(STATUS "Found Boost multiprecision.")
+  include_directories(${Boost_INCLUDE_DIRS})
+  add_configuration_option(HAVE_MULTIPRECISION True)
+else(Boost_FOUND)
+  message(WARNING
+          "Boost multiprecision not found. Exact arithmetics will not work!")
+  add_configuration_option(HAVE_MULTIPRECISION False)
+endif(Boost_FOUND)
+
 # Check if we need to activate fast math
 if(ACTIVATE_FAST_MATH)
   message(STATUS "Activating Fast Math...")
