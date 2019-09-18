@@ -54,10 +54,10 @@
  *      h^{(1)}_n(kr) \left[
  *        \frac{im}{\sin(\theta)} d^n_{0m}(\theta{}) \hat{\theta{}}
  *        - \frac{d}{d\theta{}} d^n_{0m}(\theta{}) \hat{\phi{}}
- *      \right] \\ = (-1)^m \frac{1}{\sqrt{4\pi{}}} \sqrt{\frac{2n+1}{n(n+1)}}
- *        h^{(1)}_n(kr) r \vec{\nabla{}} \times{} \left(
- *          e^{im\phi{}} d^n_{0m}(\theta{}) \hat{r}
- *        \right),
+ *      \right] \\ = \vec{\nabla{}} \times{} \left(
+ *        (-1)^m \frac{1}{\sqrt{4\pi{}}} \sqrt{\frac{2n+1}{n(n+1)}}
+ *        r h^{(1)}_n(kr) e^{im\phi{}} d^n_{0m}(\theta{}) \hat{r}
+ *      \right),
  * @f]
  * and
  * @f[
@@ -69,17 +69,75 @@
  *          \frac{d}{d\theta{}} d^n_{0m}(\theta{}) \hat{\theta{}}
  *          + \frac{im}{\sin(\theta{})} d^n_{0m}(\theta{}) \hat{\phi{}}
  *        \right)
- *      \right].
+ *      \right] \\ = \frac{1}{k} \vec{\nabla{}} \times{} \left(
+ *        \vec{\nabla{}} \times{} \left(
+ *          (-1)^m \frac{1}{\sqrt{4\pi{}}} \sqrt{\frac{2n+1}{n(n+1)}}
+ *          r h^{(1)}_n(kr) e^{im\phi{}} d^n_{0m}(\theta{}) \hat{r}
+ *        \right)
+ *      \right).
  * @f]
  * In these expressions, @f$\hat{r}, \hat{\theta{}}@f$ and @f$\hat{\phi{}}@f$
- * represent the unit vectors in spherical coordinates, @f$h^{(1)}_n(x)@f$ are
- * the spherical Hankel functions of the first kind, defined as
+ * represent the unit vectors in spherical coordinates, and the curl operator
+ * is given by
+ * (https://en.wikipedia.org/wiki/Del_in_cylindrical_and_spherical_coordinates#Del_formula)
+ * @f[
+ *    \vec{\nabla{}} \times{} \left(
+ *      A_r \hat{r} + A_\theta{} \hat{\theta{}} + A_\phi{} \hat{\phi{}}
+ *    \right) =
+ *      \frac{1}{r\sin(\theta{})} \left(
+ *        \frac{\partial{}}{\partial{}\theta{}} \left(
+ *          A_\phi{} \sin(\theta{})
+ *        \right) - \frac{\partial{}A_\theta{}}{\partial{}\phi{}}
+ *      \right) \hat{r} + \frac{1}{r} \left(
+ *        \frac{1}{\sin(\theta{})} \frac{\partial{}A_r}{\partial{}\phi{}}
+ *        - \frac{\partial{}}{\partial{}r} \left( r A_\phi{} \right)
+ *      \right) \hat{\theta{}} + \frac{1}{r} \left(
+ *        \frac{\partial{}}{\partial{}r}\left( r A_\theta{} \right)
+ *        - \frac{\partial{}A_r}{\partial{}\theta{}}
+ *      \right) \hat{\phi{}}.
+ * @f]
+ *
+ * @f$h^{(1)}_n(x)@f$ are the spherical Hankel functions of the first kind,
+ * defined as
  * @f[
  *    h^{(1)}_n(x) = j_n(x) + i y_n(x),
  * @f]
  * where @f$j_n(x)@f$ and @f$y_n(x)@f$ are the spherical Bessel functions of
  * respectively the first and second kind, and @f$d^n_{0m}(\theta{})@f$ are
- * called Wigner @f$d@f$-functions (see SpecialFunctions::wigner_dn_0m()).
+ * the Wigner @f$d@f$-functions (see SpecialFunctions::wigner_dn_0m()) that
+ * satisfy
+ * @f[
+ *    \sin^2(\theta{}) \frac{d^2}{d\cos(\theta{})^2} d^n_{0m}(\theta{})
+ *    - 2\cos(\theta{}) \frac{d}{d\cos(\theta{})} d^n_{0m}(\theta{})
+ *    + \left(
+ *      n(n+1) - \frac{m^2}{\sin^2(\theta{})}
+ *    \right) d^n_{0m}(\theta{}) = 0,
+ * @f]
+ * a variant of the general Legendre equation
+ * (https://en.wikipedia.org/wiki/Associated_Legendre_polynomials).
+ *
+ * Note that the spherical basis functions @f$\vec{M}_{mn}@f$ and
+ * @f$\vec{N}_{mn}@f$ just like the electromagnetic fields satisfy the
+ * vector Helmholtz equation
+ * @f[
+ *    \nabla{}^2\vec{A} + k^2\vec{A} = 0,
+ * @f]
+ * which also leads to
+ * (https://en.wikipedia.org/wiki/Vector_calculus_identities#Second_derivatives)
+ * @f[
+ *    \vec{\nabla{}} \times{} \left(
+ *      \vec{\nabla{}} \times{} \vec{M}_{mn}
+ *    \right) = \vec{\nabla{}}.\left(\vec{\nabla{}}\times{}\vec{M}_{mn}\right)
+ *              -\nabla{}^2 \vec{M}_{mn} = k^2 \vec{M}_{mn},
+ * @f]
+ * from which we can see that
+ * @f[
+ *    \frac{1}{k} \vec{\nabla{}} \times{} \vec{N}_{mn} = \vec{M}_{mn},
+ * @f]
+ * while we already had
+ * @f[
+ *    \frac{1}{k} \vec{\nabla{}} \times{} \vec{M}_{mn} = \vec{N}_{mn}.
+ * @f]
  *
  * The expressions for @f$Rg\vec{M}_{mn}@f$ and @f$Rg\vec{N}_{mn}@f$ are the
  * same as for @f$\vec{M}_{mn}@f$ and @f$\vec{N}_{mn}@f$, except that all
@@ -87,8 +145,8 @@
  * by spherical Bessel functions of the first kind (as the incoming field is
  * assumed to be real). Note that the coordinate @f$m_rkr@f$ that appears in
  * the expansion for the internal field can be a complex number (since @f$m_r@f$
- * is generally a complex number), so that we require spherical Bessel functions
- * of the first kind for complex arguments.
+ * is generally a complex number), so that we also require spherical Bessel
+ * functions of the first kind for complex arguments.
  *
  * The expansion coefficients @f$a_{mn}@f$ and @f$b_{mn}@f$ are assumed to be
  * known, while the expansion coefficients @f$c_{mn}, d_{mn}, p_{mn}@f$ and
@@ -122,31 +180,32 @@
  * @f[
  *    T = -RgQ Q^{-1},
  * @f]
- * where the matrix Q is given by
+ * where the matrix Q is given by (ignoring constant prefactors that do not
+ * contribute to @f$T@f$)
  * @f[
- *    Q_{mnm'n'} = \frac{k}{\pi{}} \int{} d\vec{\sigma{}} .
+ *    Q_{mnm'n'} = k \int{} d\vec{\sigma{}} .
  *      \left[
- *        \frac{1}{m_r} \left(
+ *        \left(
  *          \vec{\nabla{}} \times{} \left(
- *            Rg\vec{M}_{mn}(km_rr, \theta{}, \phi{})
- *            + Rg\vec{N}_{mn}(km_rr, \theta{}, \phi{})
+ *            Rg\vec{M}_{m'n'}(km_rr, \theta{}, \phi{})
+ *            + Rg\vec{N}_{m'n'}(km_rr, \theta{}, \phi{})
  *          \right)
  *        \right) \times{} \left(
- *          \vec{M}_{m'n'}(kr, \theta{}, \phi{})
- *          + \vec{N}_{m'n'}(kr, \theta{}, \phi{})
+ *          \vec{M}_{mn}(kr, \theta{}, \phi{})
+ *          + \vec{N}_{mn}(kr, \theta{}, \phi{})
  *        \right) - \\ \left(
- *          Rg\vec{M}_{mn}(km_rr, \theta{}, \phi{})
- *          + Rg\vec{N}_{mn}(km_rr, \theta{}, \phi{})
+ *          Rg\vec{M}_{m'n'}(km_rr, \theta{}, \phi{})
+ *          + Rg\vec{N}_{m'n'}(km_rr, \theta{}, \phi{})
  *        \right) \times{} \left(
  *          \vec{\nabla{}} \times{} \left(
- *            \vec{M}_{m'n'}(kr, \theta{}, \phi{})
- *          + \vec{N}_{m'n'}(kr, \theta{}, \phi{})
+ *            \vec{M}_{mn}(kr, \theta{}, \phi{})
+ *          + \vec{N}_{mn}(kr, \theta{}, \phi{})
  *          \right)
  *        \right)
  *      \right],
  * @f]
- * and the @f$RgQ@f$ matrix is given by the same expression where @f$M_{m'n'}@f$
- * and @f$N_{m'n'}@f$ are replaced with @f$RgM_{m'n'}@f$ and @f$RgN_{m'n'}@f$
+ * and the @f$RgQ@f$ matrix is given by the same expression where @f$M_{mn}@f$
+ * and @f$N_{mn}@f$ are replaced with @f$RgM_{mn}@f$ and @f$RgN_{mn}@f$
  * respectively. The surface element @f$d\vec{\sigma{}}@f$ is given by
  * @f[
  *    d\vec{\sigma{}} = r^2 \sin(\theta{}) d\theta{} d\phi{} \left(
@@ -163,6 +222,183 @@
  *      \hat{r} - \frac{1}{r}\frac{d}{d\theta{}} r(\theta{}) \hat{\theta{}}
  *    \right).
  * @f]
+ *
+ * To compute the matrix @f$Q@f$, it makes sense to decompose it into four
+ * quarters:
+ * @f[
+ *    Q = \begin{pmatrix}
+ *      P & R \\
+ *      S & U
+ *    \end{pmatrix},
+ * @f]
+ * with
+ * @f[
+ *    P = k \int{} d\vec{\sigma{}} . \left[
+ *        \left(
+ *          \vec{\nabla{}} \times{} Rg\vec{M}_{m'n'}(km_rr, \theta{}, \phi{})
+ *        \right) \times{} \vec{M}_{mn}(kr, \theta{}, \phi{})
+ *        - Rg\vec{M}_{m'n'}(km_rr, \theta{}, \phi{}) \times{} \left(
+ *          \vec{\nabla{}} \times{} \vec{M}_{mn}(kr, \theta{}, \phi{})
+ *        \right)
+ *    \right] \\ = k^2 \int{} d\vec{\sigma{}} . \left[
+ *      Rg\vec{N}_{m'n'}(km_rr, \theta{}, \phi{})
+ *        \times{} \vec{M}_{mn}(kr, \theta{}, \phi{})
+ *        - Rg\vec{M}_{m'n'}(km_rr, \theta{}, \phi{}) \times{}
+ *          \vec{N}_{mn}(kr, \theta{}, \phi{})
+ *    \right],
+ * @f]
+ * @f[
+ *    R = k \int{} d\vec{\sigma{}} . \left[
+ *        \left(
+ *          \vec{\nabla{}} \times{} Rg\vec{N}_{m'n'}(km_rr, \theta{}, \phi{})
+ *        \right) \times{} \vec{M}_{mn}(kr, \theta{}, \phi{})
+ *        - Rg\vec{N}_{m'n'}(km_rr, \theta{}, \phi{}) \times{} \left(
+ *          \vec{\nabla{}} \times{} \vec{M}_{mn}(kr, \theta{}, \phi{})
+ *        \right)
+ *      \right] \\ = k^2 \int{} d\vec{\sigma{}} . \left[
+ *        Rg\vec{M}_{m'n'}(km_rr, \theta{}, \phi{})
+ *        \times{} \vec{M}_{mn}(kr, \theta{}, \phi{})
+ *        - Rg\vec{N}_{m'n'}(km_rr, \theta{}, \phi{}) \times{}
+ *          \vec{N}_{mn}(kr, \theta{}, \phi{})
+ *      \right],
+ * @f]
+ * @f[
+ *    S = k \int{} d\vec{\sigma{}} . \left[
+ *        \left(
+ *          \vec{\nabla{}} \times{} Rg\vec{M}_{m'n'}(km_rr, \theta{}, \phi{})
+ *        \right) \times{} \vec{N}_{mn}(kr, \theta{}, \phi{})
+ *        - Rg\vec{M}_{m'n'}(km_rr, \theta{}, \phi{}) \times{} \left(
+ *          \vec{\nabla{}} \times{} \vec{N}_{mn}(kr, \theta{}, \phi{})
+ *        \right)
+ *      \right] \\ = k^2 \int{} d\vec{\sigma{}} . \left[
+ *        Rg\vec{N}_{m'n'}(km_rr, \theta{}, \phi{})
+ *        \times{} \vec{N}_{mn}(kr, \theta{}, \phi{})
+ *        - Rg\vec{M}_{m'n'}(km_rr, \theta{}, \phi{}) \times{}
+ *        \vec{M}_{mn}(kr, \theta{}, \phi{})
+ *    \right],
+ * @f]
+ * and
+ * @f[
+ *    U = k \int{} d\vec{\sigma{}} . \left[
+ *        \left(
+ *          \vec{\nabla{}} \times{} Rg\vec{N}_{m'n'}(km_rr, \theta{}, \phi{})
+ *        \right) \times{} \vec{N}_{mn}(kr, \theta{}, \phi{})
+ *        - Rg\vec{N}_{m'n'}(km_rr, \theta{}, \phi{}) \times{} \left(
+ *          \vec{\nabla{}} \times{} \vec{N}_{mn}(kr, \theta{}, \phi{})
+ *        \right)
+ *      \right] \\ = k^2 \int{} d\vec{\sigma{}} . \left[
+ *        Rg\vec{M}_{m'n'}(km_rr, \theta{}, \phi{})
+ *        \times{} \vec{N}_{mn}(kr, \theta{}, \phi{})
+ *        - Rg\vec{N}_{m'n'}(km_rr, \theta{}, \phi{}) \times{}
+ *          \vec{M}_{mn}(kr, \theta{}, \phi{})
+ *      \right].
+ * @f]
+ *
+ * We have
+ * @f[
+ *    d\vec{\sigma{}}.\left(
+ *      \vec{M}_{mn}(k_1r) \times{} \vec{M}_{m'n'}(k_2r)
+ *    \right) =
+ *      (-1)^{m+m'} \frac{1}{4\pi{}}
+ *      \sqrt{\frac{(2n+1)(2n'+1)}{n(n+1)n'(n'+1)}}
+ *      e^{i(m+m')\phi{}} h_n^{(1)}(k_1r) h_{n'}^{(1)}(k_2r)
+ *      \left(d\vec{\sigma{}}.\hat{r}\right) \left(
+ *        -\frac{im}{\sin(\theta{})} d^n_{0m}(\theta{})
+ *          \frac{d}{d\theta{}} d^{n'}_{0m'}(\theta{})
+ *        +\frac{im'}{\sin(\theta{})} d^{n'}_{0m'}(\theta{})
+ *          \frac{d}{d\theta{}} d^n_{0m}(\theta{})
+ *      \right) \\ =
+ *      (-1)^{m} \frac{1}{4\pi{}}
+ *      \sqrt{\frac{(2n+1)(2n'+1)}{n(n+1)n'(n'+1)}}
+ *      e^{i(m-m')\phi{}} h_n^{(1)}(k_1r) h_{n'}^{(1)}(k_2r)
+ *      \left(d\vec{\sigma{}}.\hat{r}\right) \left(
+ *        -\frac{im}{\sin(\theta{})} d^n_{0m}(\theta{})
+ *          \frac{d}{d\theta{}} d^{n'}_{0m'}(\theta{})
+ *        -\frac{im'}{\sin(\theta{})} d^{n'}_{0m'}(\theta{})
+ *          \frac{d}{d\theta{}} d^n_{0m}(\theta{})
+ *      \right),
+ * @f]
+ * where for the last step we used
+ * @f[
+ *    d^n_{0m}(\theta{}) = (-1)^{-m} d^n_{0-m}(\theta{}).
+ * @f]
+ * Similarly, we have
+ * @f[
+ *    d\vec{\sigma{}}.\left(
+ *      \vec{M}_{mn}(k_1r) \times{} \vec{N}_{m'n'}(k_2r)
+ *    \right) \\=
+ *      (-1)^{m+m'} \frac{1}{4\pi{}}
+ *      \sqrt{\frac{(2n+1)(2n'+1)}{n(n+1)n'(n'+1)}}
+ *      e^{i(m+m')\phi{}} d\vec{\sigma{}}. \left[
+ *        h_n^{(1)}(k_1r) \frac{[k_2rh_{n'}^{(1)}(k_2r)]'}{k_2r} \left(
+ *         \frac{-mm'}{\sin^2(\theta{})} d^n_{0m}(\theta{})
+ *           d^{n'}_{0m'}(\theta{})
+ *        + \frac{d}{d\theta{}}d^n_{0m}(\theta{})
+ *          \frac{d}{d\theta{}} d^{n'}_{0m'}(\theta{})
+ *      \right) \hat{r} - h_n^{(1)}(k_1r)
+ *        \frac{d}{d\theta{}}d^n_{0m}(\theta{})
+ *        \frac{n'(n'+1)}{k_2r} h_{n'}^{(1)}(k_2r) d^{n'}_{0m'}(\theta{})
+ *        \hat{\theta{}}
+ *      \right] \\=
+ *      (-1)^{m} \frac{1}{4\pi{}}
+ *      \sqrt{\frac{(2n+1)(2n'+1)}{n(n+1)n'(n'+1)}}
+ *      e^{i(m-m')\phi{}} d\vec{\sigma{}}. \left[
+ *        h_n^{(1)}(k_1r) \frac{[k_2rh_{n'}^{(1)}(k_2r)]'}{k_2r} \left(
+ *         \frac{mm'}{\sin^2(\theta{})} d^n_{0m}(\theta{})
+ *           d^{n'}_{0m'}(\theta{})
+ *        + \frac{d}{d\theta{}}d^n_{0m}(\theta{})
+ *          \frac{d}{d\theta{}} d^{n'}_{0m'}(\theta{})
+ *      \right) \hat{r} - h_n^{(1)}(k_1r)
+ *        \frac{d}{d\theta{}}d^n_{0m}(\theta{})
+ *        \frac{n'(n'+1)}{k_2r} h_{n'}^{(1)}(k_2r) d^{n'}_{0m'}(\theta{})
+ *        \hat{\theta{}}
+ *      \right],
+ * @f]
+ * where we have ignored the @f$\hat{\phi{}}@f$ factor that drops out in the
+ * inner product with the surface element, and
+ * @f[
+ *    d\vec{\sigma{}}.\left(
+ *      \vec{N}_{mn}(k_1r) \times{} \vec{N}_{m'n'}(k_2r)
+ *    \right) = (-1)^{m+m'} \frac{1}{4\pi{}}
+ *      \sqrt{\frac{(2n+1)(2n'+1)}{n(n+1)n'(n'+1)}}
+ *      e^{i(m+m')\phi{}} d\vec{\sigma{}}. \left[
+ *        \frac{[k_1rh_{n}^{(1)}(k_1r)]'}{k_1r}
+ *        \frac{[k_2rh_{n'}^{(1)}(k_2r)]'}{k_2r} \left(
+ *          \frac{d}{d\theta{}} d^n_{0m}(\theta{})
+ *            \frac{im'}{\sin(\theta{})} d^{n'}_{0m'}(\theta{})
+ *          - \frac{im}{\sin(\theta{})} d^{n}_{0m}(\theta{})
+ *            \frac{d}{d\theta{}} d^{n'}_{0m'}(\theta{})
+ *        \right) \hat{r} \\+ d^{n}_{0m}(\theta{}) d^{n'}_{0m'}(\theta{}) \left(
+ *          \frac{[k_1rh_{n}^{(1)}(k_1r)]'}{k_1r} \frac{im}{\sin(\theta{})}
+ *            \frac{n'(n'+1)}{k_2r} h_{n'}^{(1)}(k_2r)
+ *          - \frac{n(n+1)}{k_1r} h_{n}^{(1)}(k_1r)
+ *            \frac{[k_2rh_{n'}^{(1)}(k_2r)]'}{k_2r} \frac{im'}{\sin(\theta{})}
+ *        \right) \hat{\theta{}}
+ *      \right] \\ = (-1)^{m} \frac{1}{4\pi{}}
+ *      \sqrt{\frac{(2n+1)(2n'+1)}{n(n+1)n'(n'+1)}}
+ *      e^{i(m-m')\phi{}} d\vec{\sigma{}}. \left[
+ *        \frac{[k_1rh_{n}^{(1)}(k_1r)]'}{k_1r}
+ *        \frac{[k_2rh_{n'}^{(1)}(k_2r)]'}{k_2r} \left(
+ *          - \frac{d}{d\theta{}} d^n_{0m}(\theta{})
+ *            \frac{im'}{\sin(\theta{})} d^{n'}_{0m'}(\theta{})
+ *          - \frac{im}{\sin(\theta{})} d^{n}_{0m}(\theta{})
+ *            \frac{d}{d\theta{}} d^{n'}_{0m'}(\theta{})
+ *        \right) \hat{r} \\+ d^{n}_{0m}(\theta{}) d^{n'}_{0m'}(\theta{}) \left(
+ *          \frac{[k_1rh_{n}^{(1)}(k_1r)]'}{k_1r} \frac{im}{\sin(\theta{})}
+ *            \frac{n'(n'+1)}{k_2r} h_{n'}^{(1)}(k_2r)
+ *          + \frac{n(n+1)}{k_1r} h_{n}^{(1)}(k_1r)
+ *            \frac{[k_2rh_{n'}^{(1)}(k_2r)]'}{k_2r} \frac{im'}{\sin(\theta{})}
+ *        \right) \hat{\theta{}}
+ *      \right]
+ * @f]
+ *
+ * When integrating out these expressions over all angles @f$\phi{}@f$, we
+ * can make use of the identity
+ * @f[
+ *    \delta{}_{m,m'} =
+ *      \frac{1}{2\pi{}} \int_0^{2\pi{}} e^{i(m-m')\phi{}} d\phi{}
+ * @f]
+ * to get rid of all components for which @f$m\neq{}m'@f$.
  */
 class TMatrix {
 private:
@@ -367,9 +603,11 @@ public:
       wr2[ig] = _weights[ig] * _r2[ig];
     }
     for (uint_fast32_t n1 = 1; n1 < nmax + 1; ++n1) {
-      const double an1 = _an[n1 - 1];
+      // n1 * (n1 + 1)
+      const double n1n1p1 = _an[n1 - 1];
       for (uint_fast32_t n2 = 1; n2 < nmax + 1; ++n2) {
-        const double an2 = _an[n2 - 1];
+        // n2 * (n2 + 1)
+        const double n2n2p1 = _an[n2 - 1];
 
         std::complex<double> this_J12, this_J21, this_RgJ12, this_RgJ21;
         // filter out half the components because of symmetry
@@ -380,9 +618,9 @@ public:
             const double wigner_n2 = wigner_d(ig - 1, n2 - 1);
             const double dwigner_n2 = dwigner_d(ig - 1, n2 - 1);
 
-            const double a12 = wigner_n1 * dwigner_n2;
-            const double a21 = dwigner_n1 * wigner_n2;
-            const double a22 = dwigner_n1 * dwigner_n2;
+            const double wn1dwn2 = wigner_n1 * dwigner_n2;
+            const double dwn1wn2 = dwigner_n1 * wigner_n2;
+            const double dwn1dwn2 = dwigner_n1 * dwigner_n2;
 
             const double jkrn1 = _jkr(ig - 1, n1 - 1);
             const double ykrn1 = _ykr(ig - 1, n1 - 1);
@@ -414,15 +652,32 @@ public:
             const double wr2i = wr2[ig - 1];
             const double dr_over_ri = _dr_over_r[ig - 1];
 
-            const double f1 = wr2i * a22;
-            const double f2 = wr2i * dr_over_ri * an1 * a12;
+            const double f1 = wr2i * dwn1dwn2;
+            const double f2 = wr2i * dr_over_ri * n1n1p1 * wn1dwn2;
+            // r^2 * ddn1_0m/dtheta * ddn2_0m/dtheta * jn2(krmr) *
+            //    ([kr*hn1(kr)]'/kr)
+            // + r^2 * dr/rdtheta * n1 * (n1 + 1) * dn1_0m * ddn1_0m/dtheta *
+            //    jn2(krmr) * hn1(kr) / kr
             this_J12 += f1 * b2 + f2 * b3;
+            // r^2 * ddn1_0m/dtheta * ddn2_0m/dtheta * jn2(krmr) *
+            //    ([kr*jn1(kr)]'/kr)
+            // + r^2 * dr/rdtheta * n1 * (n1 + 1) * dn1_0m * ddn1_0m/dtheta *
+            //    jn2(krmr) * jn1(kr) / kr
             this_RgJ12 += f1 * c2 + f2 * c3;
 
-            const double f3 = wr2i * dr_over_ri * an2 * a21;
+            const double f3 = wr2i * dr_over_ri * n2n2p1 * dwn1wn2;
+            // r^2 * ddn1_0m/dtheta * ddn2_0m/dtheta * hn1(kr) *
+            //    ([krmr*jn2(krmr)]'/krmr)
+            // + r^2 * dr/rdtheta * n2 * (n2 + 1) * ddn1_0m/dtheta * dn2_0m *
+            //    jn2(krmr) * hn1(kr) / krmr
             this_J21 += f1 * b4 + f3 * b5;
+            // r^2 * ddn1_0m/dtheta * ddn2_0m/dtheta * jn1(kr) *
+            //    ([krmr*jn2(krmr)]'/krmr)
+            // + r^2 * dr/rdtheta * n2 * (n2 + 1) * ddn1_0m/dtheta * dn2_0m *
+            //    jn2(krmr) * jn1(kr) / krmr
             this_RgJ21 += f1 * c4 + f3 * c5;
           }
+          // prefactor sqrt{(2n1+1)*(2n2+1)/[n1*(n1+1)*n2*(n2+1)]}
           const double an12 = 2. * _ann(n1 - 1, n2 - 1);
           J12(n1 - 1, n2 - 1) = an12 * this_J12;
           J21(n1 - 1, n2 - 1) = an12 * this_J21;
@@ -439,6 +694,10 @@ public:
         const uint_fast32_t kk2 = k2 + nmax;
 
         const std::complex<double> icompl(0., 1.);
+        // no idea why we multiply with i: completely unnecessary...
+        // (code also works if you leave out the i factor)
+        // sign differences are due to a sign difference between the
+        // implementation and documentation
         const std::complex<double> this_J12 = -icompl * J12(n1 - 1, n2 - 1);
         const std::complex<double> this_RgJ12 = -icompl * RgJ12(n1 - 1, n2 - 1);
         const std::complex<double> this_J21 = icompl * J21(n1 - 1, n2 - 1);
@@ -523,9 +782,11 @@ public:
         dss[ig] = _sintheta2inv[ig] * m2;
       }
       for (uint_fast32_t n1 = m; n1 < _nmax + 1; ++n1) {
-        const double an1 = _an[n1 - 1];
+        // n1 * (n1 + 1)
+        const double n1n1p1 = _an[n1 - 1];
         for (uint_fast32_t n2 = m; n2 < _nmax + 1; ++n2) {
-          const double an2 = _an[n2 - 1];
+          // n2 * (n2 + 1)
+          const double n2n2p1 = _an[n2 - 1];
 
           std::complex<double> this_J11, this_J12, this_J21, this_J22,
               this_RgJ11, this_RgJ12, this_RgJ21, this_RgJ22;
@@ -536,9 +797,9 @@ public:
             const double wigner_n2 = wigner_d(ig, n2 - 1);
             const double dwigner_n2 = dwigner_d(ig, n2 - 1);
 
-            const double a11 = wigner_n1 * wigner_n2;
-            const double a12 = wigner_n1 * dwigner_n2;
-            const double a21 = dwigner_n1 * wigner_n2;
+            const double wn1wn2 = wigner_n1 * wigner_n2;
+            const double wn1dwn2 = wigner_n1 * dwigner_n2;
+            const double dwn1wn2 = dwigner_n1 * wigner_n2;
 
             const double jkrn1 = _jkr(ig, n1 - 1);
             const double ykrn1 = _ykr(ig, n1 - 1);
@@ -567,7 +828,6 @@ public:
 
             if (si < 0) {
               const double dsi = ds[ig];
-              const double aa1 = a12 + a21;
 
               const std::complex<double> c6 = djkrmrn2 * djkrn1;
               const std::complex<double> b6 = djkrmrn2 * dhkrn1;
@@ -577,34 +837,70 @@ public:
 
               const std::complex<double> c8 = c2 * krmrinvi;
               const std::complex<double> b8 = b2 * krmrinvi;
-              const double e1 = dsi * aa1;
+              const double e1 = dsi * (wn1dwn2 + dwn1wn2);
+              // (m / sintheta) * jn2(krmr) * hn1(kr) *
+              // (dn1_0m * ddn2_0m/dtheta + ddn1_0m/dtheta * dn2_0m)
               this_J11 += e1 * b1;
+              // (m / sintheta) * jn2(krmr) * jn1(kr) *
+              // (dn1_0m * ddn2_0m/dtheta + ddn1_0m/dtheta * dn2_0m)
               this_RgJ11 += e1 * c1;
 
-              const double e2 = dsi * dr_over_ri * a11 * an1;
-              const double e3 = dsi * dr_over_ri * a11 * an2;
+              const double e2 = dsi * dr_over_ri * wn1wn2 * n1n1p1;
+              const double e3 = dsi * dr_over_ri * wn1wn2 * n2n2p1;
+              // (m / sintheta) * ([krmr*kn2(krmr)]'/krmr) * ([kr*hn1(kr)]'/kr)
+              //    * (dn1_0m * ddn2_0m/dtheta + ddn1_0m/dtheta * dn2_0m)
+              // + (m / sintheta) * dr/rdtheta * dn1_0m * dn2_0m * n1 * (n1 + 1)
+              //    * ([krmr*jn2(krmr)]'/krmr) * hn1(kr) / kr
+              // + (m / sintheta) * dr/rdtheta * dn1_0m * dn2_0m * n2 * (n2 + 1)
+              //    * jn2(krmr) * ([kr*hn1(kr]'/kr) / krmr
               this_J22 += e1 * b6 + e2 * b7 + e3 * b8;
+              // (m / sintheta) * ([krmr*kn2(krmr)]'/krmr) * ([kr*jn1(kr)]'/kr)
+              //    * (dn1_0m * ddn2_0m/dtheta + ddn1_0m/dtheta * dn2_0m)
+              // + (m / sintheta) * dr/rdtheta * dn1_0m * dn2_0m * n1 * (n1 + 1)
+              //    * ([krmr*jn2(krmr)]'/krmr) * jn1(kr) / kr
+              // + (m / sintheta) * dr/rdtheta * dn1_0m * dn2_0m * n2 * (n2 + 1)
+              //    * jn2(krmr) * ([kr*jn1(kr]'/kr) / krmr
               this_RgJ22 += e1 * c6 + e2 * c7 + e3 * c8;
             } else {
               const double wr2i = wr2[ig];
-              const double a22 = dwigner_n1 * dwigner_n2;
-              const double aa2 = a11 * dss[ig] + a22;
               const std::complex<double> c3 = krinvi * c1;
               const std::complex<double> b3 = krinvi * b1;
               const std::complex<double> c5 = c1 * krmrinvi;
               const std::complex<double> b5 = b1 * krmrinvi;
 
-              const double f1 = wr2i * aa2;
-              const double f2 = wr2i * dr_over_ri * an1 * a12;
+              const double f1 =
+                  wr2i * (wn1wn2 * dss[ig] + dwigner_n1 * dwigner_n2);
+              const double f2 = wr2i * dr_over_ri * n1n1p1 * wn1dwn2;
+              // r^2 * (m^2 / sintheta * dn1_0m * dn2_0m +
+              //        ddn1_0m/dtheta * ddn2_0m/dtheta) * jn2(krmr) *
+              //    ([kr*hn1(kr)]'/kr)
+              // + r^2 * dr/rdtheta * n1 * (n1 + 1) * dn1_0m * ddn1_0m/dtheta *
+              //    jn2(krmr) * hn1(kr) / kr
               this_J12 += f1 * b2 + f2 * b3;
+              // r^2 * (m^2 / sintheta * dn1_0m * dn2_0m +
+              //        ddn1_0m/dtheta * ddn2_0m/dtheta) * jn2(krmr) *
+              //    ([kr*jn1(kr)]'/kr)
+              // + r^2 * dr/rdtheta * n1 * (n1 + 1) * dn1_0m * ddn1_0m/dtheta *
+              //    jn2(krmr) * jn1(kr) / kr
               this_RgJ12 += f1 * c2 + f2 * c3;
 
-              const double f3 = wr2i * dr_over_ri * an2 * a21;
+              const double f3 = wr2i * dr_over_ri * n2n2p1 * dwn1wn2;
+              // r^2 * (m^2 / sintheta * dn1_0m * dn2_0m +
+              //        ddn1_0m/dtheta * ddn2_0m/dtheta) * hn1(kr) *
+              //    ([krmr*jn2(krmr)]'/krmr)
+              // + r^2 * dr/rdtheta * n2 * (n2 + 1) * ddn1_0m/dtheta * dn2_0m *
+              //    jn2(krmr) * hn1(kr) / krmr
               this_J21 += f1 * b4 + f3 * b5;
+              // r^2 * (m^2 / sintheta * dn1_0m * dn2_0m +
+              //        ddn1_0m/dtheta * ddn2_0m/dtheta) * jn1(kr) *
+              //    ([krmr*jn2(krmr)]'/krmr)
+              // + r^2 * dr/rdtheta * n2 * (n2 + 1) * ddn1_0m/dtheta * dn2_0m *
+              //    jn2(krmr) * jn1(kr) / krmr
               this_RgJ21 += f1 * c4 + f3 * c5;
             }
           }
-          const double an12 = 2 * _ann(n1 - 1, n2 - 1);
+          // prefactor sqrt{(2n1+1)*(2n2+1)/[n1*(n1+1)*n2*(n2+1)]}
+          const double an12 = 2. * _ann(n1 - 1, n2 - 1);
           J11(n1 - 1, n2 - 1) = this_J11 * an12;
           J12(n1 - 1, n2 - 1) = this_J12 * an12;
           J21(n1 - 1, n2 - 1) = this_J21 * an12;
@@ -623,6 +919,10 @@ public:
           const uint_fast32_t kk2 = k2 + nm;
 
           const std::complex<double> icompl(0., 1.);
+          // a factor -i is missing in J11 and J22
+          // to compensate for this, we multiply J12 and J21 with -i too
+          // we then multiply J11 and J22 with -1, so that it is wrong again?
+          // not sure how to make sense of this...
           const std::complex<double> this_J11 = -J11(n1 - 1, n2 - 1);
           const std::complex<double> this_RgJ11 = -RgJ11(n1 - 1, n2 - 1);
           const std::complex<double> this_J12 = -icompl * J12(n1 - 1, n2 - 1);

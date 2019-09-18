@@ -19,7 +19,7 @@
  * @brief Main program entry point.
  *
  * For now, does the entire T-matrix calculation for the Mishchenko default
- * parameters.
+ * parameters and outputs the scattering and extinction factors.
  *
  * @param argc Number of command line arguments (currently ignored).
  * @param argv Command line arguments (currently ignored).
@@ -66,6 +66,14 @@ int main(int argc, char **argv) {
   const double xev = 2. * M_PI * R_V / wavelength;
   uint_fast32_t nmax = std::max(4., xev + 4.05 * std::cbrt(xev));
 
+  // we need to find a maximum expansion order and number of Gauss-Legendre
+  // quadrature points that leads to a converged T-matrix
+  // To this end, we will start with a reasonable guess for the order, and then
+  // keep track of how the accuracy of the scattering and extinction factors
+  // changes as we first increase the order and then the number of quadrature
+  // points
+  // To simplify the calculation, we only compute the m=0 degree terms in the
+  // T-matrix during the convergence loops
   TMatrix *active_Tmatrix = nullptr;
 
   // loop control variables
@@ -74,12 +82,16 @@ int main(int argc, char **argv) {
   double dext = 1.;
   double dsca = 1.;
   while (nmax < maximum_order && (dext > tolerance || dsca > tolerance)) {
+    // initially we assume that the number of quadrature points is a fixed
+    // multiple of the order
     const uint_fast32_t ngauss = ndgs * nmax;
 
+    // delete the old matrix (if it exists) and create a new one
     delete active_Tmatrix;
     active_Tmatrix = new TMatrix(wavelength, mr, R_V, axis_ratio, nmax, ngauss);
     TMatrix &T = *active_Tmatrix;
 
+    // calculate the scattering and extinction factors for this iteration
     double qsca = 0.;
     double qext = 0.;
     for (uint_fast32_t n = 1; n < nmax + 1; ++n) {
@@ -88,16 +100,20 @@ int main(int argc, char **argv) {
               (std::norm(T(0, n, 0, 0, n, 0)) + std::norm(T(1, n, 0, 1, n, 0)));
       qext += dn1 * (T(0, n, 0, 0, n, 0).real() + T(1, n, 0, 1, n, 0).real());
     }
+    // compute the relative difference w.r.t. the previous values
     dsca = std::abs((old_qsca - qsca) / qsca);
     dext = std::abs((old_qext - qext) / qext);
     old_qext = qext;
     old_qsca = qsca;
 
+    // some (temporary) diagnostic output
     ctm_warning("dsca: %g, dext: %g", dsca, dext);
 
+    // increase the order
     ++nmax;
   }
 
+  // check if we managed to converge
   if (nmax == maximum_order) {
     ctm_error("Unable to converge!");
   } else {
@@ -106,15 +122,18 @@ int main(int argc, char **argv) {
     ctm_warning("Converged for nmax = %" PRIuFAST32, nmax);
   }
 
+  // now start increasing the number of quadrature points
   uint_fast32_t ngauss = nmax * ndgs + 1;
   dext = tolerance + 1.;
   dsca = tolerance + 1.;
   while (ngauss < maximum_ngauss && (dext > tolerance || dsca > tolerance)) {
 
+    // delete the old matrix and create a new one
     delete active_Tmatrix;
     active_Tmatrix = new TMatrix(wavelength, mr, R_V, axis_ratio, nmax, ngauss);
     TMatrix &T = *active_Tmatrix;
 
+    // calculate the scattering and extinction factors
     double qsca = 0.;
     double qext = 0.;
     for (uint_fast32_t n = 1; n < nmax + 1; ++n) {
@@ -123,16 +142,20 @@ int main(int argc, char **argv) {
               (std::norm(T(0, n, 0, 0, n, 0)) + std::norm(T(1, n, 0, 1, n, 0)));
       qext += dn1 * (T(0, n, 0, 0, n, 0).real() + T(1, n, 0, 1, n, 0).real());
     }
+    // compute the relative difference w.r.t. the old values
     dsca = std::abs((old_qsca - qsca) / qsca);
     dext = std::abs((old_qext - qext) / qext);
     old_qext = qext;
     old_qsca = qsca;
 
+    // some diagnostic output
     ctm_warning("dsca: %g, dext: %g", dsca, dext);
 
+    // increase the number of quadrature points
     ++ngauss;
   }
 
+  // check if we reached convergence
   if (ngauss == maximum_ngauss) {
     ctm_error("Unable to converge!");
   } else {
@@ -141,7 +164,11 @@ int main(int argc, char **argv) {
     ctm_warning("Converged for ngauss = %" PRIuFAST32, ngauss);
   }
 
+  // ok: we found the right order and number of quadrature points
+  // we now need to compute the additional elements for m=/=0
   active_Tmatrix->compute_additional_elements();
+
+  // compute the actual scattering and extinction factors using the full matrix
   TMatrix &T = *active_Tmatrix;
   old_qsca = 0.;
   old_qext = 0.;
@@ -167,11 +194,14 @@ int main(int argc, char **argv) {
       old_qext += T(1, n1, m1, 1, n1, m1).real();
     }
   }
+  // output the factors
   ctm_warning("qsca: %g", old_qsca);
   ctm_warning("qext: %g", old_qext);
   ctm_warning("walb: %g", -old_qsca / old_qext);
 
+  // clean up
   delete active_Tmatrix;
 
+  // done!
   return 0;
 }
