@@ -584,23 +584,24 @@ public:
    * @param r2 Output radii squared, @f$r^2(\theta{})@f$.
    * @param dr_over_r Derivative over radius,
    * @f$\frac{1}{r(\theta{})}\frac{dr(\theta{})}{d\theta{}}@f$.
+   * @tparam DATA_TYPE Data type of input and output values.
    */
-  static inline void get_r_dr_spheroid(const std::vector<double> costheta,
-                                       const double R_V,
-                                       const double axis_ratio,
-                                       std::vector<double> &r2,
-                                       std::vector<double> &dr_over_r) {
+  template <typename DATA_TYPE>
+  static inline void
+  get_r_dr_spheroid(const std::vector<DATA_TYPE> costheta, const DATA_TYPE R_V,
+                    const DATA_TYPE axis_ratio, std::vector<DATA_TYPE> &r2,
+                    std::vector<DATA_TYPE> &dr_over_r) {
 
     // compute the horizontal axis length
-    const double a = R_V * std::cbrt(axis_ratio);
-    const double a2 = a * a;
-    const double axis_ratio2 = axis_ratio * axis_ratio;
-    const double axis_ratio2m1 = axis_ratio2 - 1.;
+    const DATA_TYPE a = R_V * cbrt(axis_ratio);
+    const DATA_TYPE a2 = a * a;
+    const DATA_TYPE axis_ratio2 = axis_ratio * axis_ratio;
+    const DATA_TYPE axis_ratio2m1 = axis_ratio2 - 1.;
     for (uint_fast32_t i = 0; i < costheta.size() / 2; ++i) {
-      const double costheta2 = costheta[i] * costheta[i];
-      const double sintheta2 = 1. - costheta2;
-      const double sintheta = std::sqrt(sintheta2);
-      const double r2_over_a2 = 1. / (sintheta2 + axis_ratio2 * costheta2);
+      const DATA_TYPE costheta2 = costheta[i] * costheta[i];
+      const DATA_TYPE sintheta2 = 1. - costheta2;
+      const DATA_TYPE sintheta = sqrt(sintheta2);
+      const DATA_TYPE r2_over_a2 = 1. / (sintheta2 + axis_ratio2 * costheta2);
       r2[i] = a2 * r2_over_a2;
       r2[costheta.size() - i - 1] = r2[i];
       dr_over_r[i] = r2_over_a2 * costheta[i] * sintheta * axis_ratio2m1;

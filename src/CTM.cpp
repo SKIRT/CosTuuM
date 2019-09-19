@@ -6,6 +6,7 @@
  * @author Bert Vandenbroucke (bert.vandenbroucke@ugent.be)
  */
 
+#include "Configuration.hpp"
 #include "Matrix.hpp"
 #include "SpecialFunctions.hpp"
 #include "TMatrix.hpp"
@@ -14,6 +15,12 @@
 #include <cmath>
 #include <complex>
 #include <vector>
+
+#if defined(HAVE_MULTIPRECISION) && defined(HAVE_QUAD_PRECISION)
+using namespace boost::multiprecision;
+#else
+using namespace std;
+#endif
 
 /**
  * @brief Main program entry point.
@@ -29,18 +36,18 @@ int main(int argc, char **argv) {
 
   /// input parameters (should become real parameters at some point
   // size of the particle (in same units as the wavelength)
-  const double axi = 10.;
+  const float_type axi = 10.;
   // ratio between the equal surface area sphere radius and equal volume sphere
   // radius (is recomputed if not equal to 1)
-  double ratio_of_radii = 0.1;
+  float_type ratio_of_radii = 0.1;
   // wavelength of incoming radiation (in same units as the particle size)
-  const double wavelength = 2. * M_PI;
+  const float_type wavelength = 2. * M_PI;
   // refractive index
-  const std::complex<double> mr(1.5, 0.02);
+  const std::complex<float_type> mr(1.5, 0.02);
   // ratio of horizontal and vertical axis of the spheroidal particle
-  const double axis_ratio = 0.5;
+  const float_type axis_ratio = 0.5;
   // tolerance for the calculation
-  const double tolerance = 1.e-4;
+  const float_type tolerance = 1.e-4;
   // number of Gauss-Legendre points to use as a multiplier of the maximum
   // order of spherical harmonics used to decompose the electric field, during
   // the first loop of the algorithm
@@ -53,18 +60,19 @@ int main(int argc, char **argv) {
   const uint_fast32_t maximum_ngauss = 500;
 
   // make sure 'rat' contains the right ratio if it is not 1
-  if (std::abs(ratio_of_radii - 1.) > 1.e-8) {
+  if (abs(ratio_of_radii - 1.) > 1.e-8) {
     ratio_of_radii =
         SpecialFunctions::get_equal_volume_to_equal_surface_area_sphere_ratio(
             axis_ratio);
   }
 
   // R_V is the equivalent sphere radius
-  const double R_V = ratio_of_radii * axi;
+  const float_type R_V = ratio_of_radii * axi;
   // we need a reasonable initial guess for the order of the spherical harmonics
   // the below expression provides this guess
-  const double xev = 2. * M_PI * R_V / wavelength;
-  uint_fast32_t nmax = std::max(4., xev + 4.05 * std::cbrt(xev));
+  const float_type xev = 2. * M_PI * R_V / wavelength;
+  uint_fast32_t nmax = static_cast<uint_fast32_t>(
+      std::max(float_type(4.), xev + 4.05 * cbrt(xev)));
 
   // we need to find a maximum expansion order and number of Gauss-Legendre
   // quadrature points that leads to a converged T-matrix
@@ -77,10 +85,10 @@ int main(int argc, char **argv) {
   TMatrix *active_Tmatrix = nullptr;
 
   // loop control variables
-  double old_qext = 0.;
-  double old_qsca = 0.;
-  double dext = 1.;
-  double dsca = 1.;
+  float_type old_qext = 0.;
+  float_type old_qsca = 0.;
+  float_type dext = 1.;
+  float_type dsca = 1.;
   while (nmax < maximum_order && (dext > tolerance || dsca > tolerance)) {
     // initially we assume that the number of quadrature points is a fixed
     // multiple of the order
@@ -92,22 +100,22 @@ int main(int argc, char **argv) {
     TMatrix &T = *active_Tmatrix;
 
     // calculate the scattering and extinction factors for this iteration
-    double qsca = 0.;
-    double qext = 0.;
+    float_type qsca = 0.;
+    float_type qext = 0.;
     for (uint_fast32_t n = 1; n < nmax + 1; ++n) {
-      const double dn1 = 2. * n + 1.;
+      const float_type dn1 = 2. * n + 1.;
       qsca += dn1 *
               (std::norm(T(0, n, 0, 0, n, 0)) + std::norm(T(1, n, 0, 1, n, 0)));
       qext += dn1 * (T(0, n, 0, 0, n, 0).real() + T(1, n, 0, 1, n, 0).real());
     }
     // compute the relative difference w.r.t. the previous values
-    dsca = std::abs((old_qsca - qsca) / qsca);
-    dext = std::abs((old_qext - qext) / qext);
+    dsca = abs((old_qsca - qsca) / qsca);
+    dext = abs((old_qext - qext) / qext);
     old_qext = qext;
     old_qsca = qsca;
 
     // some (temporary) diagnostic output
-    ctm_warning("dsca: %g, dext: %g", dsca, dext);
+    ctm_warning("dsca: %g, dext: %g", double(dsca), double(dext));
 
     // increase the order
     ++nmax;
@@ -134,22 +142,22 @@ int main(int argc, char **argv) {
     TMatrix &T = *active_Tmatrix;
 
     // calculate the scattering and extinction factors
-    double qsca = 0.;
-    double qext = 0.;
+    float_type qsca = 0.;
+    float_type qext = 0.;
     for (uint_fast32_t n = 1; n < nmax + 1; ++n) {
-      const double dn1 = 2. * n + 1.;
+      const float_type dn1 = 2. * n + 1.;
       qsca += dn1 *
               (std::norm(T(0, n, 0, 0, n, 0)) + std::norm(T(1, n, 0, 1, n, 0)));
       qext += dn1 * (T(0, n, 0, 0, n, 0).real() + T(1, n, 0, 1, n, 0).real());
     }
     // compute the relative difference w.r.t. the old values
-    dsca = std::abs((old_qsca - qsca) / qsca);
-    dext = std::abs((old_qext - qext) / qext);
+    dsca = abs((old_qsca - qsca) / qsca);
+    dext = abs((old_qext - qext) / qext);
     old_qext = qext;
     old_qsca = qsca;
 
     // some diagnostic output
-    ctm_warning("dsca: %g, dext: %g", dsca, dext);
+    ctm_warning("dsca: %g, dext: %g", double(dsca), double(dext));
 
     // increase the number of quadrature points
     ++ngauss;
@@ -195,9 +203,9 @@ int main(int argc, char **argv) {
     }
   }
   // output the factors
-  ctm_warning("qsca: %g", old_qsca);
-  ctm_warning("qext: %g", old_qext);
-  ctm_warning("walb: %g", -old_qsca / old_qext);
+  ctm_warning("qsca: %g", double(old_qsca));
+  ctm_warning("qext: %g", double(old_qext));
+  ctm_warning("walb: %g", double(-old_qsca / old_qext));
 
   // clean up
   delete active_Tmatrix;
