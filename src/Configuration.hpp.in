@@ -26,7 +26,10 @@
 /*! @brief If defined, the system has Boost multiprecision available. */
 #cmakedefine HAVE_MULTIPRECISION
 
-#ifdef HAVE_MULTIPRECISION
+/*! @brief If defined, the code uses quad instead of double precision. */
+#cmakedefine HAVE_QUAD_PRECISION
+
+#if defined(HAVE_MULTIPRECISION) && defined(HAVE_QUAD_PRECISION)
 #include <boost/multiprecision/cpp_bin_float.hpp>
 typedef boost::multiprecision::cpp_bin_float_quad float_type;
 #else

@@ -43,7 +43,7 @@ public:
   inline Matrix(const uint_fast32_t number_of_rows,
                 const uint_fast32_t number_of_columns)
       : _number_of_rows(number_of_rows), _number_of_columns(number_of_columns) {
-    _array.resize(_number_of_rows * _number_of_columns, 0.);
+    _array.resize(_number_of_rows * _number_of_columns, DATA_TYPE(0.));
   }
 
   /**
@@ -180,6 +180,10 @@ public:
    */
   inline void plu_inverse() {
 
+    // required so that the compiler finds the correct division operator for
+    // std::complex<boost::multiprecision::cpp_bin_float_quad> DATA_TYPEs
+    const DATA_TYPE one(1.);
+
     if (_number_of_rows != _number_of_columns) {
       ctm_error("Trying to invert a non-square matrix!");
     }
@@ -194,12 +198,12 @@ public:
     for (uint_fast32_t i = 0; i < _number_of_columns; ++i) {
       // find the next pivot
       uint_fast32_t imax = i;
-      // note that we always use a double to store the element absolute value,
-      // independent of the element type (std::abs() returns a double when
-      // applied to a std::complex<double>)
-      double Smax = std::abs(A(imax, i));
+      // declaring the variables Smax and this_Smax as auto is the only way of
+      // making sure that we use the right type for
+      // std::complex<boost::multiprecision::cpp_bin_float_quad>> DATA_TYPEs
+      auto Smax = abs(A(imax, i));
       for (uint_fast32_t j = i + 1; j < _number_of_columns; ++j) {
-        const double this_Smax = std::abs(A(j, i));
+        const auto this_Smax = abs(A(j, i));
         if (this_Smax > Smax) {
           Smax = this_Smax;
           imax = j;
@@ -217,7 +221,7 @@ public:
         }
       }
       // compute the inverse of A_ii to save on divisions
-      const DATA_TYPE Aii_inv = 1. / A(i, i);
+      const DATA_TYPE Aii_inv = one / A(i, i);
       // now multiply all elements below row i in column i with this value
       for (uint_fast32_t j = i + 1; j < _number_of_columns; ++j) {
         A(j, i) *= Aii_inv;
@@ -236,11 +240,11 @@ public:
     // step 2: inversion of the U part of A
     for (uint_fast32_t i = 0; i < _number_of_columns; ++i) {
       // compute the diagonal element of the inverse matrix for row i
-      A(i, i) = 1. / A(i, i);
+      A(i, i) = one / A(i, i);
       // now use forward substitution to compute the other elements in this row
       for (uint_fast32_t j = i + 1; j < _number_of_columns; ++j) {
         // we need a temporary variable, as A_ij also features in the loop below
-        DATA_TYPE Aij = 0.;
+        DATA_TYPE Aij(0.);
         for (uint_fast32_t k = i; k < j; ++k) {
           Aij -= A(i, k) * A(k, j);
         }

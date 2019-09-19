@@ -7,8 +7,15 @@
  */
 
 #include "Assert.hpp"
+#include "Configuration.hpp"
 #include "SpecialFunctions.hpp"
 #include <fstream>
+
+#if defined(HAVE_MULTIPRECISION) && defined(HAVE_QUAD_PRECISION)
+using namespace boost::multiprecision;
+#else
+using namespace std;
+#endif
 
 /*! @brief Maximum order to test for Bessel and Wigner D functions,
  *  @f$n_{max}@f$. */
@@ -60,11 +67,11 @@ int main(int argc, char **argv) {
   for (uint_fast32_t i = 0; i < 1000; ++i) {
     // this expression should match the np.arange(0.05, 100., 0.1) in the
     // Python script
-    const double x = 0.05 + 0.1 * i;
+    const float_type x = 0.05 + 0.1 * i;
     // we create a complex argument to test the complex version
-    const std::complex<double> z(x, x);
+    const std::complex<float_type> z(x, x);
     // create output arrays for the complex version test
-    std::complex<double> j[TESTSPECIALFUNCTIONS_NMAX],
+    std::complex<float_type> j[TESTSPECIALFUNCTIONS_NMAX],
         dj[TESTSPECIALFUNCTIONS_NMAX];
     // call the spherical Bessel function of the first kind for complex input
     // and output
@@ -78,7 +85,7 @@ int main(int argc, char **argv) {
           << dj[TESTSPECIALFUNCTIONS_NMAX - 1].real() << "\t"
           << dj[TESTSPECIALFUNCTIONS_NMAX - 1].imag() << "\n";
     // create output arrays for the real version tests
-    double jr[TESTSPECIALFUNCTIONS_NMAX], djr[TESTSPECIALFUNCTIONS_NMAX],
+    float_type jr[TESTSPECIALFUNCTIONS_NMAX], djr[TESTSPECIALFUNCTIONS_NMAX],
         yr[TESTSPECIALFUNCTIONS_NMAX], dyr[TESTSPECIALFUNCTIONS_NMAX];
     // call the spherical Bessel function of the first kind for real input
     // and output
@@ -103,9 +110,9 @@ int main(int argc, char **argv) {
   for (uint_fast32_t i = 0; i < 1000; ++i) {
     // this expression should match the np.arange(-0.999, 1., 0.002) expression
     // in the Python script
-    const double cosx = -0.999 + 0.002 * i;
+    const float_type cosx = -0.999 + 0.002 * i;
     // create output arrays
-    double d[TESTSPECIALFUNCTIONS_NMAX], dd[TESTSPECIALFUNCTIONS_NMAX];
+    float_type d[TESTSPECIALFUNCTIONS_NMAX], dd[TESTSPECIALFUNCTIONS_NMAX];
     // call the function with m=0
     SpecialFunctions::wigner_dn_0m(cosx, TESTSPECIALFUNCTIONS_NMAX, 0, d, dd);
     // write an output line
@@ -123,85 +130,107 @@ int main(int argc, char **argv) {
 
   assert_condition(
       SpecialFunctions::get_equal_volume_to_equal_surface_area_sphere_ratio(
-          1.) == 1.);
-  assert_values_equal_rel(
+          float_type(1.)) == float_type(1.));
+  const double prolate = double(
       SpecialFunctions::get_equal_volume_to_equal_surface_area_sphere_ratio(
-          0.5),
-      0.9637112829756893, 1.e-10);
-  assert_values_equal_rel(
-      SpecialFunctions::get_equal_volume_to_equal_surface_area_sphere_ratio(2.),
-      0.955443263377723, 1.e-10);
+          float_type(0.5)));
+  assert_values_equal_rel(prolate, 0.9637112829756893, 1.e-10);
+  const double oblate = double(
+      SpecialFunctions::get_equal_volume_to_equal_surface_area_sphere_ratio(
+          float_type(2.)));
+  assert_values_equal_rel(oblate, 0.955443263377723, 1.e-10);
 
   /// Gauss-Legendre quadrature
 
-  std::vector<double> x(TESTSPECIALFUNCTIONS_NGAUSS),
+  const double tolerance = 1.e-7;
+  std::vector<float_type> x(TESTSPECIALFUNCTIONS_NGAUSS),
       w(TESTSPECIALFUNCTIONS_NGAUSS);
   // first test against the values on Wikipedia
   {
     // n = 1
     SpecialFunctions::get_gauss_legendre_points_and_weigths(1, x, w);
-    ctm_warning("x: [%g], w: [%g]", x[0], w[0]);
+    ctm_warning("x: [%g], w: [%g]", double(x[0]), double(w[0]));
     assert_condition(x[0] == 0.);
     assert_condition(w[0] == 2.);
   }
   {
     // n = 2
     SpecialFunctions::get_gauss_legendre_points_and_weigths(2, x, w);
-    ctm_warning("x: [%g, %g], w: [%g, %g]", x[0], x[1], w[0], w[1]);
-    assert_values_equal_rel(x[0], -1. / std::sqrt(3.), 1.e-10);
-    assert_values_equal_rel(w[0], 1., 1.e-10);
-    assert_values_equal_rel(x[1], 1. / std::sqrt(3.), 1.e-10);
-    assert_values_equal_rel(w[1], 1., 1.e-10);
+    ctm_warning("x: [%g, %g], w: [%g, %g]", double(x[0]), double(x[1]),
+                double(w[0]), double(w[1]));
+    assert_values_equal_rel(double(x[0]), -1. / std::sqrt(3.), tolerance);
+    assert_values_equal_rel(double(w[0]), 1., tolerance);
+    assert_values_equal_rel(double(x[1]), 1. / std::sqrt(3.), tolerance);
+    assert_values_equal_rel(double(w[1]), 1., tolerance);
   }
   {
     // n = 3
     SpecialFunctions::get_gauss_legendre_points_and_weigths(3, x, w);
-    ctm_warning("x: [%g, %g, %g], w: [%g, %g, %g]", x[0], x[1], x[2], w[0],
-                w[1], w[2]);
-    assert_values_equal_rel(x[0], -std::sqrt(3. / 5.), 1.e-10);
-    assert_values_equal_rel(w[0], 5. / 9., 1.e-10);
-    assert_condition(x[1] == 0.);
-    assert_values_equal_rel(w[1], 8. / 9., 1.e-10);
-    assert_values_equal_rel(x[2], std::sqrt(3. / 5.), 1.e-10);
-    assert_values_equal_rel(w[2], 5. / 9., 1.e-10);
+    ctm_warning("x: [%g, %g, %g], w: [%g, %g, %g]", double(x[0]), double(x[1]),
+                double(x[2]), double(w[0]), double(w[1]), double(w[2]));
+    assert_values_equal_rel(double(x[0]), -std::sqrt(3. / 5.), tolerance);
+    assert_values_equal_rel(double(w[0]), 5. / 9., tolerance);
+    assert_values_equal_tol(double(x[1]), 0., tolerance);
+    assert_values_equal_rel(double(w[1]), 8. / 9., tolerance);
+    assert_values_equal_rel(double(x[2]), std::sqrt(3. / 5.), tolerance);
+    assert_values_equal_rel(double(w[2]), 5. / 9., tolerance);
   }
   {
     // n = 4
     SpecialFunctions::get_gauss_legendre_points_and_weigths(4, x, w);
-    ctm_warning("x: [%g, %g, %g, %g], w: [%g, %g, %g, %g]", x[0], x[1], x[2],
-                x[3], w[0], w[1], w[2], w[3]);
-    assert_values_equal_rel(
-        x[0], -std::sqrt(3. / 7. + 2. / 7. * std::sqrt(6. / 5.)), 1.e-10);
-    assert_values_equal_rel(w[0], (18 - std::sqrt(30.)) / 36., 1.e-10);
-    assert_values_equal_rel(
-        x[1], -std::sqrt(3. / 7. - 2. / 7. * std::sqrt(6. / 5.)), 1.e-10);
-    assert_values_equal_rel(w[1], (18. + std::sqrt(30.)) / 36., 1.e-10);
-    assert_values_equal_rel(
-        x[2], std::sqrt(3. / 7. - 2. / 7. * std::sqrt(6. / 5.)), 1.e-10);
-    assert_values_equal_rel(w[2], (18. + std::sqrt(30.)) / 36., 1.e-10);
-    assert_values_equal_rel(
-        x[3], std::sqrt(3. / 7. + 2. / 7. * std::sqrt(6. / 5.)), 1.e-10);
-    assert_values_equal_rel(w[3], (18 - std::sqrt(30.)) / 36., 1.e-10);
+    ctm_warning("x: [%g, %g, %g, %g], w: [%g, %g, %g, %g]", double(x[0]),
+                double(x[1]), double(x[2]), double(x[3]), double(w[0]),
+                double(w[1]), double(w[2]), double(w[3]));
+    assert_values_equal_rel(double(x[0]),
+                            -std::sqrt(3. / 7. + 2. / 7. * std::sqrt(6. / 5.)),
+                            tolerance);
+    assert_values_equal_rel(double(w[0]), (18 - std::sqrt(30.)) / 36.,
+                            tolerance);
+    assert_values_equal_rel(double(x[1]),
+                            -std::sqrt(3. / 7. - 2. / 7. * std::sqrt(6. / 5.)),
+                            tolerance);
+    assert_values_equal_rel(double(w[1]), (18. + std::sqrt(30.)) / 36.,
+                            tolerance);
+    assert_values_equal_rel(double(x[2]),
+                            std::sqrt(3. / 7. - 2. / 7. * std::sqrt(6. / 5.)),
+                            tolerance);
+    assert_values_equal_rel(double(w[2]), (18. + std::sqrt(30.)) / 36.,
+                            tolerance);
+    assert_values_equal_rel(double(x[3]),
+                            std::sqrt(3. / 7. + 2. / 7. * std::sqrt(6. / 5.)),
+                            tolerance);
+    assert_values_equal_rel(double(w[3]), (18 - std::sqrt(30.)) / 36.,
+                            tolerance);
   }
   {
     // n = 5
     SpecialFunctions::get_gauss_legendre_points_and_weigths(5, x, w);
-    ctm_warning("x: [%g, %g, %g, %g, %g], w: [%g, %g, %g, %g, %g]", x[0], x[1],
-                x[2], x[3], x[4], w[0], w[1], w[2], w[3], w[4]);
-    assert_values_equal_rel(
-        x[0], -1. / 3. * std::sqrt(5. + 2. * std::sqrt(10. / 7.)), 1.e-10);
-    assert_values_equal_rel(w[0], (322. - 13. * std::sqrt(70.)) / 900., 1.e-10);
-    assert_values_equal_rel(
-        x[1], -1. / 3. * std::sqrt(5. - 2. * std::sqrt(10. / 7.)), 1.e-10);
-    assert_values_equal_rel(w[1], (322. + 13. * std::sqrt(70.)) / 900., 1.e-10);
-    assert_condition(x[2] == 0.);
-    assert_values_equal_rel(w[2], 128. / 225., 1.e-10);
-    assert_values_equal_rel(
-        x[3], 1. / 3. * std::sqrt(5. - 2. * std::sqrt(10. / 7.)), 1.e-10);
-    assert_values_equal_rel(w[3], (322. + 13. * std::sqrt(70.)) / 900., 1.e-10);
-    assert_values_equal_rel(
-        x[4], 1. / 3. * std::sqrt(5. + 2. * std::sqrt(10. / 7.)), 1.e-10);
-    assert_values_equal_rel(w[4], (322. - 13. * std::sqrt(70.)) / 900., 1.e-10);
+    ctm_warning("x: [%g, %g, %g, %g, %g], w: [%g, %g, %g, %g, %g]",
+                double(x[0]), double(x[1]), double(x[2]), double(x[3]),
+                double(x[4]), double(w[0]), double(w[1]), double(w[2]),
+                double(w[3]), double(w[4]));
+    assert_values_equal_rel(double(x[0]),
+                            -1. / 3. * std::sqrt(5. + 2. * std::sqrt(10. / 7.)),
+                            tolerance);
+    assert_values_equal_rel(double(w[0]), (322. - 13. * std::sqrt(70.)) / 900.,
+                            tolerance);
+    assert_values_equal_rel(double(x[1]),
+                            -1. / 3. * std::sqrt(5. - 2. * std::sqrt(10. / 7.)),
+                            tolerance);
+    assert_values_equal_rel(double(w[1]), (322. + 13. * std::sqrt(70.)) / 900.,
+                            tolerance);
+    assert_values_equal_tol(double(x[2]), 0., tolerance);
+    assert_values_equal_rel(double(w[2]), 128. / 225., tolerance);
+    assert_values_equal_rel(double(x[3]),
+                            1. / 3. * std::sqrt(5. - 2. * std::sqrt(10. / 7.)),
+                            tolerance);
+    assert_values_equal_rel(double(w[3]), (322. + 13. * std::sqrt(70.)) / 900.,
+                            tolerance);
+    assert_values_equal_rel(double(x[4]),
+                            1. / 3. * std::sqrt(5. + 2. * std::sqrt(10. / 7.)),
+                            tolerance);
+    assert_values_equal_rel(double(w[4]), (322. - 13. * std::sqrt(70.)) / 900.,
+                            tolerance);
   }
 
   // now print additional values for a much higher order to analyse with the

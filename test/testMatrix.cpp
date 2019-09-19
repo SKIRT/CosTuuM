@@ -6,8 +6,15 @@
  * @author Bert Vandenbroucke (bert.vandenbroucke@ugent.be)
  */
 
+#include "Configuration.hpp"
 #include "Matrix.hpp"
 #include <iostream>
+
+#if defined(HAVE_MULTIPRECISION) && defined(HAVE_QUAD_PRECISION)
+using namespace boost::multiprecision;
+#else
+using namespace std;
+#endif
 
 /**
  * @brief Unit test for the Matrix class and its member functions.
@@ -18,7 +25,7 @@
  */
 int main(int argc, char **argv) {
 
-  Matrix<std::complex<double>> A(3, 3);
+  Matrix<std::complex<float_type>> A(3, 3);
   A(0, 0) = 1.;
   A(0, 0).imag(1.);
   A(0, 1) = 2.;

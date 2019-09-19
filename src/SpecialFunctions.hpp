@@ -78,21 +78,29 @@ public:
                                            const DATA_TYPE z, DATA_TYPE *y,
                                            DATA_TYPE *dy) {
 
+    // we need these for std::complex DATA_TYPEs with extended precision,
+    // since otherwise the compiler cannot find the correct division and
+    // multiplication operators
+    const DATA_TYPE one(1.);
+    const DATA_TYPE three(3.);
+
     // compute the 1st and 2nd order functions manually
-    const DATA_TYPE cosz = std::cos(z);
-    const DATA_TYPE sinz = std::sin(z);
-    const DATA_TYPE zinv = 1. / z;
+    const DATA_TYPE cosz = cos(z);
+    const DATA_TYPE sinz = sin(z);
+    const DATA_TYPE zinv = one / z;
     const DATA_TYPE zinv2 = zinv * zinv;
     const DATA_TYPE zinv3 = zinv2 * zinv;
     y[0] = -cosz * zinv2 - sinz * zinv;
-    y[1] = (-3. * zinv3 + zinv) * cosz - 3. * zinv2 * sinz;
+    y[1] = (-three * zinv3 + zinv) * cosz - three * zinv2 * sinz;
     // same for the derivatives (this implicitly uses the recursion relation)
     dy[0] = -zinv * (cosz + y[0]);
     dy[1] = y[0] - zinv * y[1];
     // now apply the recursion relations for the rest
     for (uint_fast32_t i = 2; i < nmax; ++i) {
-      y[i] = (2. * i + 1.) * zinv * y[i - 1] - y[i - 2];
-      dy[i] = y[i - 1] - (i + 1.) * zinv * y[i];
+      const DATA_TYPE twoip1(2. * i + 1.);
+      const DATA_TYPE ip1(i + 1.);
+      y[i] = twoip1 * zinv * y[i - 1] - y[i - 2];
+      dy[i] = y[i - 1] - ip1 * zinv * y[i];
     }
   }
 
@@ -163,18 +171,20 @@ public:
     // set up and compute the array of ratios using a backward recursion
     // algorithm
     DATA_TYPE rho[SPECIALFUNCTIONS_BESSEL_NMAX];
-    const DATA_TYPE zinv = 1. / z;
+    const DATA_TYPE one(1.);
+    const DATA_TYPE zinv = one / z;
     // we assume that for high enough order, the ratio tends to the
     // asymptotic value
-    rho[SPECIALFUNCTIONS_BESSEL_NMAX - 1] =
-        z / (2. * SPECIALFUNCTIONS_BESSEL_NMAX + 1.);
+    const DATA_TYPE twonp1(2. * SPECIALFUNCTIONS_BESSEL_NMAX + 1.);
+    rho[SPECIALFUNCTIONS_BESSEL_NMAX - 1] = z / twonp1;
     // now recurse down to get the ratio for lower orders
     for (uint_fast32_t i = 1; i < SPECIALFUNCTIONS_BESSEL_NMAX; ++i) {
       const uint_fast32_t index = SPECIALFUNCTIONS_BESSEL_NMAX - i;
-      rho[index - 1] = 1. / ((2. * index + 1.) * zinv - rho[index]);
+      const DATA_TYPE twoip1(2. * index + 1.);
+      rho[index - 1] = one / (twoip1 * zinv - rho[index]);
     }
     // compute the zeroth order Bessel function of the first kind
-    const DATA_TYPE sinz = std::sin(z);
+    const DATA_TYPE sinz = sin(z);
     const DATA_TYPE j0 = sinz * zinv;
     // use the ratio and recursion relation to find the 1st order function and
     // derivative expression
@@ -183,7 +193,8 @@ public:
     // now recurse forward to find the rest
     for (uint_fast32_t i = 1; i < nmax; ++i) {
       j[i] = rho[i] * j[i - 1];
-      dj[i] = j[i - 1] - (i + 1.) * zinv * j[i];
+      const DATA_TYPE ip1(i + 1.);
+      dj[i] = j[i - 1] - ip1 * zinv * j[i];
     }
     return;
   }
@@ -246,27 +257,33 @@ public:
    * nmax).
    * @param dy Array to store the derivatives
    * @f$d/dx\left(d^n_{0m}(x)\right)@f$ in (of size nmax).
+   * @tparam DATA_TYPE Data type of input and output values.
    */
-  static inline void wigner_dn_0m(const double cosx, const uint_fast32_t nmax,
-                                  const uint_fast32_t m, double *y,
-                                  double *dy) {
+  template <typename DATA_TYPE>
+  static inline void
+  wigner_dn_0m(const DATA_TYPE cosx, const uint_fast32_t nmax,
+               const uint_fast32_t m, DATA_TYPE *y, DATA_TYPE *dy) {
+
+    const DATA_TYPE zero(0.);
+    const DATA_TYPE one(1.);
+    const DATA_TYPE two(2.);
 
     // precompute sin(x) and its inverse
-    const double sinx = std::sqrt(1. - cosx * cosx);
-    const double sinxinv = 1. / sinx;
+    const DATA_TYPE sinx = sqrt(one - cosx * cosx);
+    const DATA_TYPE sinxinv = one / sinx;
     // branch out depending on the m value
     if (m == 0) {
       // manually set the starting point for the recursion algorithm by
       // applying the recursion formula once
-      double d1 = 1.;
-      double d2 = cosx;
+      DATA_TYPE d1(1.);
+      DATA_TYPE d2 = cosx;
       // now recurse for the other values
       for (uint_fast32_t n = 0; n < nmax; ++n) {
-        const double np1 = n + 1.;
-        const double np2 = n + 2.;
-        const double np12p1 = 2. * np1 + 1.;
-        const double dnp1 = (np12p1 * cosx * d2 - np1 * d1) / np2;
-        const double ddn = sinxinv * np1 * np2 * (dnp1 - d1) / np12p1;
+        const DATA_TYPE np1(n + 1.);
+        const DATA_TYPE np2(n + 2.);
+        const DATA_TYPE np12p1 = two * np1 + one;
+        const DATA_TYPE dnp1 = (np12p1 * cosx * d2 - np1 * d1) / np2;
+        const DATA_TYPE ddn = sinxinv * np1 * np2 * (dnp1 - d1) / np12p1;
         // note that we computed d^{n+1}_{0m}; d^n_{0m} was computed in the
         // previous iteration
         y[n] = d2;
@@ -276,31 +293,31 @@ public:
       }
     } else {
       // precompute m^2
-      const double m2 = m * m;
-      double d1 = 0.;
-      double d2 = 1.;
+      const DATA_TYPE m2 = m * m;
+      DATA_TYPE d1(0.);
+      DATA_TYPE d2(1.);
       // compute the factor A_m sin^m(x)
       for (uint_fast32_t i = 0; i < m; ++i) {
-        const double i2 = 2. * (i + 1.);
-        d2 *= std::sqrt((i2 - 1.) / i2) * sinx;
+        const DATA_TYPE i2(2. * (i + 1.));
+        d2 *= sqrt((i2 - one) / i2) * sinx;
       }
       // zero out n < m-1 elements in the array
       for (uint_fast32_t n = 0; n < m - 1; ++n) {
-        y[n] = 0.;
-        dy[n] = 0.;
+        y[n] = zero;
+        dy[n] = zero;
       }
       // now recurse to find all other values
       for (uint_fast32_t n = m - 1; n < nmax; ++n) {
-        const double np1 = n + 1.;
-        const double np2 = n + 2.;
-        const double np12p1 = 2. * np1 + 1.;
-        const double sqrtnp12mm2 = std::sqrt(np1 * np1 - m2);
-        const double sqrtnp22mm2 = std::sqrt(np2 * np2 - m2);
-        const double dnp1 =
+        const DATA_TYPE np1(n + 1.);
+        const DATA_TYPE np2(n + 2.);
+        const DATA_TYPE np12p1 = two * np1 + one;
+        const DATA_TYPE sqrtnp12mm2 = sqrt(np1 * np1 - m2);
+        const DATA_TYPE sqrtnp22mm2 = sqrt(np2 * np2 - m2);
+        const DATA_TYPE dnp1 =
             (np12p1 * cosx * d2 - sqrtnp12mm2 * d1) / sqrtnp22mm2;
-        const double ddn = sinxinv *
-                           (np1 * sqrtnp22mm2 * dnp1 - np2 * sqrtnp12mm2 * d1) /
-                           np12p1;
+        const DATA_TYPE ddn =
+            sinxinv * (np1 * sqrtnp22mm2 * dnp1 - np2 * sqrtnp12mm2 * d1) /
+            np12p1;
         // note that we computed d^{n+1}_{0m}; d^n_{0m} was computed in the
         // previous iteration
         y[n] = d2;
@@ -369,25 +386,33 @@ public:
    * spheroid, @f$d = \frac{a}{b}@f$.
    * @return Ratio of the radii of the equal volume and equal surface area
    * sphere, @f$\frac{R_V}{R_S}@f$.
+   * @tparam DATA_TYPE Data type of input and output values.
    */
-  static inline double
-  get_equal_volume_to_equal_surface_area_sphere_ratio(const double axis_ratio) {
-    if (axis_ratio > 1.) {
-      const double axis_ratio2 = axis_ratio * axis_ratio;
-      const double e = std::sqrt(1. - 1. / axis_ratio2);
-      const double cbrtaxis_ratio2 = std::cbrt(axis_ratio2);
-      return 1. /
-             std::sqrt(0.25 * (2. * cbrtaxis_ratio2 +
-                               std::log((1. + e) / (1. - e)) /
-                                   (e * cbrtaxis_ratio2 * cbrtaxis_ratio2)));
-    } else if (axis_ratio < 1.) {
-      const double cbrtaxis_ratio = std::cbrt(axis_ratio);
-      const double e = std::sqrt(1. - axis_ratio * axis_ratio);
-      return 1. / std::sqrt(0.5 * (cbrtaxis_ratio * cbrtaxis_ratio +
-                                   std::asin(e) / (e * cbrtaxis_ratio)));
+  template <typename DATA_TYPE>
+  static inline DATA_TYPE get_equal_volume_to_equal_surface_area_sphere_ratio(
+      const DATA_TYPE axis_ratio) {
+
+    const DATA_TYPE one(1.);
+    const DATA_TYPE two(2.);
+    const DATA_TYPE half(0.5);
+    const DATA_TYPE quarter(0.25);
+
+    if (axis_ratio > one) {
+      const DATA_TYPE axis_ratio2 = axis_ratio * axis_ratio;
+      const DATA_TYPE e = sqrt(one - one / axis_ratio2);
+      const DATA_TYPE cbrtaxis_ratio2 = cbrt(axis_ratio2);
+      return one /
+             sqrt(quarter * (two * cbrtaxis_ratio2 +
+                             log((one + e) / (one - e)) /
+                                 (e * cbrtaxis_ratio2 * cbrtaxis_ratio2)));
+    } else if (axis_ratio < one) {
+      const DATA_TYPE cbrtaxis_ratio = cbrt(axis_ratio);
+      const DATA_TYPE e = sqrt(one - axis_ratio * axis_ratio);
+      return one / sqrt(half * (cbrtaxis_ratio * cbrtaxis_ratio +
+                                asin(e) / (e * cbrtaxis_ratio)));
     } else {
       // the spheroid is in fact as sphere, so the ratio is trivially 1
-      return 1.;
+      return one;
     }
   }
 
@@ -448,11 +473,13 @@ public:
    * @param order Order of the quadrature, @f$n@f$.
    * @param points Vector to store the resulting coordinates in (of size order).
    * @param weights Vector to store the resulting weights in (of size order).
+   * @tparam DATA_TYPE Data type of input and output values.
    */
+  template <typename DATA_TYPE>
   static inline void
   get_gauss_legendre_points_and_weigths(const uint_fast32_t order,
-                                        std::vector<double> &points,
-                                        std::vector<double> &weights) {
+                                        std::vector<DATA_TYPE> &points,
+                                        std::vector<DATA_TYPE> &weights) {
 
     // we know that the roots are symmetric around 0 in the interval [-1,1]
     // this means we only need to compute half of them (+1 for odd n)
@@ -461,21 +488,22 @@ public:
     for (uint_fast32_t i = 0; i < k; ++i) {
 
       // compute the initial guess for x_i (note that our i is i-1)
-      const double theta_n_k = M_PI * (i + 0.75) / (order + 0.5);
-      const double orderinv = 1. / order;
-      const double orderinv2 = orderinv * orderinv;
-      double x_i = (1. - 0.125 * orderinv2 + (5. / 38.) * orderinv * orderinv2 -
-                    (2. / 25.) * orderinv2 * orderinv2 *
-                        (1. - (14. / 39.) / (theta_n_k * theta_n_k))) *
-                   std::cos(theta_n_k);
+      const DATA_TYPE theta_n_k = M_PI * (i + 0.75) / (order + 0.5);
+      const DATA_TYPE orderinv = 1. / order;
+      const DATA_TYPE orderinv2 = orderinv * orderinv;
+      DATA_TYPE x_i =
+          (1. - 0.125 * orderinv2 + (5. / 38.) * orderinv * orderinv2 -
+           (2. / 25.) * orderinv2 * orderinv2 *
+               (1. - (14. / 39.) / (theta_n_k * theta_n_k))) *
+          cos(theta_n_k);
 
       // Newton-Raphson scheme
       uint_fast32_t niter = 0;
       // we aim for a precision of 1.e-16, and relax this if we cannot obtain
       // an accurate result after many iterations
-      double check = 1.e-16;
-      double pa;
-      double pb;
+      DATA_TYPE check = 1.e-16;
+      DATA_TYPE pa;
+      DATA_TYPE pb;
       do {
         ++niter;
         // relax the tolerance after many iterations
@@ -484,7 +512,7 @@ public:
         }
         // initial values for the recursion relation
         pb = 1.;
-        double pc = x_i;
+        DATA_TYPE pc = x_i;
         // now recurse until we reach the desired order
         for (uint_fast32_t j = 1; j < order; ++j) {
           pa = pb;
@@ -497,7 +525,7 @@ public:
         pb = pa * pc * (1. - x_i * x_i);
         // pb is P_n(x)/P_n'(x)
         x_i = x_i - pb;
-      } while (std::abs(pb) > check * std::abs(x_i));
+      } while (abs(pb) > check * abs(x_i));
 
       // we set the element n - i - 1
       const uint_fast32_t m = order - i - 1;

@@ -199,6 +199,15 @@ else(ACTIVATE_ASSERTIONS)
   message(STATUS "Assertions not activated.")
 endif(ACTIVATE_ASSERTIONS)
 
+# Check if we need to activate quad precision
+if(ACTIVATE_QUAD_PRECISION)
+  add_configuration_option(HAVE_QUAD_PRECISION True)
+  message(STATUS "Using quad precision.")
+else(ACTIVATE_QUAD_PRECISION)
+  add_configuration_option(HAVE_QUAD_PRECISION False)
+  message(STATUS "Using double precision.")
+endif(ACTIVATE_QUAD_PRECISION)
+
 ## Code configuration ##########################################################
 
 # Tell CMake that headers are in one of the src folders.
