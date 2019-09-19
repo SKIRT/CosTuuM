@@ -329,6 +329,122 @@ public:
   }
 
   /**
+   * @brief Special version of SpecialFunctions::wigner_dn_0m() that divides the
+   * elements of the first return array by the sine of the input angle.
+   *
+   * The code is mostly the same as the original function with the addition of
+   * the division by the sine. However, for input angles close to zero, possible
+   * division by zero and serious round off error might occur, which we need to
+   * deal with here with special code.
+   *
+   * @param cosx Cosine of the input value @f$x@f$ (should be in the interval
+   * @f$[-1,1]@f$).
+   * @param nmax Maximum order @f$n_{max}@f$.
+   * @param m Absolute value of the quantum number @f$m@f$
+   * (@f$m \in{} [0,n_{max}]@f$).
+   * @param y Array to store the functions @f$\frac{d^{n}_{0m}(x)}{\sin(x)}@f$
+   * in (of size nmax).
+   * @param dy Array to store the derivatives
+   * @f$d/dx\left(d^n_{0m}(x)\right)@f$ in (of size nmax).
+   * @tparam DATA_TYPE Data type of input and output values.
+   */
+  template <typename DATA_TYPE>
+  static inline void
+  wigner_dn_0m_sinx(const DATA_TYPE cosx, const uint_fast32_t nmax,
+                    const uint_fast32_t m, DATA_TYPE *y, DATA_TYPE *dy) {
+
+    // check if the input argument is close to 1 (corresponding to a sine close
+    // to 0
+    if (abs(1. - abs(cosx)) <= 1.e-10) {
+      if (m == 1) {
+        int_fast8_t sign = 1;
+        for (uint_fast32_t n = 1; n < nmax + 1; ++n) {
+          DATA_TYPE dn = 0.5 * sqrt(n * (n + 1.));
+          if (cosx < 0.) {
+            dn *= sign;
+          }
+          y[n - 1] = dn;
+          if (cosx < 0.) {
+            dn = -dn;
+          }
+          dy[n - 1] = dn;
+          // swap sign for the next iteration
+          sign = -sign;
+        }
+      } else {
+        // simply set all return values to zero
+        for (uint_fast32_t i = 0; i < nmax; ++i) {
+          y[i] = 0.;
+          dy[i] = 0.;
+        }
+      }
+    } else {
+      const DATA_TYPE zero(0.);
+      const DATA_TYPE one(1.);
+      const DATA_TYPE two(2.);
+
+      // precompute sin(x) and its inverse
+      const DATA_TYPE sinx = sqrt(one - cosx * cosx);
+      const DATA_TYPE sinxinv = one / sinx;
+      // branch out depending on the m value
+      if (m == 0) {
+        // manually set the starting point for the recursion algorithm by
+        // applying the recursion formula once
+        DATA_TYPE d1(1.);
+        DATA_TYPE d2 = cosx;
+        // now recurse for the other values
+        for (uint_fast32_t n = 0; n < nmax; ++n) {
+          const DATA_TYPE np1(n + 1.);
+          const DATA_TYPE np2(n + 2.);
+          const DATA_TYPE np12p1 = two * np1 + one;
+          const DATA_TYPE dnp1 = (np12p1 * cosx * d2 - np1 * d1) / np2;
+          const DATA_TYPE ddn = sinxinv * np1 * np2 * (dnp1 - d1) / np12p1;
+          // note that we computed d^{n+1}_{0m}; d^n_{0m} was computed in the
+          // previous iteration
+          y[n] = d2 * sinxinv;
+          dy[n] = ddn;
+          d1 = d2;
+          d2 = dnp1;
+        }
+      } else {
+        // precompute m^2
+        const DATA_TYPE m2 = m * m;
+        DATA_TYPE d1(0.);
+        DATA_TYPE d2(1.);
+        // compute the factor A_m sin^m(x)
+        for (uint_fast32_t i = 0; i < m; ++i) {
+          const DATA_TYPE i2(2. * (i + 1.));
+          d2 *= sqrt((i2 - one) / i2) * sinx;
+        }
+        // zero out n < m-1 elements in the array
+        for (uint_fast32_t n = 0; n < m - 1; ++n) {
+          y[n] = zero;
+          dy[n] = zero;
+        }
+        // now recurse to find all other values
+        for (uint_fast32_t n = m - 1; n < nmax; ++n) {
+          const DATA_TYPE np1(n + 1.);
+          const DATA_TYPE np2(n + 2.);
+          const DATA_TYPE np12p1 = two * np1 + one;
+          const DATA_TYPE sqrtnp12mm2 = sqrt(np1 * np1 - m2);
+          const DATA_TYPE sqrtnp22mm2 = sqrt(np2 * np2 - m2);
+          const DATA_TYPE dnp1 =
+              (np12p1 * cosx * d2 - sqrtnp12mm2 * d1) / sqrtnp22mm2;
+          const DATA_TYPE ddn =
+              sinxinv * (np1 * sqrtnp22mm2 * dnp1 - np2 * sqrtnp12mm2 * d1) /
+              np12p1;
+          // note that we computed d^{n+1}_{0m}; d^n_{0m} was computed in the
+          // previous iteration
+          y[n] = d2 * sinxinv;
+          dy[n] = ddn;
+          d1 = d2;
+          d2 = dnp1;
+        }
+      }
+    }
+  }
+
+  /**
    * @brief Calculates the ratio of the radii of an equal volume and an equal
    * surface area sphere for the spheroid with the given axis ratio.
    *
@@ -471,13 +587,15 @@ public:
    * 59, 245 (https://doi.org/10.1016/0377-0427(94)00030-5).
    *
    * @param order Order of the quadrature, @f$n@f$.
-   * @param points Vector to store the resulting coordinates in (of size order).
-   * @param weights Vector to store the resulting weights in (of size order).
+   * @param points Vector to store the resulting coordinates in. This vector
+   * should be preallocated with the correct size, i.e. the order @f$n@f$.
+   * @param weights Vector to store the resulting weights in. This vector
+   * should be preallocated with the correct size, i.e. the order @f$n@f$.
    * @tparam DATA_TYPE Data type of input and output values.
    */
   template <typename DATA_TYPE>
   static inline void
-  get_gauss_legendre_points_and_weigths(const uint_fast32_t order,
+  get_gauss_legendre_points_and_weights(const uint_fast32_t order,
                                         std::vector<DATA_TYPE> &points,
                                         std::vector<DATA_TYPE> &weights) {
 
@@ -525,7 +643,7 @@ public:
         pb = pa * pc * (1. - x_i * x_i);
         // pb is P_n(x)/P_n'(x)
         x_i = x_i - pb;
-      } while (abs(pb) > check * abs(x_i));
+      } while (std::abs(pb) > check * std::abs(x_i));
 
       // we set the element n - i - 1
       const uint_fast32_t m = order - i - 1;
@@ -577,18 +695,23 @@ public:
    *        \sin^2(\theta{}) + d^2\cos^2(\theta{})}
    * @f]
    *
-   * @param costheta Cosine of the azimuthal angles, @f$\cos(\theta{})@f$.
+   * @param costheta Cosine of the azimuthal angles, @f$\cos(\theta{})@f$. We
+   * assume that values are given in order from low to high, and are symmetric
+   * w.r.t. @f$0@f$.
    * @param R_V Equal volume sphere radius, @f$R_V@f$.
    * @param axis_ratio Ratio of horizontal to vertical axis,
    * @f$d = \frac{a}{b}@f$.
-   * @param r2 Output radii squared, @f$r^2(\theta{})@f$.
+   * @param r2 Output radii squared, @f$r^2(\theta{})@f$. This vector should be
+   * preallocated with the correct size, i.e. the same size as the input vector.
    * @param dr_over_r Derivative over radius,
-   * @f$\frac{1}{r(\theta{})}\frac{dr(\theta{})}{d\theta{}}@f$.
+   * @f$\frac{1}{r(\theta{})}\frac{dr(\theta{})}{d\theta{}}@f$. This vector
+   * should be preallocated with the correct size, i.e. the same size as the
+   * input vector.
    * @tparam DATA_TYPE Data type of input and output values.
    */
   template <typename DATA_TYPE>
   static inline void
-  get_r_dr_spheroid(const std::vector<DATA_TYPE> costheta, const DATA_TYPE R_V,
+  get_r_dr_spheroid(const std::vector<DATA_TYPE> &costheta, const DATA_TYPE R_V,
                     const DATA_TYPE axis_ratio, std::vector<DATA_TYPE> &r2,
                     std::vector<DATA_TYPE> &dr_over_r) {
 

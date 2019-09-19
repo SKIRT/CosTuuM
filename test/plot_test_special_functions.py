@@ -223,6 +223,77 @@ pl.tight_layout()
 pl.savefig("test_wigner_d.png", dpi=300)
 pl.close()
 
+# open the output from the unit test
+testdata = np.loadtxt("test_wigner_d_sinx.txt")
+# filter out different m values and functions and derivatives
+testdm0 = testdata[::2, 0]
+testddm0 = testdata[::2, 1]
+testdmn = testdata[1::2, 0]
+testddmn = testdata[1::2, 1]
+
+# set up the reference range (should match the expression in the unit test)
+refcosx = np.arange(-0.999, 1.0, 0.002)
+
+# generate reference values for m=0
+m = 0
+refdm0 = np.zeros(refcosx.shape)
+refddm0 = np.zeros(refcosx.shape)
+# special.lpmn does not take input arrays for x, so we need to iterate
+for i in range(len(refcosx)):
+    lpmn, dlpmn = special.lpmn(m, nmax + 1, refcosx[i])
+    refdm0[i] = lpmn[m, nmax]
+    refddm0[i] = dlpmn[m, nmax]
+# compute the conversion factor from P^m_n to d^n_{0m}
+factor = (-1.0) ** m * np.sqrt(
+    np.math.factorial(nmax - m) / np.math.factorial(nmax + m)
+)
+refdm0 *= factor
+# also add the correction factor for the derivative:
+# d/dx P(cos(x)) = d/dz P(z) d/dx cos(x) = -sin(x) d/dz P(z)
+refddm0 *= -factor * np.sqrt(1.0 - refcosx ** 2)
+
+refdm0 /= np.sqrt(1.0 - refcosx ** 2)
+
+# generate reference values for m=nmax
+m = nmax
+refdmn = np.zeros(refcosx.shape)
+refddmn = np.zeros(refcosx.shape)
+for i in range(len(refcosx)):
+    lpmn, dlpmn = special.lpmn(m, nmax + 1, refcosx[i])
+    refdmn[i] = lpmn[m, nmax]
+    refddmn[i] = dlpmn[m, nmax]
+factor = (-1.0) ** m * np.sqrt(
+    np.math.factorial(nmax - m) / np.math.factorial(nmax + m)
+)
+refdmn *= factor
+refddmn *= -factor * np.sqrt(1.0 - refcosx ** 2)
+
+refdmn /= np.sqrt(1.0 - refcosx ** 2)
+
+# plot the results
+fig, ax = pl.subplots(2, 2)
+
+# plot functions and derivatives
+ax[0][0].plot(refcosx, testdm0, ".")
+ax[0][0].plot(refcosx, refdm0)
+ax[0][0].plot(refcosx, testdmn, ".")
+ax[0][0].plot(refcosx, refdmn)
+ax[0][1].plot(refcosx, testddm0, ".")
+ax[0][1].plot(refcosx, refddm0)
+ax[0][1].plot(refcosx, testddmn, ".")
+ax[0][1].plot(refcosx, refddmn)
+
+# plot the relative difference between the reference and the test results
+ax[1][0].semilogy(refcosx, abs(refdm0 - testdm0) / abs(refdm0 + testdm0))
+ax[1][0].semilogy(refcosx, abs(refdmn - testdmn) / abs(refdmn + testdmn))
+ax[1][1].semilogy(refcosx, abs(refddm0 - testddm0) / abs(refddm0 + testddm0))
+ax[1][1].semilogy(refcosx, abs(refddmn - testddmn) / abs(refddmn + testddmn))
+
+# save the figure
+pl.tight_layout()
+pl.savefig("test_wigner_d_sinx.png", dpi=300)
+pl.close()
+
 testdata = np.loadtxt("test_gauss_legendre_quadrature.txt")
 
 refx, refw = np.polynomial.legendre.leggauss(200)

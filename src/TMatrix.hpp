@@ -26,7 +26,10 @@ using namespace std;
  *
  * The T-matrix formalism is based on rewriting the incoming @f$(i)@f$, local
  * @f$(l)@f$ and scattered @f$(s)@f$ electromagnetic waves (photons) in terms of
- * spherical wave function expansions:
+ * spherical wave function expansions, with spherical basis functions
+ * @f$Rg\vec{M}_{mn}, Rg\vec{N}_{mn}, \vec{M}_{mn}@f$ and @f$\vec{N}_{mn}@f$
+ * (introduced below; the @f$Rg@f$ basis functions are the real variants of the
+ * general basis functions):
  * @f[
  *    \vec{E}^{(i)}(r, \theta{}, \phi{}) = \sum_{n=1}^{n_{max}} \sum_{m=-n}^{n}
  *        \left( a_{mn} Rg\vec{M}_{mn}(kr, \theta{}, \phi{}) +
@@ -35,7 +38,7 @@ using namespace std;
  * @f[
  *    \vec{E}^{(l)}(r, \theta{}, \phi{}) = \sum_{n=1}^{n_{max}} \sum_{m=-n}^{n}
  *        \left( c_{mn} Rg\vec{M}_{mn}(km_rr, \theta{}, \phi{}) +
- *               b_{mn} Rg\vec{N}_{mn}(km_rr, \theta{}, \phi{}) \right),
+ *               d_{mn} Rg\vec{N}_{mn}(km_rr, \theta{}, \phi{}) \right),
  * @f]
  * and
  * @f[
@@ -190,30 +193,20 @@ using namespace std;
  * where the matrix Q is given by (ignoring constant prefactors that do not
  * contribute to @f$T@f$)
  * @f[
- *    Q_{mnm'n'} = k \int{} d\vec{\sigma{}} .
- *      \left[
+ *    Q_{mnm'n'} = k \int{} d\vec{\sigma{}} . \left[
  *        \left(
- *          \vec{\nabla{}} \times{} \left(
- *            Rg\vec{M}_{m'n'}(km_rr, \theta{}, \phi{})
- *            + Rg\vec{N}_{m'n'}(km_rr, \theta{}, \phi{})
- *          \right)
- *        \right) \times{} \left(
- *          \vec{M}_{mn}(kr, \theta{}, \phi{})
- *          + \vec{N}_{mn}(kr, \theta{}, \phi{})
- *        \right) - \\ \left(
- *          Rg\vec{M}_{m'n'}(km_rr, \theta{}, \phi{})
- *          + Rg\vec{N}_{m'n'}(km_rr, \theta{}, \phi{})
- *        \right) \times{} \left(
- *          \vec{\nabla{}} \times{} \left(
- *            \vec{M}_{mn}(kr, \theta{}, \phi{})
- *          + \vec{N}_{mn}(kr, \theta{}, \phi{})
- *          \right)
+ *          \vec{\nabla{}} \times{} Rg\vec{X}_{m'n'}(km_rr, \theta{}, \phi{})
+ *        \right) \times{} \vec{X}_{mn}(kr, \theta{}, \phi{})
+ *        - Rg\vec{X}_{m'n'}(km_rr, \theta{}, \phi{}) \times{} \left(
+ *          \vec{\nabla{}} \times{} \vec{X}_{mn}(kr, \theta{}, \phi{})
  *        \right)
- *      \right],
+ *    \right],
  * @f]
- * and the @f$RgQ@f$ matrix is given by the same expression where @f$M_{mn}@f$
- * and @f$N_{mn}@f$ are replaced with @f$RgM_{mn}@f$ and @f$RgN_{mn}@f$
- * respectively. The surface element @f$d\vec{\sigma{}}@f$ is given by
+ * with @f$\vec{X}_{mn} = \vec{M}_{mn}@f$ or @f$\vec{N}_{mn}@f$ depending on the
+ * specific component of the matrix under consideration, and the @f$RgQ@f$
+ * matrix is given by the same expression where @f$M_{mn}@f$ and @f$N_{mn}@f$
+ * are replaced with @f$RgM_{mn}@f$ and @f$RgN_{mn}@f$ respectively. The surface
+ * element @f$d\vec{\sigma{}}@f$ is given by
  * @f[
  *    d\vec{\sigma{}} = r^2 \sin(\theta{}) d\theta{} d\phi{} \left(
  *      \hat{r}
@@ -547,7 +540,7 @@ public:
         _ann(nj, ni) = ddd;
       }
     }
-    SpecialFunctions::get_gauss_legendre_points_and_weigths(
+    SpecialFunctions::get_gauss_legendre_points_and_weights(
         2 * ngauss, _costheta, _weights);
     for (uint_fast32_t ig = 0; ig < ngauss; ++ig) {
       const float_type this_sintheta2inv =
@@ -982,6 +975,40 @@ public:
           }
         }
       }
+
+      if (m == 1) {
+        const TMatrix &T = *this;
+        for (uint_fast32_t n1 = 0; n1 < _nmax; ++n1) {
+          for (uint_fast32_t n2 = 0; n2 < _nmax; ++n2) {
+            const std::complex<float_type> Tn1n2 =
+                T(0, n1 + 1, 1, 0, n2 + 1, 1);
+            ctm_warning("T[%" PRIuFAST32 ",%" PRIuFAST32 "]: %g +i %g", n1, n2,
+                        double(Tn1n2.real()), double(Tn1n2.imag()));
+          }
+          for (uint_fast32_t n2 = 0; n2 < _nmax; ++n2) {
+            const std::complex<float_type> Tn1n2 =
+                T(0, n1 + 1, 1, 1, n2 + 1, 1);
+            ctm_warning("T[%" PRIuFAST32 ",%" PRIuFAST32 "]: %g +i %g", n1,
+                        n2 + _nmax, double(Tn1n2.real()), double(Tn1n2.imag()));
+          }
+        }
+        for (uint_fast32_t n1 = 0; n1 < _nmax; ++n1) {
+          for (uint_fast32_t n2 = 0; n2 < _nmax; ++n2) {
+            const std::complex<float_type> Tn1n2 =
+                T(1, n1 + 1, 1, 0, n2 + 1, 1);
+            ctm_warning("T[%" PRIuFAST32 ",%" PRIuFAST32 "]: %g +i %g",
+                        n1 + _nmax, n2, double(Tn1n2.real()),
+                        double(Tn1n2.imag()));
+          }
+          for (uint_fast32_t n2 = 0; n2 < _nmax; ++n2) {
+            const std::complex<float_type> Tn1n2 =
+                T(1, n1 + 1, 1, 1, n2 + 1, 1);
+            ctm_warning("T[%" PRIuFAST32 ",%" PRIuFAST32 "]: %g +i %g",
+                        n1 + _nmax, n2 + _nmax, double(Tn1n2.real()),
+                        double(Tn1n2.imag()));
+          }
+        }
+      }
     }
   }
 
@@ -1022,6 +1049,280 @@ public:
     const uint_fast32_t l1 = i1 * _Lmax + n1 * (n1 + 1) + m1 - 1;
     const uint_fast32_t l2 = i2 * _Lmax + n2 * (n2 + 1) + m2 - 1;
     return _T(l1, l2);
+  }
+
+  /**
+   * @brief Get the scattering matrix for a scattering from the given input
+   * angles to the given output angles at a particle with the given orientation.
+   *
+   * @param alpha_degrees Azimuth angle of the particle's rotation axis (in
+   * degrees).
+   * @param beta_degrees Zenith angle of the particle's rotation axis (in
+   * degrees).
+   * @param theta_in_degrees Azimuth angle of the incoming photon (in degrees).
+   * @param phi_in_degrees Zenith angle of the incoming photon (in degrees).
+   * @param theta_out_degrees Azimuth angle of the scattered photon (in
+   * degrees).
+   * @param phi_out_degrees Zenith angle fo the scattered photon (in degrees).
+   * @return Scattering matrix for this scattering event.
+   */
+  inline Matrix<float_type> get_scattering_matrix(
+      const float_type alpha_degrees, const float_type beta_degrees,
+      const float_type theta_in_degrees, const float_type phi_in_degrees,
+      const float_type theta_out_degrees,
+      const float_type phi_out_degrees) const {
+
+    // convert all angles to radians
+    const float_type degrees_to_radians = M_PI / 180.;
+    const float_type alpha_radians = alpha_degrees * degrees_to_radians;
+    const float_type beta_radians = beta_degrees * degrees_to_radians;
+    const float_type theta_in_radians = theta_in_degrees * degrees_to_radians;
+    const float_type phi_in_radians = phi_in_degrees * degrees_to_radians;
+    const float_type theta_out_radians = theta_out_degrees * degrees_to_radians;
+    const float_type phi_out_radians = phi_out_degrees * degrees_to_radians;
+
+    // Mishchenko includes some (buggy) corrections for small angles
+    // might be worth looking into this in a later stage...
+
+    const float_type cosbeta = cos(beta_radians);
+    const float_type sinbeta = sin(beta_radians);
+
+    const float_type costheta_in = cos(theta_in_radians);
+    const float_type sintheta_in = sin(theta_in_radians);
+    const float_type cosphirel_in = cos(phi_in_radians - alpha_radians);
+    const float_type sinphirel_in = sin(phi_in_radians - alpha_radians);
+
+    const float_type costheta_p_in =
+        costheta_in * cosbeta + sintheta_in * sinbeta * cosphirel_in;
+    const float_type cosphi_p_in =
+        cosbeta * sintheta_in * cosphirel_in - sinbeta * costheta_in;
+    const float_type sinphi_p_in = sintheta_in * sinphirel_in;
+    // note that, unlike Mishchenko, we do not explicitly compute theta_p
+    // We don't need this angle explicitly, only its sin and cos
+    const float_type phi_p_in = atan2(sinphi_p_in, cosphi_p_in);
+
+    const float_type costheta_out = cos(theta_out_radians);
+    const float_type sintheta_out = sin(theta_out_radians);
+    const float_type cosphirel_out = cos(phi_out_radians - alpha_radians);
+    const float_type sinphirel_out = sin(phi_out_radians - alpha_radians);
+
+    const float_type costheta_p_out =
+        costheta_out * cosbeta + sintheta_out * sinbeta * cosphirel_out;
+    const float_type cosphi_p_out =
+        cosbeta * sintheta_out * cosphirel_out - sinbeta * costheta_out;
+    const float_type sinphi_p_out = sintheta_out * sinphirel_out;
+    const float_type phi_p_out = atan2(sinphi_p_out, cosphi_p_out);
+
+    const float_type cosalpha = cos(alpha_radians);
+    const float_type sinalpha = sin(alpha_radians);
+    Matrix<float_type> B(3, 3);
+    B(0, 0) = cosalpha * cosbeta;
+    B(0, 1) = sinalpha * cosbeta;
+    B(0, 2) = -sinbeta;
+    B(1, 0) = -sinalpha;
+    B(1, 1) = cosalpha;
+    // B(1,2) remains 0.
+    B(2, 0) = cosalpha * sinbeta;
+    B(2, 1) = sinalpha * sinbeta;
+    B(2, 2) = cosbeta;
+
+    const float_type cosphi_in = cos(phi_in_radians);
+    const float_type sinphi_in = sin(phi_in_radians);
+    Matrix<float_type> AL_in(3, 2);
+    AL_in(0, 0) = costheta_in * cosphi_in;
+    AL_in(0, 1) = -sinphi_in;
+    AL_in(1, 0) = costheta_in * sinphi_in;
+    AL_in(1, 1) = cosphi_in;
+    AL_in(2, 0) = -sintheta_in;
+    // AL_in(2,1) remains 0.
+
+    const float_type cosphi_out = cos(phi_out_radians);
+    const float_type sinphi_out = sin(phi_out_radians);
+    Matrix<float_type> AL_out(3, 2);
+    AL_out(0, 0) = costheta_out * cosphi_out;
+    AL_out(0, 1) = -sinphi_out;
+    AL_out(1, 0) = costheta_out * sinphi_out;
+    AL_out(1, 1) = cosphi_out;
+    AL_out(2, 0) = -sintheta_out;
+    // AL_out(2,1) remains 0.
+
+    const float_type sintheta_p_in = sqrt(1. - costheta_p_in * costheta_p_in);
+    Matrix<float_type> AP_in(2, 3);
+    AP_in(0, 0) = costheta_p_in * cosphi_p_in;
+    AP_in(0, 1) = costheta_p_in * sinphi_p_in;
+    AP_in(0, 2) = -sintheta_p_in;
+    AP_in(1, 0) = -sinphi_p_in;
+    AP_in(1, 1) = cosphi_p_in;
+    // AP_in(1,2) remains 0.
+
+    const float_type sintheta_p_out =
+        sqrt(1. - costheta_p_out * costheta_p_out);
+    Matrix<float_type> AP_out(2, 3);
+    AP_out(0, 0) = costheta_p_out * cosphi_p_out;
+    AP_out(0, 1) = costheta_p_out * sinphi_p_out;
+    AP_out(0, 2) = -sintheta_p_out;
+    AP_out(1, 0) = -sinphi_p_out;
+    AP_out(1, 1) = cosphi_p_out;
+    // AP_out(1,2) remains 0.
+
+    Matrix<float_type> C(3, 2);
+    for (uint_fast8_t i = 0; i < 3; ++i) {
+      for (uint_fast8_t j = 0; j < 2; ++j) {
+        for (uint_fast8_t k = 0; k < 3; ++k) {
+          C(i, j) += B(i, k) * AL_in(k, j);
+        }
+      }
+    }
+    Matrix<float_type> R_in(2, 2);
+    for (uint_fast8_t i = 0; i < 2; ++i) {
+      for (uint_fast8_t j = 0; j < 2; ++j) {
+        for (uint_fast8_t k = 0; k < 3; ++k) {
+          R_in(i, j) += AP_in(i, k) * C(k, j);
+        }
+      }
+    }
+
+    for (uint_fast8_t i = 0; i < 3; ++i) {
+      for (uint_fast8_t j = 0; j < 2; ++j) {
+        C(i, j) = 0.;
+        for (uint_fast8_t k = 0; k < 3; ++k) {
+          C(i, j) += B(i, k) * AL_out(k, j);
+        }
+      }
+    }
+    Matrix<float_type> R_out(2, 2);
+    for (uint_fast8_t i = 0; i < 2; ++i) {
+      for (uint_fast8_t j = 0; j < 2; ++j) {
+        for (uint_fast8_t k = 0; k < 3; ++k) {
+          R_out(i, j) += AP_out(i, k) * C(k, j);
+        }
+      }
+    }
+
+    const float_type d =
+        1. / (R_out(0, 0) * R_out(1, 1) - R_out(0, 1) * R_out(1, 0));
+    const float_type temp = R_out(0, 0);
+    R_out(0, 0) = R_out(1, 1) * d;
+    R_out(0, 1) = -R_out(0, 1) * d;
+    R_out(1, 0) = -R_out(1, 0) * d;
+    R_out(1, 1) = temp * d;
+
+    const std::complex<float_type> icompl(0., 1.);
+    Matrix<std::complex<float_type>> cal(_nmax, _nmax);
+    for (uint_fast32_t nn = 1; nn < _nmax + 1; ++nn) {
+      for (uint_fast32_t n = 1; n < _nmax + 1; ++n) {
+        cal(n - 1, nn - 1) =
+            pow(icompl, nn - n - 1.) * sqrt((2. * n + 1.) * (2. * nn + 1.) /
+                                            (n * nn * (n + 1.) * (nn + 1.)));
+      }
+    }
+
+    const float_type phiout_in = phi_p_out - phi_p_in;
+    std::complex<float_type> S11, S12, S21, S22;
+    const TMatrix &T = *this;
+    for (uint_fast32_t m = 0; m < _nmax; ++m) {
+      const uint_fast32_t nmin = std::max(m, static_cast<uint_fast32_t>(1));
+
+      std::vector<float_type> dv1_in(_nmax), dv2_in(_nmax);
+      SpecialFunctions::wigner_dn_0m_sinx(costheta_p_in, _nmax, m, &dv1_in[0],
+                                          &dv2_in[0]);
+      std::vector<float_type> dv1_out(_nmax), dv2_out(_nmax);
+      SpecialFunctions::wigner_dn_0m_sinx(costheta_p_out, _nmax, m, &dv1_out[0],
+                                          &dv2_out[0]);
+
+      const float_type fcos = 2. * cos(m * phiout_in);
+      const float_type fsin = 2. * sin(m * phiout_in);
+
+      for (uint_fast32_t nn = nmin; nn < _nmax + 1; ++nn) {
+        const float_type dv1nn = m * dv1_in[nn - 1];
+        const float_type dv2nn = dv2_in[nn - 1];
+        for (uint_fast32_t n = nmin; n < _nmax + 1; ++n) {
+          const float_type dv1n = m * dv1_out[n - 1];
+          const float_type dv2n = dv2_out[n - 1];
+
+          const std::complex<float_type> ct11 = T(0, n, m, 0, nn, m);
+          const std::complex<float_type> ct22 = T(1, n, m, 1, nn, m);
+          if (m == 0) {
+            const std::complex<float_type> cn =
+                cal(n - 1, nn - 1) * dv2n * dv2nn;
+            S11 += cn * ct22;
+            S22 += cn * ct11;
+          } else {
+            const std::complex<float_type> ct12 = T(0, n, m, 1, nn, m);
+            const std::complex<float_type> ct21 = T(1, n, m, 0, nn, m);
+
+            const std::complex<float_type> cn1 = cal(n - 1, nn - 1) * fcos;
+            const std::complex<float_type> cn2 = cal(n - 1, nn - 1) * fsin;
+
+            const float_type d11 = dv1n * dv1nn;
+            const float_type d12 = dv1n * dv2nn;
+            const float_type d21 = dv2n * dv1nn;
+            const float_type d22 = dv2n * dv2nn;
+
+            S11 += cn1 * (ct11 * d11 + ct21 * d21 + ct12 * d12 + ct22 * d22);
+            S12 += cn2 * (ct11 * d12 + ct21 * d22 + ct12 * d11 + ct22 * d21);
+            S21 -= cn2 * (ct11 * d21 + ct21 * d11 + ct12 * d22 + ct22 * d12);
+            S22 += cn1 * (ct11 * d22 + ct21 * d12 + ct12 * d21 + ct22 * d11);
+          }
+        }
+      }
+    }
+    S11 /= _k;
+    S12 /= _k;
+    S21 /= _k;
+    S22 /= _k;
+
+    ctm_warning("S11: %g + i%g", double(S11.real()), double(S11.imag()));
+    ctm_warning("S12: %g + i%g", double(S12.real()), double(S12.imag()));
+    ctm_warning("S21: %g + i%g", double(S21.real()), double(S21.imag()));
+    ctm_warning("S22: %g + i%g", double(S22.real()), double(S22.imag()));
+
+    const std::complex<float_type> cS11 = S11 * R_in(0, 0) + S12 * R_in(1, 0);
+    const std::complex<float_type> cS12 = S11 * R_in(0, 1) + S12 * R_in(1, 1);
+    const std::complex<float_type> cS21 = S21 * R_in(0, 0) + S22 * R_in(1, 0);
+    const std::complex<float_type> cS22 = S21 * R_in(0, 1) + S22 * R_in(1, 1);
+
+    S11 = R_out(0, 0) * cS11 + R_out(0, 1) * cS21;
+    S12 = R_out(0, 0) * cS12 + R_out(0, 1) * cS22;
+    S21 = R_out(1, 0) * cS11 + R_out(1, 1) * cS21;
+    S22 = R_out(1, 0) * cS12 + R_out(1, 1) * cS22;
+
+    ctm_warning("S11: %g + i%g", double(S11.real()), double(S11.imag()));
+    ctm_warning("S12: %g + i%g", double(S12.real()), double(S12.imag()));
+    ctm_warning("S21: %g + i%g", double(S21.real()), double(S21.imag()));
+    ctm_warning("S22: %g + i%g", double(S22.real()), double(S22.imag()));
+
+    Matrix<float_type> Z(4, 4);
+
+    Z(0, 0) = (0.5 * (S11 * conj(S11) + S12 * conj(S12) + S21 * conj(S21) +
+                      S22 * conj(S22)))
+                  .real();
+    Z(0, 1) = (0.5 * (S11 * conj(S11) - S12 * conj(S12) + S21 * conj(S21) -
+                      S22 * conj(S22)))
+                  .real();
+    Z(0, 2) = (-S11 * conj(S12) - S22 * conj(S21)).real();
+    Z(0, 3) = (icompl * (S11 * conj(S12) - S22 * conj(S21))).real();
+
+    Z(1, 0) = (0.5 * (S11 * conj(S11) + S12 * conj(S12) - S21 * conj(S21) -
+                      S22 * conj(S22)))
+                  .real();
+    Z(1, 1) = (0.5 * (S11 * conj(S11) - S12 * conj(S12) - S21 * conj(S21) +
+                      S22 * conj(S22)))
+                  .real();
+    Z(1, 2) = (-S11 * conj(S12) + S22 * conj(S21)).real();
+    Z(1, 3) = (icompl * (S11 * conj(S12) + S22 * conj(S21))).real();
+
+    Z(2, 0) = (-S11 * conj(S21) - S22 * conj(S12)).real();
+    Z(2, 1) = (-S11 * conj(S21) + S22 * conj(S12)).real();
+    Z(2, 2) = (S11 * conj(S22) + S12 * conj(S21)).real();
+    Z(2, 3) = (-icompl * (S11 * conj(S22) + S21 * conj(S12))).real();
+
+    Z(3, 0) = (icompl * (S21 * conj(S11) + S22 * conj(S12))).real();
+    Z(3, 1) = (icompl * (S21 * conj(S11) - S22 * conj(S12))).real();
+    Z(3, 2) = (-icompl * (S22 * conj(S11) - S12 * conj(S21))).real();
+    Z(3, 3) = (S22 * conj(S11) - S12 * conj(S21)).real();
+
+    return Z;
   }
 };
 

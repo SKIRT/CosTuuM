@@ -126,6 +126,28 @@ int main(int argc, char **argv) {
           << dd[TESTSPECIALFUNCTIONS_NMAX - 1] << "\n";
   }
 
+  // open the output text file
+  std::ofstream dsfile("test_wigner_d_sinx.txt");
+  for (uint_fast32_t i = 0; i < 1000; ++i) {
+    // this expression should match the np.arange(-0.999, 1., 0.002) expression
+    // in the Python script
+    const float_type cosx = -0.999 + 0.002 * i;
+    // create output arrays
+    float_type d[TESTSPECIALFUNCTIONS_NMAX], dd[TESTSPECIALFUNCTIONS_NMAX];
+    // call the function with m=0
+    SpecialFunctions::wigner_dn_0m_sinx(cosx, TESTSPECIALFUNCTIONS_NMAX, 0, d,
+                                        dd);
+    // write an output line
+    dsfile << d[TESTSPECIALFUNCTIONS_NMAX - 1] << "\t"
+           << dd[TESTSPECIALFUNCTIONS_NMAX - 1] << "\n";
+    // call the function with m=nmax
+    SpecialFunctions::wigner_dn_0m_sinx(cosx, TESTSPECIALFUNCTIONS_NMAX,
+                                        TESTSPECIALFUNCTIONS_NMAX, d, dd);
+    // write an output line
+    dsfile << d[TESTSPECIALFUNCTIONS_NMAX - 1] << "\t"
+           << dd[TESTSPECIALFUNCTIONS_NMAX - 1] << "\n";
+  }
+
   /// Equal volume sphere to equal surface area sphere radius ratio
 
   assert_condition(
@@ -148,14 +170,14 @@ int main(int argc, char **argv) {
   // first test against the values on Wikipedia
   {
     // n = 1
-    SpecialFunctions::get_gauss_legendre_points_and_weigths(1, x, w);
+    SpecialFunctions::get_gauss_legendre_points_and_weights(1, x, w);
     ctm_warning("x: [%g], w: [%g]", double(x[0]), double(w[0]));
     assert_condition(x[0] == 0.);
     assert_condition(w[0] == 2.);
   }
   {
     // n = 2
-    SpecialFunctions::get_gauss_legendre_points_and_weigths(2, x, w);
+    SpecialFunctions::get_gauss_legendre_points_and_weights(2, x, w);
     ctm_warning("x: [%g, %g], w: [%g, %g]", double(x[0]), double(x[1]),
                 double(w[0]), double(w[1]));
     assert_values_equal_rel(double(x[0]), -1. / std::sqrt(3.), tolerance);
@@ -165,7 +187,7 @@ int main(int argc, char **argv) {
   }
   {
     // n = 3
-    SpecialFunctions::get_gauss_legendre_points_and_weigths(3, x, w);
+    SpecialFunctions::get_gauss_legendre_points_and_weights(3, x, w);
     ctm_warning("x: [%g, %g, %g], w: [%g, %g, %g]", double(x[0]), double(x[1]),
                 double(x[2]), double(w[0]), double(w[1]), double(w[2]));
     assert_values_equal_rel(double(x[0]), -std::sqrt(3. / 5.), tolerance);
@@ -177,7 +199,7 @@ int main(int argc, char **argv) {
   }
   {
     // n = 4
-    SpecialFunctions::get_gauss_legendre_points_and_weigths(4, x, w);
+    SpecialFunctions::get_gauss_legendre_points_and_weights(4, x, w);
     ctm_warning("x: [%g, %g, %g, %g], w: [%g, %g, %g, %g]", double(x[0]),
                 double(x[1]), double(x[2]), double(x[3]), double(w[0]),
                 double(w[1]), double(w[2]), double(w[3]));
@@ -204,7 +226,7 @@ int main(int argc, char **argv) {
   }
   {
     // n = 5
-    SpecialFunctions::get_gauss_legendre_points_and_weigths(5, x, w);
+    SpecialFunctions::get_gauss_legendre_points_and_weights(5, x, w);
     ctm_warning("x: [%g, %g, %g, %g, %g], w: [%g, %g, %g, %g, %g]",
                 double(x[0]), double(x[1]), double(x[2]), double(x[3]),
                 double(x[4]), double(w[0]), double(w[1]), double(w[2]),
@@ -235,7 +257,7 @@ int main(int argc, char **argv) {
 
   // now print additional values for a much higher order to analyse with the
   // script
-  SpecialFunctions::get_gauss_legendre_points_and_weigths(
+  SpecialFunctions::get_gauss_legendre_points_and_weights(
       TESTSPECIALFUNCTIONS_NGAUSS, x, w);
   std::ofstream gfile("test_gauss_legendre_quadrature.txt");
   for (uint_fast32_t i = 0; i < TESTSPECIALFUNCTIONS_NGAUSS; ++i) {

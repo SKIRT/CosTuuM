@@ -207,6 +207,33 @@ int main(int argc, char **argv) {
   ctm_warning("qext: %g", double(old_qext));
   ctm_warning("walb: %g", double(-old_qsca / old_qext));
 
+  /// compute a scattering event using the T-matrix
+
+  // first and second Euler angles describing the orientation of the particle
+  // in the fixed laboratory reference frame
+  const float_type alpha = 145.;
+  const float_type beta = 52.;
+
+  // zenith and azimuth angle of the incoming photon
+  const float_type theta_in = 56.;
+  const float_type phi_in = 114.;
+
+  // zenith and azimuth angle of the scattered photon
+  const float_type theta_out = 65.;
+  const float_type phi_out = 128.;
+
+  Matrix<float_type> Z = active_Tmatrix->get_scattering_matrix(
+      alpha, beta, theta_in, phi_in, theta_out, phi_out);
+
+  ctm_warning("Z[0,:] = %g %g %g %g", double(Z(0, 0)), double(Z(0, 1)),
+              double(Z(0, 2)), double(Z(0, 3)));
+  ctm_warning("Z[1,:] = %g %g %g %g", double(Z(1, 0)), double(Z(1, 1)),
+              double(Z(1, 2)), double(Z(1, 3)));
+  ctm_warning("Z[2,:] = %g %g %g %g", double(Z(2, 0)), double(Z(2, 1)),
+              double(Z(2, 2)), double(Z(2, 3)));
+  ctm_warning("Z[3,:] = %g %g %g %g", double(Z(3, 0)), double(Z(3, 1)),
+              double(Z(3, 2)), double(Z(3, 3)));
+
   // clean up
   delete active_Tmatrix;
 
