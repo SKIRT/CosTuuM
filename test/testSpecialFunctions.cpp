@@ -19,10 +19,10 @@ using namespace std;
 
 /*! @brief Maximum order to test for Bessel and Wigner D functions,
  *  @f$n_{max}@f$. */
-#define TESTSPECIALFUNCTIONS_NMAX 80u
+const uint_fast32_t TESTSPECIALFUNCTIONS_NMAX = 80;
 
 /*! @brief Order of Gauss-Legendre quadrature to test. */
-#define TESTSPECIALFUNCTIONS_NGAUSS 200u
+const uint_fast32_t TESTSPECIALFUNCTIONS_NGAUSS = 200;
 
 /**
  * @brief Unit test for the special functions in SpecialFunctions.hpp.

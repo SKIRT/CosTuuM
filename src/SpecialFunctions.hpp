@@ -19,7 +19,7 @@
  *  spherical Bessel functions of the first kind. The higher this number, the
  *  higher the accuracy of the Bessel functions of the first kind, but also
  *  the slower the function becomes. */
-#define SPECIALFUNCTIONS_BESSEL_NMAX 800u
+const uint_fast32_t SPECIALFUNCTIONS_BESSEL_NMAX = 800;
 
 /**
  * @brief Class namespace that contains template functions to compute general

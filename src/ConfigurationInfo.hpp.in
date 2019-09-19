@@ -14,7 +14,8 @@
 // disable clang-format for these lines to keep the final @ attached to the
 // variable name
 // clang-format off
-#define CONFIGURATION_OPTIONS_NUMBER (@CONFIGURATION_OPTIONS_NUMBER@)
+const uint_fast8_t CONFIGURATION_OPTIONS_NUMBER =
+    (@CONFIGURATION_OPTIONS_NUMBER@);
 // clang-format on
 
 #include <string>

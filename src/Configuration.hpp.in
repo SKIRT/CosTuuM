@@ -10,6 +10,8 @@
 #ifndef CONFIGURATION_HPP
 #define CONFIGURATION_HPP
 
+#include <cinttypes>
+
 /*! @brief If defined, activates inline assertions (which slows down the code
  *  considerably).*/
 #cmakedefine HAVE_ASSERTIONS
@@ -31,15 +33,17 @@
 
 #if defined(HAVE_MULTIPRECISION) && defined(HAVE_QUAD_PRECISION)
 #include <boost/multiprecision/cpp_bin_float.hpp>
+/*! @brief Data type for floating point variables. */
 typedef boost::multiprecision::cpp_bin_float_quad float_type;
 #else
+/*! @brief Data type for floating point variables. */
 typedef double float_type;
 #endif
 
 /*! @brief Maximum number of shared memory threads that can be used on this
  *  system. */
 // clang-format off
-#define MAX_NUM_THREADS @MAX_NUM_THREADS@
+const int_fast32_t MAX_NUM_THREADS = @MAX_NUM_THREADS@;
 // clang-format on
 
 #endif // CONFIGURATION_HPP
