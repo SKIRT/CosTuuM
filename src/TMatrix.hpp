@@ -1202,7 +1202,7 @@ public:
     std::complex<float_type> cnn = icompl;
     for (uint_fast32_t nn = 1; nn < _nmax + 1; ++nn) {
       // cnn now equals i^nn
-      std::complex<float_type> cn(1.);
+      std::complex<float_type> cn(-1.);
       for (uint_fast32_t n = 1; n < _nmax + 1; ++n) {
         // cn*cnn now equals i^(nn - n - 1)
         cal(n - 1, nn - 1) = cn * cnn *
