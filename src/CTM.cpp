@@ -7,6 +7,7 @@
  */
 
 #include "Configuration.hpp"
+#include "ConfigurationInfo.hpp"
 #include "Matrix.hpp"
 #include "SpecialFunctions.hpp"
 #include "TMatrix.hpp"
@@ -14,6 +15,8 @@
 #include <cinttypes>
 #include <cmath>
 #include <complex>
+#include <fstream>
+#include <iostream>
 #include <vector>
 
 #if defined(HAVE_MULTIPRECISION) && defined(HAVE_QUAD_PRECISION)
@@ -33,6 +36,12 @@ using namespace std;
  * @return Exit code: 0 on success.
  */
 int main(int argc, char **argv) {
+
+  for (auto it = ConfigurationInfo::begin(); it != ConfigurationInfo::end();
+       ++it) {
+    std::cout << it.get_key() << ": " << it.get_value() << "\n";
+  }
+  std::cout << std::endl;
 
   /// input parameters (should become real parameters at some point
   // size of the particle (in same units as the wavelength)
@@ -180,6 +189,7 @@ int main(int argc, char **argv) {
   TMatrix &T = *active_Tmatrix;
   old_qsca = 0.;
   old_qext = 0.;
+  std::ofstream tfile("TMatrix.txt");
   for (uint_fast32_t n1 = 1; n1 < nmax + 1; ++n1) {
     for (uint_fast32_t n2 = 1; n2 < nmax + 1; ++n2) {
       for (int_fast32_t m1 = -n1; m1 < static_cast<int_fast32_t>(n1 + 1);
@@ -190,6 +200,20 @@ int main(int argc, char **argv) {
           old_qsca += std::norm(T(0, n1, m1, 1, n2, m2));
           old_qsca += std::norm(T(1, n1, m1, 0, n2, m2));
           old_qsca += std::norm(T(1, n1, m1, 1, n2, m2));
+          if (m1 == m2) {
+            tfile << "0\t" << n1 << "\t" << m1 << "\t0\t" << n2 << "\t" << m2
+                  << "\t" << T(0, n1, m1, 0, n2, m2).real() << "\t"
+                  << T(0, n1, m1, 0, n2, m2).imag() << "\n";
+            tfile << "0\t" << n1 << "\t" << m1 << "\t1\t" << n2 << "\t" << m2
+                  << "\t" << T(0, n1, m1, 1, n2, m2).real() << "\t"
+                  << T(0, n1, m1, 1, n2, m2).imag() << "\n";
+            tfile << "1\t" << n1 << "\t" << m1 << "\t0\t" << n2 << "\t" << m2
+                  << "\t" << T(0, n1, m1, 0, n2, m2).real() << "\t"
+                  << T(1, n1, m1, 0, n2, m2).imag() << "\n";
+            tfile << "1\t" << n1 << "\t" << m1 << "\t1\t" << n2 << "\t" << m2
+                  << "\t" << T(0, n1, m1, 1, n2, m2).real() << "\t"
+                  << T(1, n1, m1, 1, n2, m2).imag() << "\n";
+          }
         }
       }
     }

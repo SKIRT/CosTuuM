@@ -741,7 +741,7 @@ public:
 
       const float_type m2 = m * m;
       const uint_fast32_t nmax2 = 2 * _nmax;
-      const uint_fast32_t nm = _nmax - m + 1;
+      const uint_fast32_t nm = _nmax + 1 - m;
       const uint_fast32_t nm2 = 2 * nm;
 
       std::vector<int_fast8_t> signs(nmax2);
@@ -762,13 +762,13 @@ public:
       std::vector<float_type> dss(_ngauss);
 
       int_fast8_t si = 1;
-      for (uint_fast32_t m = 0; m < nmax2; ++m) {
+      for (uint_fast32_t n = 0; n < nmax2; ++n) {
         si = -si;
-        signs[m] = si;
+        signs[n] = si;
       }
       for (uint_fast32_t ig = 1; ig < _ngauss + 1; ++ig) {
         const uint_fast32_t i1 = _ngauss + ig;
-        const uint_fast32_t i2 = _ngauss - ig + 1;
+        const uint_fast32_t i2 = _ngauss + 1 - ig;
         std::vector<float_type> dv1(_nmax), dv2(_nmax);
         SpecialFunctions::wigner_dn_0m(_costheta[i1 - 1], _nmax, m, &dv1[0],
                                        &dv2[0]);
@@ -842,6 +842,7 @@ public:
 
               const std::complex<float_type> c8 = c2 * krmrinvi;
               const std::complex<float_type> b8 = b2 * krmrinvi;
+
               const float_type e1 = dsi * (wn1dwn2 + dwn1wn2);
               // (m / sintheta) * jn2(krmr) * hn1(kr) *
               // (dn1_0m * ddn2_0m/dtheta + ddn1_0m/dtheta * dn2_0m)
@@ -850,8 +851,9 @@ public:
               // (dn1_0m * ddn2_0m/dtheta + ddn1_0m/dtheta * dn2_0m)
               this_RgJ11 += e1 * c1;
 
-              const float_type e2 = dsi * dr_over_ri * wn1wn2 * n1n1p1;
-              const float_type e3 = dsi * dr_over_ri * wn1wn2 * n2n2p1;
+              const float_type factor = dsi * dr_over_ri * wn1wn2;
+              const float_type e2 = factor * n1n1p1;
+              const float_type e3 = factor * n2n2p1;
               // (m / sintheta) * ([krmr*kn2(krmr)]'/krmr) * ([kr*hn1(kr)]'/kr)
               //    * (dn1_0m * ddn2_0m/dtheta + ddn1_0m/dtheta * dn2_0m)
               // + (m / sintheta) * dr/rdtheta * dn1_0m * dn2_0m * n1 * (n1 + 1)
@@ -917,10 +919,10 @@ public:
         }
       }
       for (uint_fast32_t n1 = m; n1 < _nmax + 1; ++n1) {
-        const uint_fast32_t k1 = n1 - m + 1;
+        const uint_fast32_t k1 = n1 + 1 - m;
         const uint_fast32_t kk1 = k1 + nm;
         for (uint_fast32_t n2 = m; n2 < _nmax + 1; ++n2) {
-          const uint_fast32_t k2 = n2 - m + 1;
+          const uint_fast32_t k2 = n2 + 1 - m;
           const uint_fast32_t kk2 = k2 + nm;
 
           const std::complex<float_type> icompl(0., 1.);
@@ -956,6 +958,7 @@ public:
       }
 
       Q.plu_inverse();
+
       for (uint_fast32_t i = 0; i < nm; ++i) {
         const uint_fast32_t lip = (m + i) * (m + i + 1) + m - 1;
         const uint_fast32_t lim = (m + i) * (m + i + 1) - m - 1;
@@ -972,40 +975,6 @@ public:
             _T(_Lmax + lim, ljm) -= RgQ(nm + i, k) * Q(k, j);
             _T(lim, _Lmax + ljm) -= RgQ(i, k) * Q(k, nm + j);
             _T(_Lmax + lim, _Lmax + ljm) -= RgQ(nm + i, k) * Q(k, nm + j);
-          }
-        }
-      }
-
-      if (m == 1) {
-        const TMatrix &T = *this;
-        for (uint_fast32_t n1 = 0; n1 < _nmax; ++n1) {
-          for (uint_fast32_t n2 = 0; n2 < _nmax; ++n2) {
-            const std::complex<float_type> Tn1n2 =
-                T(0, n1 + 1, 1, 0, n2 + 1, 1);
-            ctm_warning("T[%" PRIuFAST32 ",%" PRIuFAST32 "]: %g +i %g", n1, n2,
-                        double(Tn1n2.real()), double(Tn1n2.imag()));
-          }
-          for (uint_fast32_t n2 = 0; n2 < _nmax; ++n2) {
-            const std::complex<float_type> Tn1n2 =
-                T(0, n1 + 1, 1, 1, n2 + 1, 1);
-            ctm_warning("T[%" PRIuFAST32 ",%" PRIuFAST32 "]: %g +i %g", n1,
-                        n2 + _nmax, double(Tn1n2.real()), double(Tn1n2.imag()));
-          }
-        }
-        for (uint_fast32_t n1 = 0; n1 < _nmax; ++n1) {
-          for (uint_fast32_t n2 = 0; n2 < _nmax; ++n2) {
-            const std::complex<float_type> Tn1n2 =
-                T(1, n1 + 1, 1, 0, n2 + 1, 1);
-            ctm_warning("T[%" PRIuFAST32 ",%" PRIuFAST32 "]: %g +i %g",
-                        n1 + _nmax, n2, double(Tn1n2.real()),
-                        double(Tn1n2.imag()));
-          }
-          for (uint_fast32_t n2 = 0; n2 < _nmax; ++n2) {
-            const std::complex<float_type> Tn1n2 =
-                T(1, n1 + 1, 1, 1, n2 + 1, 1);
-            ctm_warning("T[%" PRIuFAST32 ",%" PRIuFAST32 "]: %g +i %g",
-                        n1 + _nmax, n2 + _nmax, double(Tn1n2.real()),
-                        double(Tn1n2.imag()));
           }
         }
       }
@@ -1094,12 +1063,21 @@ public:
 
     const float_type costheta_p_in =
         costheta_in * cosbeta + sintheta_in * sinbeta * cosphirel_in;
-    const float_type cosphi_p_in =
+    const float_type cosphi_p_in_rule =
         cosbeta * sintheta_in * cosphirel_in - sinbeta * costheta_in;
-    const float_type sinphi_p_in = sintheta_in * sinphirel_in;
-    // note that, unlike Mishchenko, we do not explicitly compute theta_p
-    // We don't need this angle explicitly, only its sin and cos
-    const float_type phi_p_in = atan2(sinphi_p_in, cosphi_p_in);
+    const float_type sinphi_p_in_rule = sintheta_in * sinphirel_in;
+    float_type phi_p_in = atan(sinphi_p_in_rule / cosphi_p_in_rule);
+    if (phi_p_in > 0. && sinphirel_in < 0.) {
+      phi_p_in += M_PI;
+    }
+    if (phi_p_in < 0. && sinphirel_in > 0.) {
+      phi_p_in += M_PI;
+    }
+    if (phi_p_in < 0.) {
+      phi_p_in += 2. * M_PI;
+    }
+    const float_type cosphi_p_in = cos(phi_p_in);
+    const float_type sinphi_p_in = sin(phi_p_in);
 
     const float_type costheta_out = cos(theta_out_radians);
     const float_type sintheta_out = sin(theta_out_radians);
@@ -1108,10 +1086,21 @@ public:
 
     const float_type costheta_p_out =
         costheta_out * cosbeta + sintheta_out * sinbeta * cosphirel_out;
-    const float_type cosphi_p_out =
+    const float_type cosphi_p_out_rule =
         cosbeta * sintheta_out * cosphirel_out - sinbeta * costheta_out;
-    const float_type sinphi_p_out = sintheta_out * sinphirel_out;
-    const float_type phi_p_out = atan2(sinphi_p_out, cosphi_p_out);
+    const float_type sinphi_p_out_rule = sintheta_out * sinphirel_out;
+    float_type phi_p_out = atan(sinphi_p_out_rule / cosphi_p_out_rule);
+    if (phi_p_out > 0. && sinphirel_out < 0.) {
+      phi_p_out += M_PI;
+    }
+    if (phi_p_out < 0. && sinphirel_out > 0.) {
+      phi_p_out += M_PI;
+    }
+    if (phi_p_out < 0.) {
+      phi_p_out += 2. * M_PI;
+    }
+    const float_type cosphi_p_out = cos(phi_p_out);
+    const float_type sinphi_p_out = sin(phi_p_out);
 
     const float_type cosalpha = cos(alpha_radians);
     const float_type sinalpha = sin(alpha_radians);
@@ -1146,7 +1135,8 @@ public:
     AL_out(2, 0) = -sintheta_out;
     // AL_out(2,1) remains 0.
 
-    const float_type sintheta_p_in = sqrt(1. - costheta_p_in * costheta_p_in);
+    const float_type sintheta_p_in =
+        sqrt((1. - costheta_p_in) * (1. + costheta_p_in));
     Matrix<float_type> AP_in(2, 3);
     AP_in(0, 0) = costheta_p_in * cosphi_p_in;
     AP_in(0, 1) = costheta_p_in * sinphi_p_in;
@@ -1156,7 +1146,7 @@ public:
     // AP_in(1,2) remains 0.
 
     const float_type sintheta_p_out =
-        sqrt(1. - costheta_p_out * costheta_p_out);
+        sqrt((1. - costheta_p_out) * (1. + costheta_p_out));
     Matrix<float_type> AP_out(2, 3);
     AP_out(0, 0) = costheta_p_out * cosphi_p_out;
     AP_out(0, 1) = costheta_p_out * sinphi_p_out;
@@ -1209,12 +1199,18 @@ public:
 
     const std::complex<float_type> icompl(0., 1.);
     Matrix<std::complex<float_type>> cal(_nmax, _nmax);
+    std::complex<float_type> cnn = icompl;
     for (uint_fast32_t nn = 1; nn < _nmax + 1; ++nn) {
+      // cnn now equals i^nn
+      std::complex<float_type> cn(1.);
       for (uint_fast32_t n = 1; n < _nmax + 1; ++n) {
-        cal(n - 1, nn - 1) =
-            pow(icompl, nn - n - 1.) * sqrt((2. * n + 1.) * (2. * nn + 1.) /
-                                            (n * nn * (n + 1.) * (nn + 1.)));
+        // cn*cnn now equals i^(nn - n - 1)
+        cal(n - 1, nn - 1) = cn * cnn *
+                             float_type(sqrt((2. * n + 1.) * (2. * nn + 1.) /
+                                             (n * nn * (n + 1.) * (nn + 1.))));
+        cn /= icompl;
       }
+      cnn *= icompl;
     }
 
     const float_type phiout_in = phi_p_out - phi_p_in;
@@ -1267,15 +1263,11 @@ public:
         }
       }
     }
-    S11 /= _k;
-    S12 /= _k;
-    S21 /= _k;
-    S22 /= _k;
-
-    ctm_warning("S11: %g + i%g", double(S11.real()), double(S11.imag()));
-    ctm_warning("S12: %g + i%g", double(S12.real()), double(S12.imag()));
-    ctm_warning("S21: %g + i%g", double(S21.real()), double(S21.imag()));
-    ctm_warning("S22: %g + i%g", double(S22.real()), double(S22.imag()));
+    const float_type kinv = 1. / _k;
+    S11 *= kinv;
+    S12 *= kinv;
+    S21 *= kinv;
+    S22 *= kinv;
 
     const std::complex<float_type> cS11 = S11 * R_in(0, 0) + S12 * R_in(1, 0);
     const std::complex<float_type> cS12 = S11 * R_in(0, 1) + S12 * R_in(1, 1);
@@ -1294,20 +1286,21 @@ public:
 
     Matrix<float_type> Z(4, 4);
 
-    Z(0, 0) = (0.5 * (S11 * conj(S11) + S12 * conj(S12) + S21 * conj(S21) +
-                      S22 * conj(S22)))
+    const float_type half(0.5);
+    Z(0, 0) = (half * (S11 * conj(S11) + S12 * conj(S12) + S21 * conj(S21) +
+                       S22 * conj(S22)))
                   .real();
-    Z(0, 1) = (0.5 * (S11 * conj(S11) - S12 * conj(S12) + S21 * conj(S21) -
-                      S22 * conj(S22)))
+    Z(0, 1) = (half * (S11 * conj(S11) - S12 * conj(S12) + S21 * conj(S21) -
+                       S22 * conj(S22)))
                   .real();
     Z(0, 2) = (-S11 * conj(S12) - S22 * conj(S21)).real();
     Z(0, 3) = (icompl * (S11 * conj(S12) - S22 * conj(S21))).real();
 
-    Z(1, 0) = (0.5 * (S11 * conj(S11) + S12 * conj(S12) - S21 * conj(S21) -
-                      S22 * conj(S22)))
+    Z(1, 0) = (half * (S11 * conj(S11) + S12 * conj(S12) - S21 * conj(S21) -
+                       S22 * conj(S22)))
                   .real();
-    Z(1, 1) = (0.5 * (S11 * conj(S11) - S12 * conj(S12) - S21 * conj(S21) +
-                      S22 * conj(S22)))
+    Z(1, 1) = (half * (S11 * conj(S11) - S12 * conj(S12) - S21 * conj(S21) +
+                       S22 * conj(S22)))
                   .real();
     Z(1, 2) = (-S11 * conj(S12) + S22 * conj(S21)).real();
     Z(1, 3) = (icompl * (S11 * conj(S12) + S22 * conj(S21))).real();

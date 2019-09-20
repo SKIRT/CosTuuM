@@ -355,7 +355,13 @@ public:
 
     // check if the input argument is close to 1 (corresponding to a sine close
     // to 0
-    if (abs(1. - abs(cosx)) <= 1.e-10) {
+    // note that we need to use fabs below, since abs without std namespace
+    // specifier defaults to the integer version (clang gives an error for
+    // this)
+    // abs with std namespace does not work when float_type is
+    // cpp_bin_float_quad, since then we need boost::multiprecision::abs
+    // using fabs seems to work for both cases
+    if (fabs(1. - fabs(cosx)) <= 1.e-10) {
       if (m == 1) {
         int_fast8_t sign = 1;
         for (uint_fast32_t n = 1; n < nmax + 1; ++n) {
@@ -643,7 +649,13 @@ public:
         pb = pa * pc * (1. - x_i * x_i);
         // pb is P_n(x)/P_n'(x)
         x_i = x_i - pb;
-      } while (std::abs(pb) > check * std::abs(x_i));
+        // note that we need to use fabs below, since abs without std namespace
+        // specifier defaults to the integer version (clang gives an error for
+        // this)
+        // abs with std namespace does not work when float_type is
+        // cpp_bin_float_quad, since then we need boost::multiprecision::abs
+        // using fabs seems to work for both cases
+      } while (fabs(pb) > check * fabs(x_i));
 
       // we set the element n - i - 1
       const uint_fast32_t m = order - i - 1;

@@ -12,9 +12,10 @@ set_source_files_properties(${PROJECT_BINARY_DIR}/src/CompilerInfo.cpp
                             PROPERTIES GENERATED TRUE)
 
 set(CTM_SOURCES
-    CompilerInfo.cpp
-    ConfigurationInfo.cpp
     CTM.cpp
+
+    ${PROJECT_BINARY_DIR}/src/CompilerInfo.cpp
+    ${PROJECT_BINARY_DIR}/src/ConfigurationInfo.cpp
 )
 
 add_executable(CTM ${CTM_SOURCES})
