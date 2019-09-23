@@ -718,6 +718,7 @@ public:
 
     // func_TT
     Q.plu_inverse();
+
     for (uint_fast32_t i = 0; i < nmax; ++i) {
       const uint_fast32_t li = (i + 1) * (i + 2) - 1;
       for (uint_fast32_t j = 0; j < nmax; ++j) {

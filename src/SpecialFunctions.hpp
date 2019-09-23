@@ -94,7 +94,7 @@ public:
     y[1] = (-three * zinv3 + zinv) * cosz - three * zinv2 * sinz;
     // same for the derivatives (this implicitly uses the recursion relation)
     dy[0] = -zinv * (cosz + y[0]);
-    dy[1] = y[0] - zinv * y[1];
+    dy[1] = y[0] - 2. * zinv * y[1];
     // now apply the recursion relations for the rest
     for (uint_fast32_t i = 2; i < nmax; ++i) {
       const DATA_TYPE twoip1(2. * i + 1.);
