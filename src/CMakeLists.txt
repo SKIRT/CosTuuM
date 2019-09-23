@@ -12,7 +12,10 @@ set_source_files_properties(${PROJECT_BINARY_DIR}/src/CompilerInfo.cpp
                             PROPERTIES GENERATED TRUE)
 
 set(CTM_SOURCES
+    CommandLineOption.cpp
+    CommandLineParser.cpp
     CTM.cpp
+    ParameterFile.cpp
 
     ${PROJECT_BINARY_DIR}/src/CompilerInfo.cpp
     ${PROJECT_BINARY_DIR}/src/ConfigurationInfo.cpp

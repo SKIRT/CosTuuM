@@ -6,9 +6,11 @@
  * @author Bert Vandenbroucke (bert.vandenbroucke@ugent.be)
  */
 
+#include "CommandLineParser.hpp"
 #include "Configuration.hpp"
 #include "ConfigurationInfo.hpp"
 #include "Matrix.hpp"
+#include "ParameterFile.hpp"
 #include "SpecialFunctions.hpp"
 #include "TMatrix.hpp"
 
@@ -37,36 +39,100 @@ using namespace std;
  */
 int main(int argc, char **argv) {
 
+  std::cout << "Program configuration:" << std::endl;
   for (auto it = ConfigurationInfo::begin(); it != ConfigurationInfo::end();
        ++it) {
     std::cout << it.get_key() << ": " << it.get_value() << "\n";
   }
   std::cout << std::endl;
 
-  /// input parameters (should become real parameters at some point
+  CommandLineParser parser("C++ TMatrix code");
+  parser.add_option("params", 'p', "Name of the parameter file.",
+                    COMMANDLINEOPTION_STRINGARGUMENT, "", true);
+  parser.add_option("output", 'o', "Name of the output dump file.",
+                    COMMANDLINEOPTION_STRINGARGUMENT, "", true);
+  parser.parse_arguments(argc, argv);
+
+  std::cout << "Command line options:" << std::endl;
+  parser.print_contents(std::cout);
+  std::cout << std::endl;
+
+  ParameterFile params(parser.get_value<std::string>("params"));
+
+  /// input parameters
+
+  /// dust particle
   // size of the particle (in same units as the wavelength)
-  const float_type axi = 10.;
+  const float_type axi = params.get_physical_value<QUANTITY_LENGTH>(
+                             "DustParticle:size", "10. micron") *
+                         1.e6;
   // ratio between the equal surface area sphere radius and equal volume sphere
   // radius (is recomputed if not equal to 1)
-  float_type ratio_of_radii = 0.1;
-  // wavelength of incoming radiation (in same units as the particle size)
-  const float_type wavelength = 2. * M_PI;
+  float_type ratio_of_radii = 1.;
+  if (!params.get_value<bool>("DustParticle:is equal volume sphere radius",
+                              true)) {
+    ratio_of_radii = 0.1;
+  }
   // refractive index
-  const std::complex<float_type> mr(1.5, 0.02);
+  const std::complex<float_type> mr = params.get_value<std::complex<double>>(
+      "DustParticle:refractive index", std::complex<double>(1.5, 0.02));
   // ratio of horizontal and vertical axis of the spheroidal particle
-  const float_type axis_ratio = 0.5;
+  const float_type axis_ratio =
+      params.get_value<double>("DustParticle:axis ratio", 0.5);
+
+  /// radiation
+  // wavelength of incoming radiation (in same units as the particle size)
+  const float_type wavelength =
+      params.get_physical_value<QUANTITY_LENGTH>(
+          "Radiation:incoming wavelength", "6.283185307 micron") *
+      1.e6;
+
+  /// calculation
   // tolerance for the calculation
-  const float_type tolerance = 1.e-4;
+  const float_type tolerance =
+      params.get_value<double>("Calculation:tolerance", 1.e-4);
   // number of Gauss-Legendre points to use as a multiplier of the maximum
   // order of spherical harmonics used to decompose the electric field, during
   // the first loop of the algorithm
-  const uint_fast32_t ndgs = 2;
-
-  /// hardcoded program parameters
+  const uint_fast32_t ndgs =
+      params.get_value<uint_fast32_t>("Calculation:Gauss Legendre factor", 2);
   // maximum number of iterations during the first loop
-  const uint_fast32_t maximum_order = 200;
+  const uint_fast32_t maximum_order =
+      params.get_value<uint_fast32_t>("Calculation:maximum order", 200);
   // maximum number of iterations during the second loop
-  const uint_fast32_t maximum_ngauss = 500;
+  const uint_fast32_t maximum_ngauss = params.get_value<uint_fast32_t>(
+      "Calculation:maximum number of Gauss Legendre points", 500);
+
+  /// scattering event
+  // first and second Euler angles describing the orientation of the particle
+  // in the fixed laboratory reference frame
+  const float_type alpha = params.get_physical_value<QUANTITY_ANGLE>(
+      "DustParticle:alpha angle", "145. degrees");
+  const float_type beta = params.get_physical_value<QUANTITY_ANGLE>(
+      "DustParticle:beta angle", "52. degrees");
+
+  // zenith and azimuth angle of the incoming photon
+  const float_type theta_in = params.get_physical_value<QUANTITY_ANGLE>(
+      "Radiation:incoming theta", "56. degrees");
+  const float_type phi_in = params.get_physical_value<QUANTITY_ANGLE>(
+      "Radiation:incoming phi", "114. degrees");
+
+  // zenith and azimuth angle of the scattered photon
+  const float_type theta_out = params.get_physical_value<QUANTITY_ANGLE>(
+      "Radiation:outgoing theta", "65. degrees");
+  const float_type phi_out = params.get_physical_value<QUANTITY_ANGLE>(
+      "Radiation:outgoing phi", "128. degrees");
+
+  // write used parameters to file
+  {
+    std::ofstream pfile("parameters-usedvalues.param");
+    params.print_contents(pfile);
+    pfile.close();
+
+    std::cout << "Input parameters:" << std::endl;
+    params.print_contents(std::cout);
+    std::cout << std::endl;
+  }
 
   // make sure 'rat' contains the right ratio if it is not 1
   if (abs(ratio_of_radii - 1.) > 1.e-8) {
@@ -189,7 +255,6 @@ int main(int argc, char **argv) {
   TMatrix &T = *active_Tmatrix;
   old_qsca = 0.;
   old_qext = 0.;
-  std::ofstream tfile("TMatrix.txt");
   for (uint_fast32_t n1 = 1; n1 < nmax + 1; ++n1) {
     for (uint_fast32_t n2 = 1; n2 < nmax + 1; ++n2) {
       for (int_fast32_t m1 = -n1; m1 < static_cast<int_fast32_t>(n1 + 1);
@@ -200,20 +265,6 @@ int main(int argc, char **argv) {
           old_qsca += std::norm(T(0, n1, m1, 1, n2, m2));
           old_qsca += std::norm(T(1, n1, m1, 0, n2, m2));
           old_qsca += std::norm(T(1, n1, m1, 1, n2, m2));
-          if (m1 == m2) {
-            tfile << "0\t" << n1 << "\t" << m1 << "\t0\t" << n2 << "\t" << m2
-                  << "\t" << T(0, n1, m1, 0, n2, m2).real() << "\t"
-                  << T(0, n1, m1, 0, n2, m2).imag() << "\n";
-            tfile << "0\t" << n1 << "\t" << m1 << "\t1\t" << n2 << "\t" << m2
-                  << "\t" << T(0, n1, m1, 1, n2, m2).real() << "\t"
-                  << T(0, n1, m1, 1, n2, m2).imag() << "\n";
-            tfile << "1\t" << n1 << "\t" << m1 << "\t0\t" << n2 << "\t" << m2
-                  << "\t" << T(0, n1, m1, 0, n2, m2).real() << "\t"
-                  << T(1, n1, m1, 0, n2, m2).imag() << "\n";
-            tfile << "1\t" << n1 << "\t" << m1 << "\t1\t" << n2 << "\t" << m2
-                  << "\t" << T(0, n1, m1, 1, n2, m2).real() << "\t"
-                  << T(1, n1, m1, 1, n2, m2).imag() << "\n";
-          }
         }
       }
     }
@@ -233,19 +284,6 @@ int main(int argc, char **argv) {
 
   /// compute a scattering event using the T-matrix
 
-  // first and second Euler angles describing the orientation of the particle
-  // in the fixed laboratory reference frame
-  const float_type alpha = 145.;
-  const float_type beta = 52.;
-
-  // zenith and azimuth angle of the incoming photon
-  const float_type theta_in = 56.;
-  const float_type phi_in = 114.;
-
-  // zenith and azimuth angle of the scattered photon
-  const float_type theta_out = 65.;
-  const float_type phi_out = 128.;
-
   Matrix<float_type> Z = active_Tmatrix->get_scattering_matrix(
       alpha, beta, theta_in, phi_in, theta_out, phi_out);
 
@@ -257,6 +295,8 @@ int main(int argc, char **argv) {
               double(Z(2, 2)), double(Z(2, 3)));
   ctm_warning("Z[3,:] = %g %g %g %g", double(Z(3, 0)), double(Z(3, 1)),
               double(Z(3, 2)), double(Z(3, 3)));
+
+  Z.binary_dump(parser.get_value<std::string>("output"));
 
   // clean up
   delete active_Tmatrix;

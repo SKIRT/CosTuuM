@@ -1025,31 +1025,22 @@ public:
    * @brief Get the scattering matrix for a scattering from the given input
    * angles to the given output angles at a particle with the given orientation.
    *
-   * @param alpha_degrees Azimuth angle of the particle's rotation axis (in
-   * degrees).
-   * @param beta_degrees Zenith angle of the particle's rotation axis (in
-   * degrees).
-   * @param theta_in_degrees Azimuth angle of the incoming photon (in degrees).
-   * @param phi_in_degrees Zenith angle of the incoming photon (in degrees).
-   * @param theta_out_degrees Azimuth angle of the scattered photon (in
-   * degrees).
-   * @param phi_out_degrees Zenith angle fo the scattered photon (in degrees).
+   * @param alpha_radians Azimuth angle of the particle's rotation axis (in
+   * radians).
+   * @param beta_radians Zenith angle of the particle's rotation axis (in
+   * radians).
+   * @param theta_in_radians Azimuth angle of the incoming photon (in radians).
+   * @param phi_in_radians Zenith angle of the incoming photon (in radians).
+   * @param theta_out_radians Azimuth angle of the scattered photon (in
+   * radians).
+   * @param phi_out_radians Zenith angle fo the scattered photon (in radians).
    * @return Scattering matrix for this scattering event.
    */
   inline Matrix<float_type> get_scattering_matrix(
-      const float_type alpha_degrees, const float_type beta_degrees,
-      const float_type theta_in_degrees, const float_type phi_in_degrees,
-      const float_type theta_out_degrees,
-      const float_type phi_out_degrees) const {
-
-    // convert all angles to radians
-    const float_type degrees_to_radians = M_PI / 180.;
-    const float_type alpha_radians = alpha_degrees * degrees_to_radians;
-    const float_type beta_radians = beta_degrees * degrees_to_radians;
-    const float_type theta_in_radians = theta_in_degrees * degrees_to_radians;
-    const float_type phi_in_radians = phi_in_degrees * degrees_to_radians;
-    const float_type theta_out_radians = theta_out_degrees * degrees_to_radians;
-    const float_type phi_out_radians = phi_out_degrees * degrees_to_radians;
+      const float_type alpha_radians, const float_type beta_radians,
+      const float_type theta_in_radians, const float_type phi_in_radians,
+      const float_type theta_out_radians,
+      const float_type phi_out_radians) const {
 
     // Mishchenko includes some (buggy) corrections for small angles
     // might be worth looking into this in a later stage...
