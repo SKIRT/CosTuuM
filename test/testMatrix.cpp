@@ -53,6 +53,8 @@ int main(int argc, char **argv) {
 
   A.plu_inverse();
 
+  A.binary_dump("test_matrix.dump");
+
   for (uint_fast32_t i = 0; i < 3; ++i) {
     for (uint_fast32_t j = 0; j < 3; ++j) {
       std::cout << A(i, j) << " ";

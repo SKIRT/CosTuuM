@@ -12,6 +12,8 @@
 
 #include <cinttypes>
 #include <complex>
+#include <fstream>
+#include <string>
 #include <vector>
 
 /**
@@ -96,6 +98,33 @@ public:
    */
   inline DATA_TYPE *get_row(const uint_fast32_t i) {
     return &_array[i * _number_of_columns];
+  }
+
+  /**
+   * @brief Dump the Matrix to a binary file with the given name.
+   *
+   * The first two 32-bit values in the output file will contain the number of
+   * rows and columns in the matrix, followed by the size of a single element
+   * of the matrix, followed by all the matrix elements in C++ array order (i.e.
+   * first all columns of the first row, and so on...).
+   *
+   * @param filename Name of the output file.
+   */
+  inline void binary_dump(const std::string filename) const {
+
+    std::ofstream file(filename, std::ofstream::binary);
+    // make sure these numbers are actual 32-bit integers before writing them
+    // out
+    const uint32_t number_of_rows = _number_of_rows;
+    file.write(reinterpret_cast<const char *>(&number_of_rows),
+               sizeof(number_of_rows));
+    const uint32_t number_of_columns = _number_of_columns;
+    file.write(reinterpret_cast<const char *>(&number_of_columns),
+               sizeof(number_of_columns));
+    const uint32_t datasize = sizeof(DATA_TYPE);
+    file.write(reinterpret_cast<const char *>(&datasize), sizeof(datasize));
+    const uint_fast32_t size = _number_of_columns * _number_of_rows;
+    file.write(reinterpret_cast<const char *>(&_array[0]), size * datasize);
   }
 
   /**

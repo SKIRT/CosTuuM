@@ -51,6 +51,9 @@ set(TESTMATRIX_SOURCES
 )
 add_unit_test(NAME testMatrix
               SOURCES ${TESTMATRIX_SOURCES})
+configure_file(${PROJECT_SOURCE_DIR}/test/test_matrix.py
+               ${PROJECT_BINARY_DIR}/bin/test/test_matrix.py
+               COPYONLY)
 
 ### Done adding unit tests. Create the 'make check' target #####################
 ### Do not touch these lines unless you know what you're doing! ################
