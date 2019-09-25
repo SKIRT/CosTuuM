@@ -1025,15 +1025,257 @@ public:
    * @brief Get the scattering matrix for a scattering from the given input
    * angles to the given output angles at a particle with the given orientation.
    *
-   * @param alpha_radians Azimuth angle of the particle's rotation axis (in
-   * radians).
-   * @param beta_radians Zenith angle of the particle's rotation axis (in
-   * radians).
-   * @param theta_in_radians Azimuth angle of the incoming photon (in radians).
-   * @param phi_in_radians Zenith angle of the incoming photon (in radians).
-   * @param theta_out_radians Azimuth angle of the scattered photon (in
-   * radians).
-   * @param phi_out_radians Zenith angle fo the scattered photon (in radians).
+   * The scattering matrix @f$Z@f$ is a @f$4\times{}4@f$ matrix that transforms
+   * the 4 elements of an incoming Stokes vector into the 4 elements of the
+   * scattered Stokes vector after a scattering event. This matrix depends
+   * on the direction of the incoming radiation, @f$\vec{n}_i@f$, the direction
+   * of the scattered radiation, @f$\vec{n}_s@f$ (both measured in some
+   * arbitrary fixed reference *laboratory* frame with its origin at the centre
+   * of the particle), and the orientation of the scattering particle, generally
+   * encoded in the three Euler angles that link the laboratory frame with a
+   * frame fixed to the particle:
+   *  - the angle @f$\alpha{}@f$ between the original @f$y_L@f$ axis and the
+   *    projection of the new @f$y_P@f$ axis in the original @f$x_Ly_L@f$ plane,
+   *    after a counterclockwise rotation along the @f$z_L@f$ axis.
+   *  - the angle @f$\beta{}@f$ between the @f$z_L@f$ axis and the @f$z_P@f$
+   *    axis after a counterclockwise rotation along the projection of the
+   *    @f$y_P@f$ axis in the @f$x_Ly_L@f$ plane.
+   *  - the angle @f$\gamma{}@f$ between the projection of the @f$y_P@f$ axis in
+   *    the @f$x_Ly_L@f$ plane and the @f$y_P@f$ axis after a counterclockwise
+   *    rotation along the @f$z_P@f$ axis.
+   *
+   * Because of the spheroidal symmetry of the scattering particle, we can
+   * always choose the particle reference frame so that the @f$y_P@f$ axis and
+   * its projection in the @f$x_Ly_L@f$ plane coincide, i.e. @f$\gamma{}=0@f$.
+   * In this case, the angles @f$\alpha{}@f$ and @f$\beta{}@f$ will simply be
+   * the azimuth and zenith angles for the @f$z_P@f$ axis, which we choose to
+   * align with the rotation axis of the spheroidal particle. Similarly, we
+   * can express the incoming and scattered directions in terms of a zenith
+   * angle @f$\theta{}@f$ and an azimuth angle @f$\phi{}@f$. These are the 6
+   * input parameters for the scattering function.
+   *
+   * The scattering matrix @f$Z@f$ is related to the @f$2\times{}2@f$
+   * scattering matrix @f$S@f$ that transforms the two (complex) amplitudes
+   * of the electromagnetic field perpendicular to the incoming direction into
+   * the two amplitudes perpendicular to the outgoing direction. The relation
+   * between the matrix @f$S@f$ and the matrix @f$Z@f$ is given in section VI
+   * of chapter 1 of Mishchenko, Hovenier & Travis, 2000, Light Scattering by
+   * Nonspherical Particles
+   * (https://www.elsevier.com/books/light-scattering-by-nonspherical-particles/mishchenko/978-0-12-498660-2),
+   * where @f$X_{ij}@f$ represents the element on row @f$i@f$, column @f$j@f$ of
+   * the matrix @f$X@f$:
+   * @f[
+   *    Z_{11} = \frac{1}{2} \left(
+   *      |S_{11}|^2 + |S_{12}|^2 + |S_{21}|^2 + |S_{22}|^2
+   *    \right),
+   * @f]
+   * @f[
+   *    Z_{12} = \frac{1}{2} \left(
+   *      |S_{11}|^2 - |S_{12}|^2 + |S_{21}|^2 - |S_{22}|^2
+   *    \right),
+   * @f]
+   * @f[
+   *    Z_{13} = -\Re\left( S_{11} S^*_{12} + S_{22} S^*_{21} \right),
+   * @f]
+   * @f[
+   *    Z_{14} = -\Im\left( S_{11} S^*_{12} - S_{22} S^*_{21} \right),
+   * @f]
+   * @f[
+   *    Z_{21} = \frac{1}{2} \left(
+   *      |S_{11}|^2 + |S_{12}|^2 - |S_{21}|^2 - |S_{22}|^2
+   *    \right),
+   * @f]
+   * @f[
+   *    Z_{22} = \frac{1}{2} \left(
+   *      |S_{11}|^2 - |S_{12}|^2 - |S_{21}|^2 + |S_{22}|^2
+   *    \right),
+   * @f]
+   * @f[
+   *    Z_{23} = -\Re\left( S_{11} S^*_{12} - S_{22} S^*_{21} \right),
+   * @f]
+   * @f[
+   *    Z_{24} = -\Im\left( S_{11} S^*_{12} + S_{22} S^*_{21} \right),
+   * @f]
+   * @f[
+   *    Z_{31} = -\Re\left( S_{11} S^*_{21} + S_{22} S^*_{12} \right),
+   * @f]
+   * @f[
+   *    Z_{32} = -\Re\left( S_{11} S^*_{21} - S_{22} S^*_{12} \right),
+   * @f]
+   * @f[
+   *    Z_{33} = \Re\left( S_{11} S^*_{22} + S_{12} S^*_{21} \right),
+   * @f]
+   * @f[
+   *    Z_{34} = \Im\left( S_{11} S^*_{22} + S_{21} S^*_{12} \right),
+   * @f]
+   * @f[
+   *    Z_{41} = -\Im\left( S_{21} S^*_{11} + S_{22} S^*_{12} \right),
+   * @f]
+   * @f[
+   *    Z_{42} = -\Im\left( S_{21} S^*_{11} - S_{22} S^*_{12} \right),
+   * @f]
+   * @f[
+   *    Z_{43} = \Im\left( S_{22} S^*_{11} - S_{12} S^*_{21} \right),
+   * @f]
+   * @f[
+   *    Z_{44} = \Re\left( S_{22} S^*_{11} - S_{12} S^*_{21} \right),
+   * @f]
+   * where @f$\Re(z)@f$ and @f$\Im(z)@f$ represent respectively the real part
+   * @f$x@f$ and imaginary part @f$y@f$ of the complex number @f$z = x + iy@f$.
+   *
+   * The scattering matrix @f$S@f$ can be computed in the particle reference
+   * frame from the T matrix (Mishchenko, 2000, Applied Optics, 39, 1026;
+   * https://doi.org/10.1364/AO.39.001026):
+   * @f[
+   *    S^P_{11} = \frac{1}{k} \sum_{n=1}^{n_{max}} \sum_{n'=1}^{n_{max}}
+   *      \sum_{m = -\min(n, n')}^{\min(n, n')}
+   *      i^{n' - n -1} \sqrt{\frac{(2n+1)(2n'+1)}{n(n+1)n'(n'+1)}}
+   *      e^{im(\phi{}_s^P - \phi{}_i^P)} \\\left(
+   *        T^{11}_{mnmn'} \frac{m^2}{\sin^2(\theta{})} d^n_{0m}(\theta{}_s^P)
+   *          d^{n'}_{0m}(\theta{}_i^P) +
+   *        T^{21}_{mnmn'} \frac{m}{\sin(\theta{})}
+   *          \frac{d}{d\theta{}} d^n_{0m}(\theta{}_s^P)
+   *          d^{n'}_{0m}(\theta{}_i^P) +
+   *        T^{12}_{mnmn'} \frac{m}{\sin(\theta{})} d^n_{0m}(\theta{}_s^P)
+   *          \frac{d}{d\theta{}} d^{n'}_{0m}(\theta{}_i^P) +
+   *        T^{22}_{mnmn'} \frac{d}{d\theta{}} d^{n}_{0m}(\theta{}_s^P)
+   *          \frac{d}{d\theta{}} d^{n'}_{0m}(\theta{}_i^P)
+   *      \right),
+   * @f]
+   * @f[
+   *    S^P_{12} = -\frac{i}{k} \sum_{n=1}^{n_{max}} \sum_{n'=1}^{n_{max}}
+   *      \sum_{m = -\min(n, n')}^{\min(n, n')}
+   *      i^{n' - n -1} \sqrt{\frac{(2n+1)(2n'+1)}{n(n+1)n'(n'+1)}}
+   *      e^{im(\phi{}_s^P - \phi{}_i^P)} \\\left(
+   *        T^{11}_{mnmn'} \frac{m}{\sin(\theta{})} d^n_{0m}(\theta{}_s^P)
+   *          \frac{d}{d\theta{}} d^{n'}_{0m}(\theta{}_i^P) +
+   *        T^{21}_{mnmn'} \frac{d}{d\theta{}} d^{n}_{0m}(\theta{}_s^P)
+   *          \frac{d}{d\theta{}} d^{n'}_{0m}(\theta{}_i^P) +
+   *        T^{12}_{mnmn'} \frac{m^2}{\sin^2(\theta{})} d^n_{0m}(\theta{}_s^P)
+   *          d^{n'}_{0m}(\theta{}_i^P) +
+   *        T^{22}_{mnmn'} \frac{m}{\sin(\theta{})}
+   *          \frac{d}{d\theta{}} d^n_{0m}(\theta{}_s^P)
+   *          d^{n'}_{0m}(\theta{}_i^P)
+   *      \right),
+   * @f]
+   * @f[
+   *    S^P_{21} = \frac{i}{k} \sum_{n=1}^{n_{max}} \sum_{n'=1}^{n_{max}}
+   *      \sum_{m = -\min(n, n')}^{\min(n, n')}
+   *      i^{n' - n -1} \sqrt{\frac{(2n+1)(2n'+1)}{n(n+1)n'(n'+1)}}
+   *      e^{im(\phi{}_s^P - \phi{}_i^P)} \\\left(
+   *        T^{11}_{mnmn'} \frac{m}{\sin(\theta{})}
+   *          \frac{d}{d\theta{}} d^n_{0m}(\theta{}_s^P)
+   *          d^{n'}_{0m}(\theta{}_i^P) +
+   *        T^{21}_{mnmn'} \frac{m^2}{\sin^2(\theta{})} d^n_{0m}(\theta{}_s^P)
+   *          d^{n'}_{0m}(\theta{}_i^P) +
+   *        T^{12}_{mnmn'} \frac{d}{d\theta{}} d^{n}_{0m}(\theta{}_s^P)
+   *          \frac{d}{d\theta{}} d^{n'}_{0m}(\theta{}_i^P) +
+   *        T^{22}_{mnmn'} \frac{m}{\sin(\theta{})} d^n_{0m}(\theta{}_s^P)
+   *          \frac{d}{d\theta{}} d^{n'}_{0m}(\theta{}_i^P)
+   *      \right),
+   * @f]
+   * @f[
+   *    S^P_{22} = \frac{1}{k} \sum_{n=1}^{n_{max}} \sum_{n'=1}^{n_{max}}
+   *      \sum_{m = -\min(n, n')}^{\min(n, n')}
+   *      i^{n' - n -1} \sqrt{\frac{(2n+1)(2n'+1)}{n(n+1)n'(n'+1)}}
+   *      e^{im(\phi{}_s^P - \phi{}_i^P)} \\\left(
+   *        T^{11}_{mnmn'} \frac{d}{d\theta{}} d^{n}_{0m}(\theta{}_s^P)
+   *          \frac{d}{d\theta{}} d^{n'}_{0m}(\theta{}_i^P) +
+   *        T^{21}_{mnmn'} \frac{m}{\sin(\theta{})} d^n_{0m}(\theta{}_s^P)
+   *          \frac{d}{d\theta{}} d^{n'}_{0m}(\theta{}_i^P) +
+   *        T^{12}_{mnmn'} \frac{m}{\sin(\theta{})}
+   *          \frac{d}{d\theta{}} d^n_{0m}(\theta{}_s^P)
+   *          d^{n'}_{0m}(\theta{}_i^P) +
+   *        T^{22}_{mnmn'} \frac{m^2}{\sin^2(\theta{})} d^n_{0m}(\theta{}_s^P)
+   *          d^{n'}_{0m}(\theta{}_i^P)
+   *      \right).
+   * @f]
+   * In this expression, the angles @f$\phi{}_i^P, \phi{}_s^P, \theta{}_i^P@f$
+   * and @f$\theta_s^P@f$ represent the azimuth and zenith angles of the
+   * incoming and outgoing ray in the particle reference frame. Note that
+   * the scattering matrix in this frame strictly speaking only depends on
+   * three angles: the zenith angles @f$\theta{}_i^P@f$ and @f$\theta{}_s^P@f$
+   * and the relative azimuth angle @f$\phi{}_s^P - \phi{}_i^P@f$.
+   *
+   * To compute the @f$Z@f$ matrix in the original laboratory reference frame,
+   * we need to rotate the scattering matrix @f$S^P@f$ into the laboratory
+   * frame to get @f$S^L@f$. This requires knowledge of the reference frame
+   * transformation, and hence the rotations encoded by @f$\alpha{}@f$ and
+   * @f$\beta{}@f$. If we denote the unit vectors along the Cartesian coordinate
+   * axes in the laboratory frame as @f$\hat{x}_L, \hat{y}_L, \hat{z}_L@f$ and
+   * the unit vectors in the particle frame as @f$\hat{x}_P, \hat{y}_P,
+   * \hat{z}_P@f$, and we also introduce the intermediate frame with unit
+   * vectors @f$\hat{x}_I, \hat{y}_I, \hat{z}_I@f$ that represents the frame
+   * after the first rotation with angle @f$\alpha{}@f$, then we can derive
+   * the following relations between the various unit vectors:
+   * @f[
+   *    \begin{cases}
+   *      \hat{x}_I = \cos(\alpha{}) \hat{x}_L + \sin(\alpha{}) \hat{y}_L, \\
+   *      \hat{y}_I = -\sin(\alpha{}) \hat{x}_L + \cos(\alpha{}) \hat{y}_L, \\
+   *      \hat{z}_I = \hat{z}_L,
+   *    \end{cases}
+   * @f]
+   * @f[
+   *    \begin{cases}
+   *      \hat{x}_L = \cos(\alpha{}) \hat{x}_I - \sin(\alpha{}) \hat{y}_I, \\
+   *      \hat{y}_L = \sin(\alpha{}) \hat{x}_I + \cos(\alpha{}) \hat{y}_I, \\
+   *      \hat{z}_L = \hat{z}_I,
+   *    \end{cases}
+   * @f]
+   * @f[
+   *    \begin{cases}
+   *      \hat{x}_P = \cos(\beta{}) \hat{x}_I - \sin(\beta{}) \hat{z}_I =
+   *        \cos(\alpha{}) \cos(\beta{}) \hat{x}_L +
+   *        \sin(\alpha{}) \cos(\beta{}) \hat{y}_L - \sin(\beta{}) \hat{z}_L, \\
+   *      \hat{y}_P = \hat{y}_I =
+   *        -\sin(\alpha{}) \hat{x}_L + \cos(\alpha{}) \hat{y}_L, \\
+   *      \hat{z}_P = \sin(\beta{}) \hat{x}_I + \cos(\beta{}) \hat{z}_I =
+   *        \cos(\alpha{}) \sin(\beta{}) \hat{x}_L +
+   *        \sin(\alpha{}) \sin(\beta{}) \hat{y}_L + \cos(\beta{}) \hat{z}_L,
+   *    \end{cases}
+   * @f]
+   * @f[
+   *    \begin{cases}
+   *      \hat{x}_L = \cos(\alpha{}) \cos(\beta{}) \hat{x}_P
+   *        - \sin(\alpha{}) \hat{y}_P
+   *        + \cos(\alpha{}) \sin(\beta{}) \hat{z}_P, \\
+   *      \hat{y}_L = \sin(\alpha{}) \cos(\beta{}) \hat{x}_P
+   *        + \cos(\alpha{}) \hat{y}_P
+   *        + \sin(\alpha{}) \sin(\beta{}) \hat{z}_P, \\
+   *      \hat{z}_L = -\sin(\beta{}) \hat{x}_P + \cos(\beta{}) \hat{z}_P.
+   *    \end{cases}
+   * @f]
+   *
+   * The direction vectors @f$\vec{n}_i@f$ and @f$\vec{n}_s@f$ can be expanded
+   * in both reference frames as
+   * @f[
+   *    \vec{n} = \sin(\theta{}) \cos(\phi{}) \hat{x}
+   *      + \sin(\theta{}) \sin(\phi{}) \hat{y}
+   *      + \cos(\theta{}) \hat{z},
+   * @f]
+   * which leads to the following transformation formulas for @f$\theta{}^P@f$
+   * and @f$\phi{}^P@f$:
+   * @f[
+   *    \cos(\theta{}^P) = \cos(\theta{}^L) \cos(\beta{})
+   *      + \sin(\theta{}^L) \sin(\beta{}) \left(
+   *        \cos(\phi{}^L) \cos(\alpha{}) + \sin(\phi{}^L) \sin(\alpha{})
+   *      \right) = \cos(\theta{}^L) \cos(\beta{})
+   *      + \sin(\theta{}^L) \sin(\beta{}) \cos(\phi{}^L - \alpha{}),
+   * @f]
+   * AND CONTINUE HERE TOMORROW...
+   *
+   * @param alpha_radians Azimuth angle of the particle's rotation axis,
+   * @f$\alpha{}@f$ (in radians).
+   * @param beta_radians Zenith angle of the particle's rotation axis,
+   * @f$\beta{}@f$ (in radians).
+   * @param theta_in_radians Zenith angle of the incoming photon,
+   * @f$\theta{}_i@f$ (in radians).
+   * @param phi_in_radians Azimuth angle of the incoming photon, @f$\phi{}_i@f$
+   * (in radians).
+   * @param theta_out_radians Zenith angle of the scattered photon,
+   * @f$\theta{}_s@f$ (in radians).
+   * @param phi_out_radians Azimuth angle fo the scattered photon,
+   * @f$\phi{}_s@f$ (in radians).
    * @return Scattering matrix for this scattering event.
    */
   inline Matrix<float_type> get_scattering_matrix(
