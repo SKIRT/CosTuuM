@@ -1200,7 +1200,7 @@ public:
    * Also note that we use symbols similar to the ones introduced in Mishchenko
    * (2000) in the code:
    * @f[
-   *    c_{nn'} = i^{n'-n-1} \sqrt{\frac{(2n+1)(2n'+1)}{n(n+1)n'(n'+1)},
+   *    c_{nn'} = i^{n'-n-1} \sqrt{\frac{(2n+1)(2n'+1)}{n(n+1)n'(n'+1)}},
    * @f]
    * @f[
    *    \pi{}_{mn}(\theta{}) = \frac{m}{\sin(\theta{})} d^n_{0m}(\theta{}),
@@ -1323,6 +1323,97 @@ public:
    * @f$\phi{}^P@f$ and then evaluating the trigonometric functions for every
    * value of @f$m@f$.
    *
+   * Since the @f$T@f$ matrix itself is even in @f$m@f$ (@f$T_{mnmn'} =
+   * T_{-mn-mn'}@f$), we can simplify the summation over @f$m@f$ in the @f$S@f$
+   * matrix calculation drastically depending on the value of the exponential.
+   * IS THIS TRUE: WHAT ABOUT THE VALUE FOR THE WIGNER D FUNCTIONS AND
+   * DERIVATIVES??
+   * In the expressions for @f$S_{11}@f$ and @f$S_{22}@f$, the exponential for
+   * the terms in the summation with the same @f$|m|@f$ can be isolated as
+   * @f[
+   *    e^{i|m|\phi{}} + e^{-i|m|\phi{}} = 2\cos(|m|\phi{}),
+   * @f]
+   * while in the expressions for @f$S_{12}@f$ and @f$S_{21}@f$, we end up with
+   * @f[
+   *    ie^{i|m|\phi{}} + ie^{-i|m|\phi{}} =
+   *      e^{i\left(\frac{\pi{}}{2} + |m|\phi{}\right)} +
+   *      e^{i\left(\frac{\pi{}}{2} - |m|\phi{}\right)}
+   *    = 2\sin(|m|\phi{}).
+   * @f]
+   *
+   * The formulas above allow us to transform the laboratory frame incoming and
+   * scattered directions into the particle frame for the calculation of
+   * @f$S^P@f$. To convert @f$S^P@f$ into @f$S^L@f$, we need additional
+   * transformation matrices. The first transformation matrix, called @f$B@f$,
+   * is used to transform the electromagnetic field from the laboratory frame
+   * to the particle frame. Its elements can be read of from the relations
+   * between @f$[\hat{x}_P, \hat{y}_P, \hat{z}_P]@f$ and @f$[\hat{x}_L,
+   * \hat{y}_L, \hat{z}_L]@f$:
+   * @f[
+   *    B = \begin{pmatrix}
+   *      \cos(\alpha{}) \cos(\beta{}) & \sin(\alpha{}) \cos(\beta{}) &
+   *        -\sin(\beta{}) \\
+   *      -\sin(\alpha{}) & \cos(\alpha{}) & 0 \\
+   *      \cos(\alpha{}) \sin(\beta{}) & \sin(\alpha{}) \sin(\beta{}) &
+   *        \cos(\beta{})
+   *    \end{pmatrix}.
+   * @f]
+   * However, the radiation field is usually not given in the basis
+   * @f$[\hat{x}_L, \hat{y}_L, \hat{z}_L]@f$, but is instead specified in a
+   * spherical basis, in the plane orthogonal to the radial direction vector
+   * @f$\vec{n}@f$:
+   * @f[
+   *    \begin{cases}
+   *      \hat{\theta{}} = \cos(\theta{}) \cos(\phi{}) \hat{x} +
+   *        \cos(\theta{}) \sin(\phi{}) \hat{y} - \sin(\theta{}) \hat{z}, \\
+   *      \hat{\phi{}} = -\sin(\phi{}) \hat{x} + \cos(\phi{}) \hat{y},
+   *    \end{cases}
+   * @f]
+   * with inverse
+   * @f[
+   *    \begin{cases}
+   *      \hat{x} = \cos(\phi{}) \cos(\theta{}) \hat{\theta{}}
+   *        - \sin(\phi{}) \hat{\phi{}}, \\
+   *      \hat{y} = \sin(\phi{}) \cos(\theta{}) \hat{\theta{}}
+   *        + \cos(\phi{}) \hat{\phi{}}, \\
+   *      \hat{z} = -\sin(\theta{}) \hat{\theta{}}.
+   *    \end{cases}
+   * @f]
+   * Note that to derive these formulas, we have made the implicit assumption
+   * that the components of the electromagnetic field along the radial direction
+   * @f$\hat{r} = \vec{n}@f$ are @f$0@f$. These transformations can be
+   * summarised in a second transformation matrix @f$A@f$ and its inverse:
+   * @f[
+   *    A = \begin{pmatrix}
+   *      \cos(\theta{}) \cos(\phi{}) & -\sin(\phi{}) \\
+   *      \cos(\theta{}) \sin(\phi{}) & \cos(\phi{}) \\
+   *      -\sin(\theta{}) & 0
+   *    \end{pmatrix},
+   * @f]
+   * @f[
+   *    A^{-1} = \begin{pmatrix}
+   *      \cos(\theta{}) \cos(\phi{}) & \cos(\theta{}) \sin(\phi{}) &
+   *        -\sin(\theta{} \\
+   *      -\sin(\phi{}) & \cos(\phi{}) & 0
+   *    \end{pmatrix}.
+   * @f]
+   * It is clear that @f$A^{-1} = A^T@f$. The total transformation for the
+   * electromagnetic field components from the particle to the laboratory frame
+   * is then given by the matrix @f$R@f$:
+   * @f[
+   *    R(\theta{}^P, \phi{}^P, \alpha{}, \beta{}, \theta{}^L, \phi{}^L) =
+   *      A^T(\theta{}^P, \phi{}^P) B(\alpha{}, \beta{})
+   *        A(\theta{}^L, \phi{}^L),
+   * @f]
+   * and the total transformation from @f$S^P@f$ to @f$S^L@f$ is
+   * @f[
+   *    S^L = R^{-1}(
+   *      \theta{}^P_s, \phi{}^P_s, \alpha{}, \beta{}, \theta{}^L_s, \phi{}^L_s
+   *    ) S^P R(
+   *      \theta{}^P_i, \phi{}^P_i, \alpha{}, \beta{}, \theta{}^L_i, \phi{}^L_i
+   *    ).
+   * @f]
+   *
    * @param alpha_radians Azimuth angle of the particle's rotation axis,
    * @f$\alpha{}@f$ (in radians).
    * @param beta_radians Zenith angle of the particle's rotation axis,
@@ -1425,14 +1516,6 @@ public:
     AL_in(2, 0) = -sintheta_l_in;
     // AL_in(2,1) remains 0.
 
-    Matrix<float_type> AL_out(3, 2);
-    AL_out(0, 0) = costheta_l_out * cosphi_l_out;
-    AL_out(0, 1) = -sinphi_l_out;
-    AL_out(1, 0) = costheta_l_out * sinphi_l_out;
-    AL_out(1, 1) = cosphi_l_out;
-    AL_out(2, 0) = -sintheta_l_out;
-    // AL_out(2,1) remains 0.
-
     Matrix<float_type> AP_in(2, 3);
     AP_in(0, 0) = costheta_p_in * cosphi_p_in;
     AP_in(0, 1) = costheta_p_in * sinphi_p_in;
@@ -1440,6 +1523,14 @@ public:
     AP_in(1, 0) = -sinphi_p_in;
     AP_in(1, 1) = cosphi_p_in;
     // AP_in(1,2) remains 0.
+
+    Matrix<float_type> AL_out(3, 2);
+    AL_out(0, 0) = costheta_l_out * cosphi_l_out;
+    AL_out(0, 1) = -sinphi_l_out;
+    AL_out(1, 0) = costheta_l_out * sinphi_l_out;
+    AL_out(1, 1) = cosphi_l_out;
+    AL_out(2, 0) = -sintheta_l_out;
+    // AL_out(2,1) remains 0.
 
     Matrix<float_type> AP_out(2, 3);
     AP_out(0, 0) = costheta_p_out * cosphi_p_out;
@@ -1449,6 +1540,7 @@ public:
     AP_out(1, 1) = cosphi_p_out;
     // AP_out(1,2) remains 0.
 
+    // C is a temporary matrix that contains B x AL_in
     Matrix<float_type> C(3, 2);
     for (uint_fast8_t i = 0; i < 3; ++i) {
       for (uint_fast8_t j = 0; j < 2; ++j) {
@@ -1466,6 +1558,7 @@ public:
       }
     }
 
+    // now C will contain B x AL_out
     for (uint_fast8_t i = 0; i < 3; ++i) {
       for (uint_fast8_t j = 0; j < 2; ++j) {
         C(i, j) = 0.;
@@ -1483,6 +1576,7 @@ public:
       }
     }
 
+    // manually invert the 2x2 matrix R_out
     const float_type d =
         1. / (R_out(0, 0) * R_out(1, 1) - R_out(0, 1) * R_out(1, 0));
     const float_type temp = R_out(0, 0);
@@ -1491,6 +1585,7 @@ public:
     R_out(1, 0) = -R_out(1, 0) * d;
     R_out(1, 1) = temp * d;
 
+    // precompute the c factors
     const std::complex<float_type> icompl(0., 1.);
     Matrix<std::complex<float_type>> c(_nmax, _nmax);
     std::complex<float_type> icomp_pow_nn = icompl;
@@ -1506,15 +1601,24 @@ public:
       icomp_pow_nn *= icompl;
     }
 
+    // now compute the matrix S^P
+    // we precompute e^{i(phi_out-phi_in)}
     const std::complex<float_type> expiphi_p_out_m_in(
         cosphi_p_out * cosphi_p_in + sinphi_p_out * sinphi_p_in,
         sinphi_p_out * cosphi_p_in - cosphi_p_out * sinphi_p_in);
+    // e^{im(phi_out-phi_in)} is computed recursively, starting with the value
+    // for m=0: 1
     std::complex<float_type> expimphi_p_out_m_in(1., 0.);
     std::complex<float_type> S11, S12, S21, S22;
     const TMatrix &T = *this;
+    // instead of summing over n and n', we sum over m, since then we can reuse
+    // the e^{im(phi_out-phi_in)}, pi and tau factors
     for (uint_fast32_t m = 0; m < _nmax; ++m) {
+      // only n and n' values larger than or equal to m have non-trivial
+      // contributions to the S matrix
       const uint_fast32_t nmin = std::max(m, static_cast<uint_fast32_t>(1));
 
+      // precompute the pi and tau functions for this value of m
       std::vector<float_type> pi_in(_nmax), tau_in(_nmax);
       SpecialFunctions::wigner_dn_0m_sinx(costheta_p_in, sintheta_p_in,
                                           sintheta_p_in_inv, _nmax, m,
@@ -1531,29 +1635,44 @@ public:
       // recurse the exponential for the next iteration
       expimphi_p_out_m_in *= expiphi_p_out_m_in;
 
+      // now perform the actual sums over n and n'
       for (uint_fast32_t nn = nmin; nn < _nmax + 1; ++nn) {
+
+        // get the specific pi and tau for this n'
         const float_type pi_nn = m * pi_in[nn - 1];
         const float_type tau_nn = tau_in[nn - 1];
+
         for (uint_fast32_t n = nmin; n < _nmax + 1; ++n) {
 
+          // get the specific pi and tau for this n
           const float_type pi_n = m * pi_out[n - 1];
           const float_type tau_n = tau_out[n - 1];
 
+          // get the c factor for these values of n and n'
           const std::complex<float_type> c_nnn = c(n - 1, nn - 1);
 
+          // get the T11 and T22 elements for this m, n and n' (we need these
+          // in all cases)
           const std::complex<float_type> T11nmnnm = T(0, n, m, 0, nn, m);
           const std::complex<float_type> T22nmnnm = T(1, n, m, 1, nn, m);
+          // if m=0, the T12 and T21 matrices are trivially zero, and we can
+          // simplify the expression for S
           if (m == 0) {
             const std::complex<float_type> factor = c_nnn * tau_n * tau_nn;
             S11 += factor * T22nmnnm;
             S22 += factor * T11nmnnm;
           } else {
+            // in the general case m=/=0, we also need the T12 and T21 elements
+            // for this m, n and n'
             const std::complex<float_type> T12nmnnm = T(0, n, m, 1, nn, m);
             const std::complex<float_type> T21nmnnm = T(1, n, m, 0, nn, m);
 
+            // due to m symmetry, S11 and S22 only have the cosine factor,
+            // while S12 and S21 only have the sine factor
             const std::complex<float_type> real_factor = c_nnn * fcos;
             const std::complex<float_type> imag_factor = c_nnn * fsin;
 
+            // precompute the pi and tau factor combinations
             const float_type pi_pi = pi_n * pi_nn;
             const float_type pi_tau = pi_n * tau_nn;
             const float_type tau_pi = tau_n * pi_nn;
@@ -1571,12 +1690,14 @@ public:
         }
       }
     }
+    // now divide all expressions by the wavenumber
     const float_type kinv = 1. / _k;
     S11 *= kinv;
     S12 *= kinv;
     S21 *= kinv;
     S22 *= kinv;
 
+    // perform the double 2x2 matrix product to convert S^P to S^L
     const std::complex<float_type> cS11 = S11 * R_in(0, 0) + S12 * R_in(1, 0);
     const std::complex<float_type> cS12 = S11 * R_in(0, 1) + S12 * R_in(1, 1);
     const std::complex<float_type> cS21 = S21 * R_in(0, 0) + S22 * R_in(1, 0);
@@ -1592,6 +1713,7 @@ public:
     ctm_warning("S21: %g + i%g", double(S21.real()), double(S21.imag()));
     ctm_warning("S22: %g + i%g", double(S22.real()), double(S22.imag()));
 
+    // now compute the components of the Z matrix
     Matrix<float_type> Z(4, 4);
 
     const float_type half(0.5);
@@ -1623,6 +1745,7 @@ public:
     Z(3, 2) = (-icompl * (S22 * conj(S11) - S12 * conj(S21))).real();
     Z(3, 3) = (S22 * conj(S11) - S12 * conj(S21)).real();
 
+    // done!
     return Z;
   }
 };
