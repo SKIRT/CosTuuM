@@ -1197,6 +1197,19 @@ public:
    * three angles: the zenith angles @f$\theta{}_i^P@f$ and @f$\theta{}_s^P@f$
    * and the relative azimuth angle @f$\phi{}_s^P - \phi{}_i^P@f$.
    *
+   * Also note that we use symbols similar to the ones introduced in Mishchenko
+   * (2000) in the code:
+   * @f[
+   *    c_{nn'} = i^{n'-n-1} \sqrt{\frac{(2n+1)(2n'+1)}{n(n+1)n'(n'+1)},
+   * @f]
+   * @f[
+   *    \pi{}_{mn}(\theta{}) = \frac{m}{\sin(\theta{})} d^n_{0m}(\theta{}),
+   * @f]
+   * and
+   * @f[
+   *    \tau{}_{mn}(\theta{}) = \frac{d}{d\theta{}} d^n_{0m}(\theta{}).
+   * @f]
+   *
    * To compute the @f$Z@f$ matrix in the original laboratory reference frame,
    * we need to rotate the scattering matrix @f$S^P@f$ into the laboratory
    * frame to get @f$S^L@f$. This requires knowledge of the reference frame
@@ -1262,7 +1275,53 @@ public:
    *      \right) = \cos(\theta{}^L) \cos(\beta{})
    *      + \sin(\theta{}^L) \sin(\beta{}) \cos(\phi{}^L - \alpha{}),
    * @f]
-   * AND CONTINUE HERE TOMORROW...
+   * @f[
+   *    \cos(\phi{}^P) = \frac{1}{\sin(\theta{}^P)} \left[
+   *      \sin(\theta{}^L) \cos(\beta{}) \left(
+   *        \cos(\phi{}^L) \cos(\alpha{}) + \sin(\phi{}^L) \sin(\alpha{})
+   *      \right) - \cos(\theta{}^L) \sin(\beta{})
+   *    \right] =
+   *    \frac{1}{\sin(\theta{}^P)} \left(
+   *      \sin(\theta{}^L) \cos(\beta{}) \cos(\phi{}^L - \alpha{})
+   *        - \cos(\theta{}^L) \sin(\beta{})
+   *    \right),
+   * @f]
+   * @f[
+   *    \sin(\phi{}^P) = \frac{1}{\sin(\theta{}^P)} \left[
+   *      \sin(\theta{}^L) \left(
+   *        \sin(\phi{}^L) \cos(\alpha{}) - \cos(\phi{}^L) \sin(\alpha{})
+   *      \right)
+   *    \right] = \frac{1}{\sin(\theta{}^P)} \left(
+   *      \sin(\theta{}^L) \sin(\phi{}^L - \alpha{})
+   *    \right).
+   * @f]
+   * These formulas could potentially cause problems if @f$\theta{}^P = 0@f$,
+   * since then the division in the formulas for @f$\phi{}^P@f$ will go wrong.
+   * The original code of Mishchenko does not explicitly address these issues.
+   * Since @f$\theta{}^P = 0@f$ signals a degeneracy in @f$\phi{}^P@f$, we
+   * are free to choose any arbitrary value for @f$\phi{}^P@f$ in this case.
+   * We will conveniently choose @f$\phi{}^P=0@f$. Note that we never explicitly
+   * require @f$\theta{}^P@f$ or @f$\phi{}^P@f$; we always require either their
+   * @f$\sin{}@f$ or @f$\cos{}@f$ or expressions like
+   * @f[
+   *    \cos(\phi{}^P_s - \phi{}^P_i) =
+   *      \cos(\phi{}^P_s) \cos(\phi{}^P_i) + \sin(\phi{}^P_s) \sin(\phi{}^P_i),
+   * @f]
+   * or
+   * @f[
+   *    \sin(\phi{}^P_s - \phi{}^P_i) =
+   *      \sin(\phi{}^P_s) \cos(\phi{}^P_i) - \cos(\phi{}^P_s) \sin(\phi{}^P_i),
+   * @f]
+   * which are trivially calculated. To compute the azimuthal factor in the
+   * scattering matrix expression, we recursively compute
+   * @f[
+   *    e^{im(\phi{}^P_s - \phi{}^P_i)} = \left(
+   *      \cos(\phi{}^P_s - \phi{}^P_i) + i \sin(\phi{}^P_s - \phi{}^P_i)
+   *    \right)^m.
+   * @f]
+   * This is much faster than having to first explicitly compute the angles
+   * @f$\phi{}^P@f$ and then evaluating the trigonometric functions for every
+   * value of @f$m@f$.
    *
    * @param alpha_radians Azimuth angle of the particle's rotation axis,
    * @f$\alpha{}@f$ (in radians).
@@ -1287,57 +1346,66 @@ public:
     // Mishchenko includes some (buggy) corrections for small angles
     // might be worth looking into this in a later stage...
 
-    const float_type cosbeta = cos(beta_radians);
-    const float_type sinbeta = sin(beta_radians);
-
-    const float_type costheta_in = cos(theta_in_radians);
-    const float_type sintheta_in = sin(theta_in_radians);
-    const float_type cosphirel_in = cos(phi_in_radians - alpha_radians);
-    const float_type sinphirel_in = sin(phi_in_radians - alpha_radians);
-
-    const float_type costheta_p_in =
-        costheta_in * cosbeta + sintheta_in * sinbeta * cosphirel_in;
-    const float_type cosphi_p_in_rule =
-        cosbeta * sintheta_in * cosphirel_in - sinbeta * costheta_in;
-    const float_type sinphi_p_in_rule = sintheta_in * sinphirel_in;
-    float_type phi_p_in = atan(sinphi_p_in_rule / cosphi_p_in_rule);
-    if (phi_p_in > 0. && sinphirel_in < 0.) {
-      phi_p_in += M_PI;
-    }
-    if (phi_p_in < 0. && sinphirel_in > 0.) {
-      phi_p_in += M_PI;
-    }
-    if (phi_p_in < 0.) {
-      phi_p_in += 2. * M_PI;
-    }
-    const float_type cosphi_p_in = cos(phi_p_in);
-    const float_type sinphi_p_in = sin(phi_p_in);
-
-    const float_type costheta_out = cos(theta_out_radians);
-    const float_type sintheta_out = sin(theta_out_radians);
-    const float_type cosphirel_out = cos(phi_out_radians - alpha_radians);
-    const float_type sinphirel_out = sin(phi_out_radians - alpha_radians);
-
-    const float_type costheta_p_out =
-        costheta_out * cosbeta + sintheta_out * sinbeta * cosphirel_out;
-    const float_type cosphi_p_out_rule =
-        cosbeta * sintheta_out * cosphirel_out - sinbeta * costheta_out;
-    const float_type sinphi_p_out_rule = sintheta_out * sinphirel_out;
-    float_type phi_p_out = atan(sinphi_p_out_rule / cosphi_p_out_rule);
-    if (phi_p_out > 0. && sinphirel_out < 0.) {
-      phi_p_out += M_PI;
-    }
-    if (phi_p_out < 0. && sinphirel_out > 0.) {
-      phi_p_out += M_PI;
-    }
-    if (phi_p_out < 0.) {
-      phi_p_out += 2. * M_PI;
-    }
-    const float_type cosphi_p_out = cos(phi_p_out);
-    const float_type sinphi_p_out = sin(phi_p_out);
-
+    // compute all sines and cosines in one go; we need all of them anyway
     const float_type cosalpha = cos(alpha_radians);
     const float_type sinalpha = sin(alpha_radians);
+    const float_type cosbeta = cos(beta_radians);
+    const float_type sinbeta = sin(beta_radians);
+    const float_type costheta_l_in = cos(theta_in_radians);
+    const float_type sintheta_l_in = sin(theta_in_radians);
+    const float_type costheta_l_out = cos(theta_out_radians);
+    const float_type sintheta_l_out = sin(theta_out_radians);
+    const float_type cosphi_l_in = cos(phi_in_radians);
+    const float_type sinphi_l_in = sin(phi_in_radians);
+    const float_type cosphi_l_out = cos(phi_out_radians);
+    const float_type sinphi_l_out = sin(phi_out_radians);
+
+    const float_type cosphirel_in =
+        cosphi_l_in * cosalpha + sinphi_l_in * sinalpha;
+    const float_type sinphirel_in =
+        sinphi_l_in * cosalpha - cosphi_l_in * sinalpha;
+
+    const float_type costheta_p_in =
+        costheta_l_in * cosbeta + sintheta_l_in * sinbeta * cosphirel_in;
+    const float_type sintheta_p_in =
+        sqrt((1. - costheta_p_in) * (1. + costheta_p_in));
+    float_type cosphi_p_in, sinphi_p_in, sintheta_p_in_inv;
+    if (sintheta_p_in != 0.) {
+      sintheta_p_in_inv = 1. / sintheta_p_in;
+      cosphi_p_in =
+          (cosbeta * sintheta_l_in * cosphirel_in - sinbeta * costheta_l_in) *
+          sintheta_p_in_inv;
+      sinphi_p_in = sintheta_l_in * sinphirel_in * sintheta_p_in_inv;
+    } else {
+      cosphi_p_in = 1.;
+      sinphi_p_in = 0.;
+      // this value will not be used, but we set it to something anyway
+      sintheta_p_in_inv = 9000.;
+    }
+
+    const float_type cosphirel_out =
+        cosphi_l_out * cosalpha + sinphi_l_out * sinalpha;
+    const float_type sinphirel_out =
+        sinphi_l_out * cosalpha - cosphi_l_out * sinalpha;
+
+    const float_type costheta_p_out =
+        costheta_l_out * cosbeta + sintheta_l_out * sinbeta * cosphirel_out;
+    const float_type sintheta_p_out =
+        sqrt((1. - costheta_p_out) * (1. + costheta_p_out));
+    float_type cosphi_p_out, sinphi_p_out, sintheta_p_out_inv;
+    if (sintheta_p_out != 0.) {
+      sintheta_p_out_inv = 1. / sintheta_p_out;
+      cosphi_p_out = (cosbeta * sintheta_l_out * cosphirel_out -
+                      sinbeta * costheta_l_out) *
+                     sintheta_p_out_inv;
+      sinphi_p_out = sintheta_l_out * sinphirel_out * sintheta_p_out_inv;
+    } else {
+      cosphi_p_out = 1.;
+      sinphi_p_out = 0.;
+      // this value will not be used, but we set it to something anyway
+      sintheta_p_out_inv = 9000.;
+    }
+
     Matrix<float_type> B(3, 3);
     B(0, 0) = cosalpha * cosbeta;
     B(0, 1) = sinalpha * cosbeta;
@@ -1349,28 +1417,22 @@ public:
     B(2, 1) = sinalpha * sinbeta;
     B(2, 2) = cosbeta;
 
-    const float_type cosphi_in = cos(phi_in_radians);
-    const float_type sinphi_in = sin(phi_in_radians);
     Matrix<float_type> AL_in(3, 2);
-    AL_in(0, 0) = costheta_in * cosphi_in;
-    AL_in(0, 1) = -sinphi_in;
-    AL_in(1, 0) = costheta_in * sinphi_in;
-    AL_in(1, 1) = cosphi_in;
-    AL_in(2, 0) = -sintheta_in;
+    AL_in(0, 0) = costheta_l_in * cosphi_l_in;
+    AL_in(0, 1) = -sinphi_l_in;
+    AL_in(1, 0) = costheta_l_in * sinphi_l_in;
+    AL_in(1, 1) = cosphi_l_in;
+    AL_in(2, 0) = -sintheta_l_in;
     // AL_in(2,1) remains 0.
 
-    const float_type cosphi_out = cos(phi_out_radians);
-    const float_type sinphi_out = sin(phi_out_radians);
     Matrix<float_type> AL_out(3, 2);
-    AL_out(0, 0) = costheta_out * cosphi_out;
-    AL_out(0, 1) = -sinphi_out;
-    AL_out(1, 0) = costheta_out * sinphi_out;
-    AL_out(1, 1) = cosphi_out;
-    AL_out(2, 0) = -sintheta_out;
+    AL_out(0, 0) = costheta_l_out * cosphi_l_out;
+    AL_out(0, 1) = -sinphi_l_out;
+    AL_out(1, 0) = costheta_l_out * sinphi_l_out;
+    AL_out(1, 1) = cosphi_l_out;
+    AL_out(2, 0) = -sintheta_l_out;
     // AL_out(2,1) remains 0.
 
-    const float_type sintheta_p_in =
-        sqrt((1. - costheta_p_in) * (1. + costheta_p_in));
     Matrix<float_type> AP_in(2, 3);
     AP_in(0, 0) = costheta_p_in * cosphi_p_in;
     AP_in(0, 1) = costheta_p_in * sinphi_p_in;
@@ -1379,8 +1441,6 @@ public:
     AP_in(1, 1) = cosphi_p_in;
     // AP_in(1,2) remains 0.
 
-    const float_type sintheta_p_out =
-        sqrt((1. - costheta_p_out) * (1. + costheta_p_out));
     Matrix<float_type> AP_out(2, 3);
     AP_out(0, 0) = costheta_p_out * cosphi_p_out;
     AP_out(0, 1) = costheta_p_out * sinphi_p_out;
@@ -1432,67 +1492,81 @@ public:
     R_out(1, 1) = temp * d;
 
     const std::complex<float_type> icompl(0., 1.);
-    Matrix<std::complex<float_type>> cal(_nmax, _nmax);
-    std::complex<float_type> cnn = icompl;
+    Matrix<std::complex<float_type>> c(_nmax, _nmax);
+    std::complex<float_type> icomp_pow_nn = icompl;
     for (uint_fast32_t nn = 1; nn < _nmax + 1; ++nn) {
-      // cnn now equals i^nn
-      std::complex<float_type> cn(-1.);
+      std::complex<float_type> icomp_pow_m_n_m_1(-1.);
       for (uint_fast32_t n = 1; n < _nmax + 1; ++n) {
-        // cn*cnn now equals i^(nn - n - 1)
-        cal(n - 1, nn - 1) = cn * cnn *
-                             float_type(sqrt((2. * n + 1.) * (2. * nn + 1.) /
-                                             (n * nn * (n + 1.) * (nn + 1.))));
-        cn /= icompl;
+        // icomp_pow_nn*icomp_pow_m_n_m_1 now equals i^(nn - n - 1)
+        c(n - 1, nn - 1) = icomp_pow_m_n_m_1 * icomp_pow_nn *
+                           float_type(sqrt((2. * n + 1.) * (2. * nn + 1.) /
+                                           (n * nn * (n + 1.) * (nn + 1.))));
+        icomp_pow_m_n_m_1 /= icompl;
       }
-      cnn *= icompl;
+      icomp_pow_nn *= icompl;
     }
 
-    const float_type phiout_in = phi_p_out - phi_p_in;
+    const std::complex<float_type> expiphi_p_out_m_in(
+        cosphi_p_out * cosphi_p_in + sinphi_p_out * sinphi_p_in,
+        sinphi_p_out * cosphi_p_in - cosphi_p_out * sinphi_p_in);
+    std::complex<float_type> expimphi_p_out_m_in(1., 0.);
     std::complex<float_type> S11, S12, S21, S22;
     const TMatrix &T = *this;
     for (uint_fast32_t m = 0; m < _nmax; ++m) {
       const uint_fast32_t nmin = std::max(m, static_cast<uint_fast32_t>(1));
 
-      std::vector<float_type> dv1_in(_nmax), dv2_in(_nmax);
-      SpecialFunctions::wigner_dn_0m_sinx(costheta_p_in, _nmax, m, &dv1_in[0],
-                                          &dv2_in[0]);
-      std::vector<float_type> dv1_out(_nmax), dv2_out(_nmax);
-      SpecialFunctions::wigner_dn_0m_sinx(costheta_p_out, _nmax, m, &dv1_out[0],
-                                          &dv2_out[0]);
+      std::vector<float_type> pi_in(_nmax), tau_in(_nmax);
+      SpecialFunctions::wigner_dn_0m_sinx(costheta_p_in, sintheta_p_in,
+                                          sintheta_p_in_inv, _nmax, m,
+                                          &pi_in[0], &tau_in[0]);
+      std::vector<float_type> pi_out(_nmax), tau_out(_nmax);
+      SpecialFunctions::wigner_dn_0m_sinx(costheta_p_out, sintheta_p_out,
+                                          sintheta_p_out_inv, _nmax, m,
+                                          &pi_out[0], &tau_out[0]);
 
-      const float_type fcos = 2. * cos(m * phiout_in);
-      const float_type fsin = 2. * sin(m * phiout_in);
+      // we get the real and imaginary part of e^{im\phi{}} and multiply with
+      // 2 to account for both m and -m
+      const float_type fcos = 2. * expimphi_p_out_m_in.real();
+      const float_type fsin = 2. * expimphi_p_out_m_in.imag();
+      // recurse the exponential for the next iteration
+      expimphi_p_out_m_in *= expiphi_p_out_m_in;
 
       for (uint_fast32_t nn = nmin; nn < _nmax + 1; ++nn) {
-        const float_type dv1nn = m * dv1_in[nn - 1];
-        const float_type dv2nn = dv2_in[nn - 1];
+        const float_type pi_nn = m * pi_in[nn - 1];
+        const float_type tau_nn = tau_in[nn - 1];
         for (uint_fast32_t n = nmin; n < _nmax + 1; ++n) {
-          const float_type dv1n = m * dv1_out[n - 1];
-          const float_type dv2n = dv2_out[n - 1];
 
-          const std::complex<float_type> ct11 = T(0, n, m, 0, nn, m);
-          const std::complex<float_type> ct22 = T(1, n, m, 1, nn, m);
+          const float_type pi_n = m * pi_out[n - 1];
+          const float_type tau_n = tau_out[n - 1];
+
+          const std::complex<float_type> c_nnn = c(n - 1, nn - 1);
+
+          const std::complex<float_type> T11nmnnm = T(0, n, m, 0, nn, m);
+          const std::complex<float_type> T22nmnnm = T(1, n, m, 1, nn, m);
           if (m == 0) {
-            const std::complex<float_type> cn =
-                cal(n - 1, nn - 1) * dv2n * dv2nn;
-            S11 += cn * ct22;
-            S22 += cn * ct11;
+            const std::complex<float_type> factor = c_nnn * tau_n * tau_nn;
+            S11 += factor * T22nmnnm;
+            S22 += factor * T11nmnnm;
           } else {
-            const std::complex<float_type> ct12 = T(0, n, m, 1, nn, m);
-            const std::complex<float_type> ct21 = T(1, n, m, 0, nn, m);
+            const std::complex<float_type> T12nmnnm = T(0, n, m, 1, nn, m);
+            const std::complex<float_type> T21nmnnm = T(1, n, m, 0, nn, m);
 
-            const std::complex<float_type> cn1 = cal(n - 1, nn - 1) * fcos;
-            const std::complex<float_type> cn2 = cal(n - 1, nn - 1) * fsin;
+            const std::complex<float_type> real_factor = c_nnn * fcos;
+            const std::complex<float_type> imag_factor = c_nnn * fsin;
 
-            const float_type d11 = dv1n * dv1nn;
-            const float_type d12 = dv1n * dv2nn;
-            const float_type d21 = dv2n * dv1nn;
-            const float_type d22 = dv2n * dv2nn;
+            const float_type pi_pi = pi_n * pi_nn;
+            const float_type pi_tau = pi_n * tau_nn;
+            const float_type tau_pi = tau_n * pi_nn;
+            const float_type tau_tau = tau_n * tau_nn;
 
-            S11 += cn1 * (ct11 * d11 + ct21 * d21 + ct12 * d12 + ct22 * d22);
-            S12 += cn2 * (ct11 * d12 + ct21 * d22 + ct12 * d11 + ct22 * d21);
-            S21 -= cn2 * (ct11 * d21 + ct21 * d11 + ct12 * d22 + ct22 * d12);
-            S22 += cn1 * (ct11 * d22 + ct21 * d12 + ct12 * d21 + ct22 * d11);
+            S11 += real_factor * (T11nmnnm * pi_pi + T21nmnnm * tau_pi +
+                                  T12nmnnm * pi_tau + T22nmnnm * tau_tau);
+            S12 += imag_factor * (T11nmnnm * pi_tau + T21nmnnm * tau_tau +
+                                  T12nmnnm * pi_pi + T22nmnnm * tau_pi);
+            S21 -= imag_factor * (T11nmnnm * tau_pi + T21nmnnm * pi_pi +
+                                  T12nmnnm * tau_tau + T22nmnnm * pi_tau);
+            S22 += real_factor * (T11nmnnm * tau_tau + T21nmnnm * pi_tau +
+                                  T12nmnnm * tau_pi + T22nmnnm * pi_pi);
           }
         }
       }

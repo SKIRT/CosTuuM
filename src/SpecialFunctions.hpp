@@ -339,6 +339,10 @@ public:
    *
    * @param cosx Cosine of the input value @f$x@f$ (should be in the interval
    * @f$[-1,1]@f$).
+   * @param sinx Sine of the input value @f$x@f$ (should be in the interval
+   * @f$[-1,1]@f$).
+   * @param sinx_inv Inverse sine of the input value @f$x@f$. Is only used if
+   * @f$x\neq{}0@f$.
    * @param nmax Maximum order @f$n_{max}@f$.
    * @param m Absolute value of the quantum number @f$m@f$
    * (@f$m \in{} [0,n_{max}]@f$).
@@ -350,7 +354,8 @@ public:
    */
   template <typename DATA_TYPE>
   static inline void
-  wigner_dn_0m_sinx(const DATA_TYPE cosx, const uint_fast32_t nmax,
+  wigner_dn_0m_sinx(const DATA_TYPE cosx, const DATA_TYPE sinx,
+                    const DATA_TYPE sinx_inv, const uint_fast32_t nmax,
                     const uint_fast32_t m, DATA_TYPE *y, DATA_TYPE *dy) {
 
     // check if the input argument is close to 1 (corresponding to a sine close
@@ -389,9 +394,6 @@ public:
       const DATA_TYPE one(1.);
       const DATA_TYPE two(2.);
 
-      // precompute sin(x) and its inverse
-      const DATA_TYPE sinx = sqrt(one - cosx * cosx);
-      const DATA_TYPE sinxinv = one / sinx;
       // branch out depending on the m value
       if (m == 0) {
         // manually set the starting point for the recursion algorithm by
@@ -404,10 +406,10 @@ public:
           const DATA_TYPE np2(n + 2.);
           const DATA_TYPE np12p1 = two * np1 + one;
           const DATA_TYPE dnp1 = (np12p1 * cosx * d2 - np1 * d1) / np2;
-          const DATA_TYPE ddn = sinxinv * np1 * np2 * (dnp1 - d1) / np12p1;
+          const DATA_TYPE ddn = sinx_inv * np1 * np2 * (dnp1 - d1) / np12p1;
           // note that we computed d^{n+1}_{0m}; d^n_{0m} was computed in the
           // previous iteration
-          y[n] = d2 * sinxinv;
+          y[n] = d2 * sinx_inv;
           dy[n] = ddn;
           d1 = d2;
           d2 = dnp1;
@@ -437,11 +439,11 @@ public:
           const DATA_TYPE dnp1 =
               (np12p1 * cosx * d2 - sqrtnp12mm2 * d1) / sqrtnp22mm2;
           const DATA_TYPE ddn =
-              sinxinv * (np1 * sqrtnp22mm2 * dnp1 - np2 * sqrtnp12mm2 * d1) /
+              sinx_inv * (np1 * sqrtnp22mm2 * dnp1 - np2 * sqrtnp12mm2 * d1) /
               np12p1;
           // note that we computed d^{n+1}_{0m}; d^n_{0m} was computed in the
           // previous iteration
-          y[n] = d2 * sinxinv;
+          y[n] = d2 * sinx_inv;
           dy[n] = ddn;
           d1 = d2;
           d2 = dnp1;

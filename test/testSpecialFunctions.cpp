@@ -132,16 +132,19 @@ int main(int argc, char **argv) {
     // this expression should match the np.arange(-0.999, 1., 0.002) expression
     // in the Python script
     const float_type cosx = -0.999 + 0.002 * i;
+    const float_type sinx = sqrt(1. - cosx * cosx);
+    const float_type sinx_inv = 1. / sinx;
     // create output arrays
     float_type d[TESTSPECIALFUNCTIONS_NMAX], dd[TESTSPECIALFUNCTIONS_NMAX];
     // call the function with m=0
-    SpecialFunctions::wigner_dn_0m_sinx(cosx, TESTSPECIALFUNCTIONS_NMAX, 0, d,
-                                        dd);
+    SpecialFunctions::wigner_dn_0m_sinx(cosx, sinx, sinx_inv,
+                                        TESTSPECIALFUNCTIONS_NMAX, 0, d, dd);
     // write an output line
     dsfile << d[TESTSPECIALFUNCTIONS_NMAX - 1] << "\t"
            << dd[TESTSPECIALFUNCTIONS_NMAX - 1] << "\n";
     // call the function with m=nmax
-    SpecialFunctions::wigner_dn_0m_sinx(cosx, TESTSPECIALFUNCTIONS_NMAX,
+    SpecialFunctions::wigner_dn_0m_sinx(cosx, sinx, sinx_inv,
+                                        TESTSPECIALFUNCTIONS_NMAX,
                                         TESTSPECIALFUNCTIONS_NMAX, d, dd);
     // write an output line
     dsfile << d[TESTSPECIALFUNCTIONS_NMAX - 1] << "\t"
