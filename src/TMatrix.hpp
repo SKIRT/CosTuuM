@@ -525,9 +525,10 @@ public:
         _dykr(2 * ngauss, nmax), _jkrmr(2 * ngauss, nmax),
         _djkrmr(2 * ngauss, nmax) {
 
-    _T.reserve(nmax + 1);
-    for (uint_fast32_t m = 0; m < nmax + 1; ++m) {
-      _T.push_back(Matrix<std::complex<float_type>>(2 * nmax, 2 * nmax));
+    _T.reserve(_nmax + 1);
+    for (uint_fast32_t m = 0; m < _nmax + 1; ++m) {
+      const uint_fast32_t nm = _nmax + 1 - m;
+      _T.push_back(Matrix<std::complex<float_type>>(2 * nm, 2 * nm));
     }
 
     for (uint_fast32_t ni = 0; ni < nmax; ++ni) {
@@ -962,11 +963,10 @@ public:
       for (uint_fast32_t i = 0; i < nm; ++i) {
         for (uint_fast32_t j = 0; j < nm; ++j) {
           for (uint_fast32_t k = 0; k < nm2; ++k) {
-            _T[m](m + i - 1, m + j - 1) -= RgQ(i, k) * Q(k, j);
-            _T[m](_nmax + m + i - 1, m + j - 1) -= RgQ(nm + i, k) * Q(k, j);
-            _T[m](m + i - 1, _nmax + m + j - 1) -= RgQ(i, k) * Q(k, nm + j);
-            _T[m](_nmax + m + i - 1, _nmax + m + j - 1) -=
-                RgQ(nm + i, k) * Q(k, nm + j);
+            _T[m](i, j) -= RgQ(i, k) * Q(k, j);
+            _T[m](nm + i, j) -= RgQ(nm + i, k) * Q(k, j);
+            _T[m](i, nm + j) -= RgQ(i, k) * Q(k, nm + j);
+            _T[m](nm + i, nm + j) -= RgQ(nm + i, k) * Q(k, nm + j);
           }
         }
       }
@@ -1019,7 +1019,12 @@ public:
     ctm_assert(n1 <= _nmax);
     ctm_assert(n2 > 0);
     ctm_assert(n2 <= _nmax);
-    return _T[m1](i1 * _nmax + n1 - 1, i2 * _nmax + n2 - 1);
+    if (m1 > 0) {
+      const uint_fast32_t nm = _nmax + 1 - m1;
+      return _T[m1](i1 * nm + n1 - m1, i2 * nm + n2 - m2);
+    } else {
+      return _T[m1](i1 * _nmax + n1 - m1 - 1, i2 * _nmax + n2 - m2 - 1);
+    }
   }
 
   /**
