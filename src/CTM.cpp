@@ -257,24 +257,36 @@ int main(int argc, char **argv) {
   old_qext = 0.;
   for (uint_fast32_t n1 = 1; n1 < nmax + 1; ++n1) {
     for (uint_fast32_t n2 = 1; n2 < nmax + 1; ++n2) {
-      for (int_fast32_t m1 = -n1; m1 < static_cast<int_fast32_t>(n1 + 1);
-           ++m1) {
-        for (int_fast32_t m2 = -n2; m2 < static_cast<int_fast32_t>(n2 + 1);
-             ++m2) {
-          old_qsca += std::norm(T(0, n1, m1, 0, n2, m2));
-          old_qsca += std::norm(T(0, n1, m1, 1, n2, m2));
-          old_qsca += std::norm(T(1, n1, m1, 0, n2, m2));
-          old_qsca += std::norm(T(1, n1, m1, 1, n2, m2));
+      for (uint_fast32_t m1 = 0; m1 < n1 + 1; ++m1) {
+        for (uint_fast32_t m2 = 0; m2 < n2 + 1; ++m2) {
+          if (m1 == m2) {
+            float_type factor;
+            if (m1 > 0) {
+              factor = 2.;
+            } else {
+              factor = 1.;
+            }
+            old_qsca += factor * std::norm(T(0, n1, m1, 0, n2, m2));
+            old_qsca += factor * std::norm(T(0, n1, m1, 1, n2, m2));
+            old_qsca += factor * std::norm(T(1, n1, m1, 0, n2, m2));
+            old_qsca += factor * std::norm(T(1, n1, m1, 1, n2, m2));
+          }
         }
       }
     }
   }
   for (uint_fast32_t n1 = 1; n1 < nmax + 1; ++n1) {
-    for (int_fast32_t m1 = -n1; m1 < static_cast<int_fast32_t>(n1 + 1); ++m1) {
-      old_qext += T(0, n1, m1, 0, n1, m1).real();
-      old_qext += T(0, n1, m1, 1, n1, m1).real();
-      old_qext += T(1, n1, m1, 0, n1, m1).real();
-      old_qext += T(1, n1, m1, 1, n1, m1).real();
+    for (uint_fast32_t m1 = 0; m1 < n1 + 1; ++m1) {
+      float_type factor;
+      if (m1 > 0) {
+        factor = 2.;
+      } else {
+        factor = 1.;
+      }
+      old_qext += factor * T(0, n1, m1, 0, n1, m1).real();
+      old_qext += factor * T(0, n1, m1, 1, n1, m1).real();
+      old_qext += factor * T(1, n1, m1, 0, n1, m1).real();
+      old_qext += factor * T(1, n1, m1, 1, n1, m1).real();
     }
   }
   // output the factors

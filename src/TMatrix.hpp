@@ -405,10 +405,6 @@ private:
   /*! @brief Maximum order of the spherical basis functions, @f$n_{max}@f$. */
   const uint_fast32_t _nmax;
 
-  /*! @brief Number of components in one quarter of the T-matrix,
-   *  @f$L_{max} = n_{max} (n_{max} + 2) @f$. */
-  const uint_fast32_t _Lmax;
-
   /*! @brief Number of Gauss-Legendre quadrature points, @f$n_{GL}@f$. */
   const uint_fast32_t _ngauss;
 
@@ -496,9 +492,9 @@ private:
    *  matrix). */
   Matrix<std::complex<float_type>> _djkrmr;
 
-  /*! @brief T-matrix itself
-   *  (@f$2n_{max}(n_{max}+2)\times{}2n_{max}(n_{max}+2)@f$ matrix). */
-  Matrix<std::complex<float_type>> _T;
+  /*! @brief T-matrix itself. Is in fact a @f$n_{max}+1@f$ element vector for
+   *  which every element is a @f$2n_{max}\times{}2n_{max}@f$ matrix. */
+  std::vector<Matrix<std::complex<float_type>>> _T;
 
 public:
   /**
@@ -515,8 +511,8 @@ public:
                  const std::complex<float_type> refractive_index,
                  const float_type R_V, const float_type axis_ratio,
                  const uint_fast32_t nmax, const uint_fast32_t ngauss)
-      : _nmax(nmax), _Lmax(nmax * (nmax + 2)), _ngauss(ngauss),
-        _an(nmax, float_type(0.)), _dd(nmax, float_type(0.)), _ann(nmax, nmax),
+      : _nmax(nmax), _ngauss(ngauss), _an(nmax, float_type(0.)),
+        _dd(nmax, float_type(0.)), _ann(nmax, nmax),
         _costheta(2 * ngauss, float_type(0.)),
         _sinthetainv(2 * ngauss, float_type(0.)),
         _sintheta2inv(2 * ngauss, float_type(0.)),
@@ -527,7 +523,12 @@ public:
         _k2(_k * _k), _k2mr(refractive_index * _k2), _jkr(2 * ngauss, nmax),
         _ykr(2 * ngauss, nmax), _djkr(2 * ngauss, nmax),
         _dykr(2 * ngauss, nmax), _jkrmr(2 * ngauss, nmax),
-        _djkrmr(2 * ngauss, nmax), _T(2 * _Lmax, 2 * _Lmax) {
+        _djkrmr(2 * ngauss, nmax) {
+
+    _T.reserve(nmax + 1);
+    for (uint_fast32_t m = 0; m < nmax + 1; ++m) {
+      _T.push_back(Matrix<std::complex<float_type>>(2 * nmax, 2 * nmax));
+    }
 
     for (uint_fast32_t ni = 0; ni < nmax; ++ni) {
       const float_type nn((ni + 2.) * (ni + 1.));
@@ -720,14 +721,12 @@ public:
     Q.plu_inverse();
 
     for (uint_fast32_t i = 0; i < nmax; ++i) {
-      const uint_fast32_t li = (i + 1) * (i + 2) - 1;
       for (uint_fast32_t j = 0; j < nmax; ++j) {
-        const uint_fast32_t lj = (j + 1) * (j + 2) - 1;
         for (uint_fast32_t k = 0; k < nmax2; ++k) {
-          _T(li, lj) -= RgQ(i, k) * Q(k, j);
-          _T(_Lmax + li, lj) -= RgQ(nmax + i, k) * Q(k, j);
-          _T(li, _Lmax + lj) -= RgQ(i, k) * Q(k, nmax + j);
-          _T(_Lmax + li, _Lmax + lj) -= RgQ(nmax + i, k) * Q(k, nmax + j);
+          _T[0](i, j) -= RgQ(i, k) * Q(k, j);
+          _T[0](_nmax + i, j) -= RgQ(nmax + i, k) * Q(k, j);
+          _T[0](i, _nmax + j) -= RgQ(i, k) * Q(k, nmax + j);
+          _T[0](_nmax + i, _nmax + j) -= RgQ(nmax + i, k) * Q(k, nmax + j);
         }
       }
     }
@@ -738,7 +737,7 @@ public:
    */
   inline void compute_additional_elements() {
 
-    for (uint_fast32_t m = 1; m < _nmax; ++m) {
+    for (uint_fast32_t m = 1; m < _nmax + 1; ++m) {
 
       const float_type m2 = m * m;
       const uint_fast32_t nmax2 = 2 * _nmax;
@@ -961,21 +960,13 @@ public:
       Q.plu_inverse();
 
       for (uint_fast32_t i = 0; i < nm; ++i) {
-        const uint_fast32_t lip = (m + i) * (m + i + 1) + m - 1;
-        const uint_fast32_t lim = (m + i) * (m + i + 1) - m - 1;
         for (uint_fast32_t j = 0; j < nm; ++j) {
-          const uint_fast32_t ljp = (m + j) * (m + j + 1) + m - 1;
-          const uint_fast32_t ljm = (m + j) * (m + j + 1) - m - 1;
           for (uint_fast32_t k = 0; k < nm2; ++k) {
-            _T(lip, ljp) -= RgQ(i, k) * Q(k, j);
-            _T(_Lmax + lip, ljp) -= RgQ(nm + i, k) * Q(k, j);
-            _T(lip, _Lmax + ljp) -= RgQ(i, k) * Q(k, nm + j);
-            _T(_Lmax + lip, _Lmax + ljp) -= RgQ(nm + i, k) * Q(k, nm + j);
-
-            _T(lim, ljm) -= RgQ(i, k) * Q(k, j);
-            _T(_Lmax + lim, ljm) -= RgQ(nm + i, k) * Q(k, j);
-            _T(lim, _Lmax + ljm) -= RgQ(i, k) * Q(k, nm + j);
-            _T(_Lmax + lim, _Lmax + ljm) -= RgQ(nm + i, k) * Q(k, nm + j);
+            _T[m](m + i - 1, m + j - 1) -= RgQ(i, k) * Q(k, j);
+            _T[m](_nmax + m + i - 1, m + j - 1) -= RgQ(nm + i, k) * Q(k, j);
+            _T[m](m + i - 1, _nmax + m + j - 1) -= RgQ(i, k) * Q(k, nm + j);
+            _T[m](_nmax + m + i - 1, _nmax + m + j - 1) -=
+                RgQ(nm + i, k) * Q(k, nm + j);
           }
         }
       }
@@ -992,8 +983,8 @@ public:
    *      T^{(21)} & T^{(22)}
    *    \end{pmatrix}.
    * @f]
-   * Each of these blocks is an @f$L_{max}\times{}L_{max}@f$ matrix indexed
-   * using the combined index
+   * In principle, each of these blocks is an @f$L_{max}\times{}L_{max}@f$
+   * matrix indexed using the combined index
    * @f[
    *    l = n (n+1) + m,
    * @f]
@@ -1002,6 +993,11 @@ public:
    * (https://doi.org/10.1029/RS019i002p00629).
    *
    * This function returns the element @f$T^{(i_1i_2)}_{n_1n_2m_1m_2}@f$.
+   *
+   * However, since for spheroidal particles @f$T_{nmn'm'} \sim{}
+   * \delta{}_{mm'}@f$, we can greatly reduce the storage space of the T matrix
+   * by storing it as @f$n_{max}+1@f$ individual matrices (one for each value of
+   * @f$m@f$). This is in fact what we do.
    *
    * @param i1 Row index of the desired T-matrix quarter, @f$i_1@f$.
    * @param n1 Order of the row index of the element, @f$n_1@f$.
@@ -1013,12 +1009,17 @@ public:
    */
   inline const std::complex<float_type> &
   operator()(const uint_fast8_t i1, const uint_fast32_t n1,
-             const int_fast32_t m1, const uint_fast8_t i2,
-             const uint_fast32_t n2, const int_fast32_t m2) const {
+             const uint_fast32_t m1, const uint_fast8_t i2,
+             const uint_fast32_t n2, const uint_fast32_t m2) const {
 
-    const uint_fast32_t l1 = i1 * _Lmax + n1 * (n1 + 1) + m1 - 1;
-    const uint_fast32_t l2 = i2 * _Lmax + n2 * (n2 + 1) + m2 - 1;
-    return _T(l1, l2);
+    ctm_assert(m1 == m2);
+    ctm_assert(m1 <= _nmax);
+    ctm_assert(m2 <= _nmax);
+    ctm_assert(n1 > 0);
+    ctm_assert(n1 <= _nmax);
+    ctm_assert(n2 > 0);
+    ctm_assert(n2 <= _nmax);
+    return _T[m1](i1 * _nmax + n1 - 1, i2 * _nmax + n2 - 1);
   }
 
   /**
@@ -1613,7 +1614,7 @@ public:
     const TMatrix &T = *this;
     // instead of summing over n and n', we sum over m, since then we can reuse
     // the e^{im(phi_out-phi_in)}, pi and tau factors
-    for (uint_fast32_t m = 0; m < _nmax; ++m) {
+    for (uint_fast32_t m = 0; m < _nmax + 1; ++m) {
       // only n and n' values larger than or equal to m have non-trivial
       // contributions to the S matrix
       const uint_fast32_t nmin = std::max(m, static_cast<uint_fast32_t>(1));
