@@ -151,6 +151,18 @@ int main(int argc, char **argv) {
   ctm_warning("Z[3,:] = %g %g %g %g", double(Z(3, 0)), double(Z(3, 1)),
               double(Z(3, 2)), double(Z(3, 3)));
 
+  Matrix<float_type> K = active_Tmatrix->get_extinction_matrix(
+      alpha, beta, theta_in, phi_in, theta_out, phi_out);
+
+  ctm_warning("K[0,:] = %g %g %g %g", double(K(0, 0)), double(K(0, 1)),
+              double(K(0, 2)), double(K(0, 3)));
+  ctm_warning("K[1,:] = %g %g %g %g", double(K(1, 0)), double(K(1, 1)),
+              double(K(1, 2)), double(K(1, 3)));
+  ctm_warning("K[2,:] = %g %g %g %g", double(K(2, 0)), double(K(2, 1)),
+              double(K(2, 2)), double(K(2, 3)));
+  ctm_warning("K[3,:] = %g %g %g %g", double(K(3, 0)), double(K(3, 1)),
+              double(K(3, 2)), double(K(3, 3)));
+
   Z.binary_dump(parser.get_value<std::string>("output"));
 
   // clean up
