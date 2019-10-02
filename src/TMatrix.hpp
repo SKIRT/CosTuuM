@@ -1754,6 +1754,68 @@ public:
     // done!
     return Z;
   }
+
+  /**
+   * @brief Get the scattering coefficient for the T-matrix.
+   *
+   * @return Scattering coefficient.
+   */
+  inline float_type get_scattering_coefficient() const {
+
+    float_type scattering_coefficient = 0.;
+    const TMatrix &T = *this;
+    for (uint_fast32_t n1 = 1; n1 < _nmax + 1; ++n1) {
+      for (uint_fast32_t n2 = 1; n2 < _nmax + 1; ++n2) {
+        for (uint_fast32_t m1 = 0; m1 < n1 + 1; ++m1) {
+          for (uint_fast32_t m2 = 0; m2 < n2 + 1; ++m2) {
+            if (m1 == m2) {
+              float_type factor;
+              if (m1 > 0) {
+                factor = 2.;
+              } else {
+                factor = 1.;
+              }
+              scattering_coefficient +=
+                  factor * std::norm(T(0, n1, m1, 0, n2, m2));
+              scattering_coefficient +=
+                  factor * std::norm(T(0, n1, m1, 1, n2, m2));
+              scattering_coefficient +=
+                  factor * std::norm(T(1, n1, m1, 0, n2, m2));
+              scattering_coefficient +=
+                  factor * std::norm(T(1, n1, m1, 1, n2, m2));
+            }
+          }
+        }
+      }
+    }
+    return scattering_coefficient;
+  }
+
+  /**
+   * @brief Get the extinction coefficient for the T-matrix.
+   *
+   * @return Extinction coefficient.
+   */
+  inline float_type get_extinction_coefficient() const {
+
+    float_type extinction_coefficient = 0.;
+    const TMatrix &T = *this;
+    for (uint_fast32_t n1 = 1; n1 < _nmax + 1; ++n1) {
+      for (uint_fast32_t m1 = 0; m1 < n1 + 1; ++m1) {
+        float_type factor;
+        if (m1 > 0) {
+          factor = 2.;
+        } else {
+          factor = 1.;
+        }
+        extinction_coefficient += factor * T(0, n1, m1, 0, n1, m1).real();
+        extinction_coefficient += factor * T(0, n1, m1, 1, n1, m1).real();
+        extinction_coefficient += factor * T(1, n1, m1, 0, n1, m1).real();
+        extinction_coefficient += factor * T(1, n1, m1, 1, n1, m1).real();
+      }
+    }
+    return extinction_coefficient;
+  }
 };
 
 #endif // TMATRIX_HPP

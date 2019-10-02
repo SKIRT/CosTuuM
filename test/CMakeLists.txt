@@ -61,6 +61,16 @@ configure_file(${PROJECT_SOURCE_DIR}/test/test_matrix.py
                ${PROJECT_BINARY_DIR}/bin/test/test_matrix.py
                COPYONLY)
 
+## Unit test for TMatrixCalculator
+set(TESTTMATRIXCALCULATOR_SOURCES
+    testTMatrixCalculator.cpp
+)
+add_unit_test(NAME testTMatrixCalculator
+              SOURCES ${TESTTMATRIXCALCULATOR_SOURCES})
+configure_file(${PROJECT_SOURCE_DIR}/test/test_tmatrixcalculator.txt
+               ${PROJECT_BINARY_DIR}/bin/test/test_tmatrixcalculator.txt
+               COPYONLY)
+
 ### Done adding unit tests. Create the 'make check' target #####################
 ### Do not touch these lines unless you know what you're doing! ################
 add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure

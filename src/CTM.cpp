@@ -11,8 +11,7 @@
 #include "ConfigurationInfo.hpp"
 #include "Matrix.hpp"
 #include "ParameterFile.hpp"
-#include "SpecialFunctions.hpp"
-#include "TMatrix.hpp"
+#include "TMatrixCalculator.hpp"
 
 #include <cinttypes>
 #include <cmath>
@@ -134,165 +133,9 @@ int main(int argc, char **argv) {
     std::cout << std::endl;
   }
 
-  // make sure 'rat' contains the right ratio if it is not 1
-  if (abs(ratio_of_radii - 1.) > 1.e-8) {
-    ratio_of_radii =
-        SpecialFunctions::get_equal_volume_to_equal_surface_area_sphere_ratio(
-            axis_ratio);
-  }
-
-  // R_V is the equivalent sphere radius
-  const float_type R_V = ratio_of_radii * axi;
-  // we need a reasonable initial guess for the order of the spherical harmonics
-  // the below expression provides this guess
-  const float_type xev = 2. * M_PI * R_V / wavelength;
-  uint_fast32_t nmax = static_cast<uint_fast32_t>(
-      std::max(float_type(4.), xev + 4.05 * cbrt(xev)));
-
-  // we need to find a maximum expansion order and number of Gauss-Legendre
-  // quadrature points that leads to a converged T-matrix
-  // To this end, we will start with a reasonable guess for the order, and then
-  // keep track of how the accuracy of the scattering and extinction factors
-  // changes as we first increase the order and then the number of quadrature
-  // points
-  // To simplify the calculation, we only compute the m=0 degree terms in the
-  // T-matrix during the convergence loops
-  TMatrix *active_Tmatrix = nullptr;
-
-  // loop control variables
-  float_type old_qext = 0.;
-  float_type old_qsca = 0.;
-  float_type dext = 1.;
-  float_type dsca = 1.;
-  while (nmax < maximum_order && (dext > tolerance || dsca > tolerance)) {
-    // initially we assume that the number of quadrature points is a fixed
-    // multiple of the order
-    const uint_fast32_t ngauss = ndgs * nmax;
-
-    // delete the old matrix (if it exists) and create a new one
-    delete active_Tmatrix;
-    active_Tmatrix = new TMatrix(wavelength, mr, R_V, axis_ratio, nmax, ngauss);
-    TMatrix &T = *active_Tmatrix;
-
-    // calculate the scattering and extinction factors for this iteration
-    float_type qsca = 0.;
-    float_type qext = 0.;
-    for (uint_fast32_t n = 1; n < nmax + 1; ++n) {
-      const float_type dn1 = 2. * n + 1.;
-      qsca += dn1 *
-              (std::norm(T(0, n, 0, 0, n, 0)) + std::norm(T(1, n, 0, 1, n, 0)));
-      qext += dn1 * (T(0, n, 0, 0, n, 0).real() + T(1, n, 0, 1, n, 0).real());
-    }
-    // compute the relative difference w.r.t. the previous values
-    dsca = abs((old_qsca - qsca) / qsca);
-    dext = abs((old_qext - qext) / qext);
-    old_qext = qext;
-    old_qsca = qsca;
-
-    // some (temporary) diagnostic output
-    ctm_warning("dsca: %g, dext: %g", double(dsca), double(dext));
-
-    // increase the order
-    ++nmax;
-  }
-
-  // check if we managed to converge
-  if (nmax == maximum_order) {
-    ctm_error("Unable to converge!");
-  } else {
-    // correct for overshoot in last iteration
-    --nmax;
-    ctm_warning("Converged for nmax = %" PRIuFAST32, nmax);
-  }
-
-  // now start increasing the number of quadrature points
-  uint_fast32_t ngauss = nmax * ndgs + 1;
-  dext = tolerance + 1.;
-  dsca = tolerance + 1.;
-  while (ngauss < maximum_ngauss && (dext > tolerance || dsca > tolerance)) {
-
-    // delete the old matrix and create a new one
-    delete active_Tmatrix;
-    active_Tmatrix = new TMatrix(wavelength, mr, R_V, axis_ratio, nmax, ngauss);
-    TMatrix &T = *active_Tmatrix;
-
-    // calculate the scattering and extinction factors
-    float_type qsca = 0.;
-    float_type qext = 0.;
-    for (uint_fast32_t n = 1; n < nmax + 1; ++n) {
-      const float_type dn1 = 2. * n + 1.;
-      qsca += dn1 *
-              (std::norm(T(0, n, 0, 0, n, 0)) + std::norm(T(1, n, 0, 1, n, 0)));
-      qext += dn1 * (T(0, n, 0, 0, n, 0).real() + T(1, n, 0, 1, n, 0).real());
-    }
-    // compute the relative difference w.r.t. the old values
-    dsca = abs((old_qsca - qsca) / qsca);
-    dext = abs((old_qext - qext) / qext);
-    old_qext = qext;
-    old_qsca = qsca;
-
-    // some diagnostic output
-    ctm_warning("dsca: %g, dext: %g", double(dsca), double(dext));
-
-    // increase the number of quadrature points
-    ++ngauss;
-  }
-
-  // check if we reached convergence
-  if (ngauss == maximum_ngauss) {
-    ctm_error("Unable to converge!");
-  } else {
-    // correct for overshoot in final iteration
-    --ngauss;
-    ctm_warning("Converged for ngauss = %" PRIuFAST32, ngauss);
-  }
-
-  // ok: we found the right order and number of quadrature points
-  // we now need to compute the additional elements for m=/=0
-  active_Tmatrix->compute_additional_elements();
-
-  // compute the actual scattering and extinction factors using the full matrix
-  TMatrix &T = *active_Tmatrix;
-  old_qsca = 0.;
-  old_qext = 0.;
-  for (uint_fast32_t n1 = 1; n1 < nmax + 1; ++n1) {
-    for (uint_fast32_t n2 = 1; n2 < nmax + 1; ++n2) {
-      for (uint_fast32_t m1 = 0; m1 < n1 + 1; ++m1) {
-        for (uint_fast32_t m2 = 0; m2 < n2 + 1; ++m2) {
-          if (m1 == m2) {
-            float_type factor;
-            if (m1 > 0) {
-              factor = 2.;
-            } else {
-              factor = 1.;
-            }
-            old_qsca += factor * std::norm(T(0, n1, m1, 0, n2, m2));
-            old_qsca += factor * std::norm(T(0, n1, m1, 1, n2, m2));
-            old_qsca += factor * std::norm(T(1, n1, m1, 0, n2, m2));
-            old_qsca += factor * std::norm(T(1, n1, m1, 1, n2, m2));
-          }
-        }
-      }
-    }
-  }
-  for (uint_fast32_t n1 = 1; n1 < nmax + 1; ++n1) {
-    for (uint_fast32_t m1 = 0; m1 < n1 + 1; ++m1) {
-      float_type factor;
-      if (m1 > 0) {
-        factor = 2.;
-      } else {
-        factor = 1.;
-      }
-      old_qext += factor * T(0, n1, m1, 0, n1, m1).real();
-      old_qext += factor * T(0, n1, m1, 1, n1, m1).real();
-      old_qext += factor * T(1, n1, m1, 0, n1, m1).real();
-      old_qext += factor * T(1, n1, m1, 1, n1, m1).real();
-    }
-  }
-  // output the factors
-  ctm_warning("qsca: %g", double(old_qsca));
-  ctm_warning("qext: %g", double(old_qext));
-  ctm_warning("walb: %g", double(-old_qsca / old_qext));
+  TMatrix *active_Tmatrix = TMatrixCalculator::calculate_TMatrix(
+      ratio_of_radii, axis_ratio, axi, wavelength, maximum_order, tolerance,
+      ndgs, mr, maximum_ngauss);
 
   /// compute a scattering event using the T-matrix
 
