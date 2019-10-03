@@ -45,4 +45,5 @@ set(CosTuuM_SOURCES
 )
 
 add_executable(CosTuuM ${CosTuuM_SOURCES})
+target_link_libraries(CosTuuM ${LIBQUICKSCHED})
 add_dependencies(CosTuuM CompilerInfo)

@@ -208,6 +208,17 @@ else(ACTIVATE_QUAD_PRECISION)
   message(STATUS "Using double precision.")
 endif(ACTIVATE_QUAD_PRECISION)
 
+if(ACTIVATE_TASKS)
+  add_configuration_option(HAVE_TASKS True)
+  include_directories(/home/bv7/Programs/quicksched/src)
+  set(LIBQUICKSCHED "/home/bv7/Programs/quicksched/src/.libs/libquicksched.a")
+  message(STATUS "Using task-based parallel algorithm.")
+else(ACTIVATE_TASKS)
+  add_configuration_option(HAVE_TASKS False)
+  message(STATUS "Not using task-based parallel algorithm.")
+  set(LIBQUICKSCHED "")
+endif(ACTIVATE_TASKS)
+
 ## Code configuration ##########################################################
 
 # Tell CMake that headers are in one of the src folders.
