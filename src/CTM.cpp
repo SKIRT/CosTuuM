@@ -151,8 +151,8 @@ int main(int argc, char **argv) {
   ctm_warning("Z[3,:] = %g %g %g %g", double(Z(3, 0)), double(Z(3, 1)),
               double(Z(3, 2)), double(Z(3, 3)));
 
-  Matrix<float_type> K = active_Tmatrix->get_extinction_matrix(
-      alpha, beta, theta_in, phi_in, theta_out, phi_out);
+  Matrix<float_type> K =
+      active_Tmatrix->get_extinction_matrix(alpha, beta, theta_in, phi_in);
 
   ctm_warning("K[0,:] = %g %g %g %g", double(K(0, 0)), double(K(0, 1)),
               double(K(0, 2)), double(K(0, 3)));

@@ -1819,21 +1819,17 @@ public:
    * @f$\theta{}_i@f$ (in radians).
    * @param phi_in_radians Azimuth angle of the incoming photon, @f$\phi{}_i@f$
    * (in radians).
-   * @param theta_out_radians Zenith angle of the scattered photon,
-   * @f$\theta{}_s@f$ (in radians).
-   * @param phi_out_radians Azimuth angle fo the scattered photon,
-   * @f$\phi{}_s@f$ (in radians).
    * @return Extinction matrix for this scattering event.
    */
-  inline Matrix<float_type> get_extinction_matrix(
-      const float_type alpha_radians, const float_type beta_radians,
-      const float_type theta_in_radians, const float_type phi_in_radians,
-      const float_type theta_out_radians,
-      const float_type phi_out_radians) const {
+  inline Matrix<float_type>
+  get_extinction_matrix(const float_type alpha_radians,
+                        const float_type beta_radians,
+                        const float_type theta_in_radians,
+                        const float_type phi_in_radians) const {
 
     Matrix<std::complex<float_type>> S = get_forward_scattering_matrix(
         alpha_radians, beta_radians, theta_in_radians, phi_in_radians,
-        theta_out_radians, phi_out_radians);
+        theta_in_radians, phi_in_radians);
 
     Matrix<float_type> K(4, 4);
 
