@@ -10,7 +10,7 @@ if(NOT CMAKE_BUILD_TYPE)
         "Set the default CMake build type to Release" FORCE)
 endif(NOT CMAKE_BUILD_TYPE)
 
-project(CTM_working_title)
+project(CosTuuM)
 
 # Enable unit testing using CTest
 enable_testing()
@@ -106,9 +106,9 @@ string(REGEX REPLACE "v([0-9]*).*" "\\1" GIT_VERSION_MAJOR ${GIT_BUILD_STRING})
 string(REGEX REPLACE "v[0-9]*.([0-9]*).*" "\\1" GIT_VERSION_MINOR
        ${GIT_BUILD_STRING})
 message(STATUS
-  "This is CTM_working_title version ${GIT_VERSION_MAJOR}.${GIT_VERSION_MINOR}")
-set(CTM_VERSION_MAJOR ${GIT_VERSION_MAJOR})
-set(CTM_VERSION_MINOR ${GIT_VERSION_MINOR})
+        "This is CosTuuM version ${GIT_VERSION_MAJOR}.${GIT_VERSION_MINOR}")
+set(CosTuuM_VERSION_MAJOR ${GIT_VERSION_MAJOR})
+set(CosTuuM_VERSION_MINOR ${GIT_VERSION_MINOR})
 
 # Enable C++11, since we need this for delegating constructors
 add_compiler_flag("-std=c++11" REQUIRED)

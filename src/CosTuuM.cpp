@@ -1,5 +1,5 @@
 /**
- * @file CTM.cpp
+ * @file CosTuuM.cpp
  *
  * @brief Main program entry point.
  *
