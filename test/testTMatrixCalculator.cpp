@@ -65,9 +65,9 @@ int main(int argc, char **argv) {
     phi0 = UnitConverter::to_SI<QUANTITY_ANGLE>(double(phi0), "degrees");
     phi = UnitConverter::to_SI<QUANTITY_ANGLE>(double(phi), "degrees");
 
-    assert_values_equal_rel(double(qext), double(refqext), 1.e-6);
-    assert_values_equal_rel(double(qsca), double(refqsca), 1.e-6);
-    assert_values_equal_rel(double(walb), double(refwalb), 1.e-6);
+    assert_values_equal_rel(double(qext), double(refqext), 1.e-5);
+    assert_values_equal_rel(double(qsca), double(refqsca), 1.e-5);
+    assert_values_equal_rel(double(walb), double(refwalb), 1.e-5);
 
     Matrix<float_type> Z =
         Tmat->get_scattering_matrix(alpha, beta, thet0, phi0, thet, phi);

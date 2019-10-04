@@ -267,5 +267,123 @@ int main(int argc, char **argv) {
     gfile << x[i] << "\t" << w[i] << "\n";
   }
 
-  return 0;
+  /// Clebsch-Gordan coefficients
+  /// We test our implementation against the values for all coefficients
+  /// with n1 = 1 and n2 = 1 provided on Wikipedia:
+  /// https://en.wikipedia.org/wiki/Table_of_Clebsch%E2%80%93Gordan_coefficients
+  {
+    const float_type C111122 =
+        SpecialFunctions::get_clebsch_gordan_coefficient<float_type>(1, 1, 1, 1,
+                                                                     2, 2);
+    assert_condition(double(C111122) == 1.);
+
+    const float_type C111021 =
+        SpecialFunctions::get_clebsch_gordan_coefficient<float_type>(1, 1, 1, 0,
+                                                                     2, 1);
+    assert_values_equal_rel(double(C111021), std::sqrt(0.5), 1.e-10);
+    const float_type C101121 =
+        SpecialFunctions::get_clebsch_gordan_coefficient<float_type>(1, 0, 1, 1,
+                                                                     2, 1);
+    assert_values_equal_rel(double(C101121), std::sqrt(0.5), 1.e-10);
+
+    const float_type C111011 =
+        SpecialFunctions::get_clebsch_gordan_coefficient<float_type>(1, 1, 1, 0,
+                                                                     1, 1);
+    assert_values_equal_rel(double(C111011), std::sqrt(0.5), 1.e-10);
+    const float_type C101111 =
+        SpecialFunctions::get_clebsch_gordan_coefficient<float_type>(1, 0, 1, 1,
+                                                                     1, 1);
+    assert_values_equal_rel(double(C101111), -std::sqrt(0.5), 1.e-10);
+
+    const float_type C111m120 =
+        SpecialFunctions::get_clebsch_gordan_coefficient<float_type>(1, 1, 1,
+                                                                     -1, 2, 0);
+    assert_values_equal_rel(double(C111m120), std::sqrt(1. / 6.), 1.e-10);
+    const float_type C101020 =
+        SpecialFunctions::get_clebsch_gordan_coefficient<float_type>(1, 0, 1, 0,
+                                                                     2, 0);
+    assert_values_equal_rel(double(C101020), std::sqrt(2. / 3.), 1.e-10);
+    const float_type C1m11120 =
+        SpecialFunctions::get_clebsch_gordan_coefficient<float_type>(1, -1, 1,
+                                                                     1, 2, 0);
+    assert_values_equal_rel(double(C1m11120), std::sqrt(1. / 6.), 1.e-10);
+
+    const float_type C111m110 =
+        SpecialFunctions::get_clebsch_gordan_coefficient<float_type>(1, 1, 1,
+                                                                     -1, 1, 0);
+    assert_values_equal_rel(double(C111m110), std::sqrt(0.5), 1.e-10);
+    const float_type C101010 =
+        SpecialFunctions::get_clebsch_gordan_coefficient<float_type>(1, 0, 1, 0,
+                                                                     1, 0);
+    assert_condition(double(C101010) == 0.);
+    const float_type C1m11110 =
+        SpecialFunctions::get_clebsch_gordan_coefficient<float_type>(1, -1, 1,
+                                                                     1, 1, 0);
+    assert_values_equal_rel(double(C1m11110), -std::sqrt(0.5), 1.e-10);
+
+    const float_type C111m100 =
+        SpecialFunctions::get_clebsch_gordan_coefficient<float_type>(1, 1, 1,
+                                                                     -1, 0, 0);
+    assert_values_equal_rel(double(C111m100), std::sqrt(1. / 3.), 1.e-10);
+    const float_type C101000 =
+        SpecialFunctions::get_clebsch_gordan_coefficient<float_type>(1, 0, 1, 0,
+                                                                     0, 0);
+    assert_values_equal_rel(double(C101000), -std::sqrt(1. / 3.), 1.e-10);
+    const float_type C1m11100 =
+        SpecialFunctions::get_clebsch_gordan_coefficient<float_type>(1, -1, 1,
+                                                                     1, 0, 0);
+    assert_values_equal_rel(double(C1m11100), std::sqrt(1. / 3.), 1.e-10);
+
+    const float_type C1m1102m1 =
+        SpecialFunctions::get_clebsch_gordan_coefficient<float_type>(1, -1, 1,
+                                                                     0, 2, -1);
+    assert_values_equal_rel(double(C1m1102m1), std::sqrt(0.5), 1.e-10);
+    const float_type C101m12m1 =
+        SpecialFunctions::get_clebsch_gordan_coefficient<float_type>(1, 0, 1,
+                                                                     -1, 2, -1);
+    assert_values_equal_rel(double(C101m12m1), std::sqrt(0.5), 1.e-10);
+
+    const float_type C1m1101m1 =
+        SpecialFunctions::get_clebsch_gordan_coefficient<float_type>(1, -1, 1,
+                                                                     0, 1, -1);
+    assert_values_equal_rel(double(C1m1101m1), -std::sqrt(0.5), 1.e-10);
+    const float_type C101m11m1 =
+        SpecialFunctions::get_clebsch_gordan_coefficient<float_type>(1, 0, 1,
+                                                                     -1, 1, -1);
+    assert_values_equal_rel(double(C101m11m1), std::sqrt(0.5), 1.e-10);
+
+    const float_type C1m11m12m2 =
+        SpecialFunctions::get_clebsch_gordan_coefficient<float_type>(1, -1, 1,
+                                                                     -1, 2, -2);
+    assert_values_equal_rel(double(C1m11m12m2), 1., 1.e-10);
+
+    // some additional checks to check the n1<n2 cases
+    const float_type C211122 =
+        SpecialFunctions::get_clebsch_gordan_coefficient<float_type>(2, 1, 1, 1,
+                                                                     2, 2);
+    assert_values_equal_rel(double(C211122), -std::sqrt(1. / 3.), 1.e-10);
+
+    const float_type C112122 =
+        SpecialFunctions::get_clebsch_gordan_coefficient<float_type>(1, 1, 2, 1,
+                                                                     2, 2);
+    assert_values_equal_rel(double(C112122), std::sqrt(1. / 3.), 1.e-10);
+
+    const float_type C221032 =
+        SpecialFunctions::get_clebsch_gordan_coefficient<float_type>(2, 2, 1, 0,
+                                                                     3, 2);
+    assert_values_equal_rel(double(C221032), std::sqrt(1. / 3.), 1.e-10);
+    const float_type C102232 =
+        SpecialFunctions::get_clebsch_gordan_coefficient<float_type>(1, 0, 2, 2,
+                                                                     3, 2);
+    assert_values_equal_rel(double(C102232), std::sqrt(1. / 3.), 1.e-10);
+
+    // check a large value, without reference, just to check nothing breaks
+    const float_type large_coefficient =
+        SpecialFunctions::get_clebsch_gordan_coefficient<float_type>(
+            100, 40, 120, -40, 220, 0);
+    ctm_warning("Random large value: %g", double(large_coefficient));
+    assert_condition(double(large_coefficient) == double(large_coefficient));
+  }
+
+  return 1;
 }

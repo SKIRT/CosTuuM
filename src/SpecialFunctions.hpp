@@ -745,6 +745,291 @@ public:
       dr_over_r[costheta.size() - i - 1] = -dr_over_r[i];
     }
   }
+
+  /**
+   * @brief Get the element with the given indices in the given Clebsch-Gordan
+   * array.
+   *
+   * The order in which the coefficients are stored is arbitrary, we choose
+   * to store them in lexical order: the first quantum number acts as outer
+   * index, the second quantum number as middle index and the total quantum
+   * number as outer index. There are @f$(2n+1)@f$ projections @f$m@f$ for each
+   * quantum number @f$n=n_1,n_2,N@f$.
+   *
+   * There is only a very limited subset of quantum numbers for which the
+   * Clebsch-Gordan coefficients are non-zero, so we could dramatically decrease
+   * the memory footprint of the stored coefficients by exploiting this. But as
+   * it is currently Friday evening 19:00, this is currently not one of the
+   * developer's skills.
+   *
+   * @param n1 First angular momentum quantum number, @f$n_1@f$.
+   * @param m1 First angular momentum projection quantum number, @f$m_1@f$.
+   * @param n2 Second angular momentum quantum number, @f$n_2@f$.
+   * @param m2 Second angular momentum projection quantum number, @f$m_2@f$.
+   * @param N Total angular momentum quantum number, @f$N@f$.
+   * @param M Total angular momentum projection quantum number, @f$M@f$.
+   * @param C Array with Clebsch-Gordan coefficients for fixed angular momentum
+   * quantum numbers.
+   * @return Reference to the corresponding Clebsch-Gordan coefficient.
+   * @tparam DATA_TYPE Data type of input and output values.
+   */
+  template <typename DATA_TYPE>
+  static inline DATA_TYPE &
+  get_clebsch_gordan_element(const int_fast32_t n1, const int_fast32_t m1,
+                             const int_fast32_t n2, const int_fast32_t m2,
+                             const int_fast32_t N, const int_fast32_t M,
+                             std::vector<DATA_TYPE> &C) {
+
+    ctm_assert_message(m1 <= n1,
+                       "n1: %" PRIiFAST32 ", m1: %" PRIiFAST32
+                       ", n2: %" PRIiFAST32 ", m2: %" PRIiFAST32
+                       ", N: %" PRIiFAST32 ", M: %" PRIiFAST32,
+                       n1, m1, n2, m2, N, M);
+    ctm_assert_message(m1 >= -n1,
+                       "n1: %" PRIiFAST32 ", m1: %" PRIiFAST32
+                       ", n2: %" PRIiFAST32 ", m2: %" PRIiFAST32
+                       ", N: %" PRIiFAST32 ", M: %" PRIiFAST32,
+                       n1, m1, n2, m2, N, M);
+    ctm_assert_message(m2 <= n2,
+                       "n1: %" PRIiFAST32 ", m1: %" PRIiFAST32
+                       ", n2: %" PRIiFAST32 ", m2: %" PRIiFAST32
+                       ", N: %" PRIiFAST32 ", M: %" PRIiFAST32,
+                       n1, m1, n2, m2, N, M);
+    ctm_assert_message(m2 >= -n2,
+                       "n1: %" PRIiFAST32 ", m1: %" PRIiFAST32
+                       ", n2: %" PRIiFAST32 ", m2: %" PRIiFAST32
+                       ", N: %" PRIiFAST32 ", M: %" PRIiFAST32,
+                       n1, m1, n2, m2, N, M);
+    ctm_assert_message(M <= N,
+                       "n1: %" PRIiFAST32 ", m1: %" PRIiFAST32
+                       ", n2: %" PRIiFAST32 ", m2: %" PRIiFAST32
+                       ", N: %" PRIiFAST32 ", M: %" PRIiFAST32,
+                       n1, m1, n2, m2, N, M);
+    ctm_assert_message(M >= -N,
+                       "n1: %" PRIiFAST32 ", m1: %" PRIiFAST32
+                       ", n2: %" PRIiFAST32 ", m2: %" PRIiFAST32
+                       ", N: %" PRIiFAST32 ", M: %" PRIiFAST32,
+                       n1, m1, n2, m2, N, M);
+
+    const uint_fast32_t i1 = n1 + m1;
+    const uint_fast32_t i2 = n2 + m2;
+    const uint_fast32_t i3 = N + M;
+
+    return C[i1 * (2 * n2 + 1) * (2 * N + 1) + i2 * (2 * N + 1) + i3];
+  }
+
+  /**
+   * @brief Get the positive Clebsch-Gordan ladder coefficient for the given
+   * quantum numbers.
+   *
+   * The positive ladder coefficient is defined as
+   * @f[
+   *   C_{+}(n, m) = \sqrt{(n-m) (n+m+1)}.
+   * @f]
+   *
+   * @param n First angular momentum quantum number, @f$n@f$.
+   * @param m First angular momentum projection quantum number, @f$m@f$.
+   * @return Positive ladder coefficient.
+   * @tparam DATA_TYPE Data type of input and output values.
+   */
+  template <typename DATA_TYPE>
+  static inline DATA_TYPE get_clebsch_gordan_Cplus(const int_fast32_t n,
+                                                   const int_fast32_t m) {
+
+    ctm_assert_message(m <= n, "m: %" PRIiFAST32 ", n: %" PRIiFAST32, m, n);
+    ctm_assert_message(m >= -n, "m: %" PRIiFAST32 ", n: %" PRIiFAST32, m, n);
+
+    return sqrt((n - m) * (n + m + 1));
+  }
+
+  /**
+   * @brief Get the negative Clebsch-Gordan ladder coefficient for the given
+   * quantum numbers.
+   *
+   * The negative ladder coefficient is defined as
+   * @f[
+   *   C_{-}(n, m) = \sqrt{(n+m) (n-m+1)}.
+   * @f]
+   *
+   * @param n First angular momentum quantum number, @f$n@f$.
+   * @param m First angular momentum projection quantum number, @f$m@f$.
+   * @return Negative ladder coefficient.
+   * @tparam DATA_TYPE Data type of input and output values.
+   */
+  template <typename DATA_TYPE>
+  static inline DATA_TYPE get_clebsch_gordan_Cmin(const int_fast32_t n,
+                                                  const int_fast32_t m) {
+
+    ctm_assert_message(m <= n, "m: %" PRIiFAST32 ", n: %" PRIiFAST32, m, n);
+    ctm_assert_message(m >= -n, "m: %" PRIiFAST32 ", n: %" PRIiFAST32, m, n);
+
+    return sqrt((n + m) * (n - m + 1));
+  }
+
+  /**
+   * @brief Get the Clebsch-Gordan coefficient @f$C^{NM}_{n_1m_1n_2m_2} =
+   * \langle{} n_1 m_1 n_2 m_2 | N M \rangle{}@f$.
+   *
+   * Based on the hints dropped in various Mishchenko publications, we use
+   * a recursive algorithm based on the recursion relations given on
+   * Wikipedia
+   * (https://en.wikipedia.org/wiki/Clebsch%E2%80%93Gordan_coefficients#Recursion_relations):
+   * @f[
+   *    C_{+}(n_1, m_1-1) C^{NN}_{n_1(m_1-1)n_2(N-m_1+1)} +
+   *      C_{+}(n2, N-m_1) C^{NN}_{n_1m_1n_2(N-m_1)} = 0
+   * @f]
+   * and
+   * @f[
+   *    C_{-}(N, M) C^{N(M-1)}_{n_1m_1n_2(M-1-m_1)} =
+   *      C_{-}(n_1,m_1+1) C^{NM}_{n_1(m_1+1)n_2(M-m_1-1)} +
+   *        C_{-}(n_2, M-m_1) C^{NM}_{n_1m_1n_2(M-m_1)}.
+   * @f]
+   * To derive these relations, we have factored in the fact that only the
+   * Clebsch-Gordan coefficients with
+   * @f[
+   *    M = m_1 + m_2
+   * @f]
+   * are non-zero. The ladder functions @f$C_{-}@f$ and @f$C_{+}@f$ are
+   * implemented in get_clebsch_gordan_Cmin() and get_clebsch_gordan_Cplus().
+   *
+   * The recursion relations themselves are not sufficient to fix the
+   * coefficients, since even the first relation still contains two unknowns.
+   * To completely fix them, we also need to impose the normalisation condition
+   * @f[
+   *    \sum_{m_1=-n_1}^{n_1} \sum_{m_2=-n_2}^{n_2}
+   *      \left(C^{NM}_{n_1m_1n_2m_2}\right)^2 = 1,
+   * @f]
+   * and we need to choose a sign convention, since the Clebsch-Gordan
+   * coefficients for a given set of quantum numbers are only defined up to a
+   * sign. We use the so-called Condon-Shortley convention, i.e.
+   * @f[
+   *    C^{NN}_{n_1n_1n_2(N-n_1)} > 0.
+   * @f]
+   *
+   * Practically, we compute the coefficients as follows. We first impose the
+   * Condon-Shortley convention by setting the value for
+   * @f$C^{NN}_{n_1n_1n_2(N-n_1)}@f$ to 1, and then use the first recursion
+   * relation to compute all other non-trivial Clebsch-Gordan coefficients
+   * @f$C^{NN}_{n_1m_1n_2(N-m_1)}@f$. These coefficients will likely not
+   * satisfy the normalisation condition, so once we have computed these
+   * temporary coefficients, we can normalise them using this relation.
+   *
+   * We then use the second recursion relation to recurse down for all other
+   * values @f$M \in{} [-N, N-1]@f$, again only computing the non-trivial
+   * elements @f$C^{NM}_{n_1m_1n_2(M-m_1)}@f$.
+   *
+   * Once we have all the coefficients for the given set of main quantum
+   * numbers @f$n_1, n_2, N@f$, we then return the specific values requested.
+   *
+   * Note that the current version of this function ignores some obvious
+   * optimisations that exploit the properties of the Clebsch-Gordan
+   * coefficients (see also the note for get_clebsch_gordan_element()).
+   *
+   * @param n1 First angular momentum quantum number, @f$n_1@f$.
+   * @param m1 First angular momentum projection quantum number, @f$m_1@f$.
+   * @param n2 Second angular momentum quantum number, @f$n_2@f$.
+   * @param m2 Second angular momentum projection quantum number, @f$m_2@f$.
+   * @param N Total angular momentum quantum number, @f$N@f$.
+   * @param M Total angular momentum projection quantum number, @f$M@f$.
+   * @return Corresponding Clebsch-Gordan coefficient.
+   * @tparam DATA_TYPE Data type of input and output values.
+   */
+  template <typename DATA_TYPE>
+  static inline DATA_TYPE
+  get_clebsch_gordan_coefficient(const int_fast32_t n1, const int_fast32_t m1,
+                                 const int_fast32_t n2, const int_fast32_t m2,
+                                 const int_fast32_t N, const int_fast32_t M) {
+
+    // we compute all coefficients with m1 in [-n1,n1], m2 in [-n2,n2]
+    // and M in [-N, N]
+    std::vector<DATA_TYPE> C((2 * n1 + 1) * (2 * n2 + 1) * (2 * N + 1), 0.);
+
+    // first use the upper row recursion relation to get the coefficients
+    // for M = N
+    // this is also where we fix the sign
+    ctm_assert(N - n1 <= n2);
+    ctm_assert(N - n1 >= -n2);
+    get_clebsch_gordan_element(n1, n1, n2, N - n1, N, N, C) = 1.;
+    // keep track of the norm of the unnormalised coefficients
+    DATA_TYPE norm = 1.;
+    // we need to recurse down in m1
+    for (int_fast32_t m1temp = n1 - 1; m1temp >= n2; --m1temp) {
+      // we use a temporary variable, since we also need the coefficient for
+      // the running norm calculation
+      const DATA_TYPE Cplus1 =
+          get_clebsch_gordan_Cplus<DATA_TYPE>(n2, N - m1temp - 1);
+      const DATA_TYPE Cplus2 = get_clebsch_gordan_Cplus<DATA_TYPE>(n1, m1temp);
+      ctm_assert(N - m1temp - 1 <= n2);
+      ctm_assert(N - m1temp - 1 >= -n2);
+      const DATA_TYPE Cn1m1p1 = get_clebsch_gordan_element(
+          n1, m1temp + 1, n2, N - m1temp - 1, N, N, C);
+      const DATA_TYPE Cnext = -Cplus1 * Cn1m1p1 / Cplus2;
+      ctm_assert_message(Cnext == Cnext, "Cplus1: %g, Cplus2: %g, Cn1m1p1: %g",
+                         double(Cplus1), double(Cplus2), double(Cn1m1p1));
+      // set the coefficient
+      ctm_assert_message(N - m1temp <= n2,
+                         "m1temp: %" PRIiFAST32 ", n2: %" PRIiFAST32
+                         ", N: %" PRIiFAST32,
+                         m1temp, n2, N);
+      ctm_assert_message(N - m1temp >= -n2,
+                         "m1temp: %" PRIiFAST32 ", n2: %" PRIiFAST32
+                         ", N: %" PRIiFAST32,
+                         m1temp, n2, N);
+      get_clebsch_gordan_element(n1, m1temp, n2, N - m1temp, N, N, C) = Cnext;
+      // add its norm contribution
+      norm += Cnext * Cnext;
+    }
+    // compute the inverse norm
+    const DATA_TYPE inverse_norm = 1. / sqrt(norm);
+    // normalise the coefficients we just computed (there is an obvious
+    // optimisation here)
+    for (int_fast32_t m1temp = -n1; m1temp <= n1; ++m1temp) {
+      for (int_fast32_t m2temp = -n2; m2temp <= n2; ++m2temp) {
+        get_clebsch_gordan_element(n1, m1temp, n2, m2temp, N, N, C) *=
+            inverse_norm;
+
+        ctm_assert(
+            get_clebsch_gordan_element(n1, m1temp, n2, m2temp, N, N, C) ==
+            get_clebsch_gordan_element(n1, m1temp, n2, m2temp, N, N, C));
+      }
+    }
+
+    // now recurse down in M for the other coefficients
+    for (int_fast32_t Mtemp = N - 1; Mtemp >= -N; --Mtemp) {
+      // precompute the inverse ladder coefficient, since it does not change
+      const DATA_TYPE Cmin_inverse =
+          1. / get_clebsch_gordan_Cmin<DATA_TYPE>(N, Mtemp + 1);
+      // compute all non-trivial m_1 m_2 coefficients (order does not matter
+      // here)
+      for (int_fast32_t m1temp = -n1; m1temp <= n1; ++m1temp) {
+        const DATA_TYPE Cmin1 =
+            get_clebsch_gordan_Cmin<DATA_TYPE>(n1, m1temp + 1);
+        const DATA_TYPE Cmin2 =
+            get_clebsch_gordan_Cmin<DATA_TYPE>(n2, Mtemp + 1 - m1temp);
+        const DATA_TYPE Cn1m1p1 = get_clebsch_gordan_element(
+            n1, m1temp + 1, n2, Mtemp - m1temp, N, Mtemp + 1, C);
+        const DATA_TYPE Cn1m1 = get_clebsch_gordan_element(
+            n1, m1temp, n2, Mtemp + 1 - m1temp, N, Mtemp + 1, C);
+        const DATA_TYPE Cnext =
+            Cmin_inverse * (Cmin1 * Cn1m1p1 + Cmin2 * Cn1m1);
+        get_clebsch_gordan_element(n1, m1temp, n2, Mtemp - m1temp, N, Mtemp,
+                                   C) = Cnext;
+
+        ctm_assert_message(
+            Cnext == Cnext, "Cmin1: %g, Cmin2: %g, Cn1m1p1: %g, Cn1m1: %g",
+            double(Cmin1), double(Cmin2), double(Cn1m1p1), double(Cn1m1));
+        //        ctm_warning("C(%" PRIiFAST32 ", %" PRIiFAST32 ", %" PRIiFAST32
+        //                    ", %" PRIiFAST32 ", %" PRIiFAST32 ", %" PRIiFAST32
+        //                    ") = %g", n1, m1temp, n2, Mtemp - m1temp, N,
+        //                    Mtemp, double(get_clebsch_gordan_element(
+        //                        n1, m1temp, n2, Mtemp - m1temp, N, Mtemp,
+        //                        C)));
+      }
+    }
+
+    // now return the element that was requested
+    return get_clebsch_gordan_element(n1, m1, n2, m2, N, M, C);
+  }
 };
 
 #endif // SPECIALFUNCTIONS_HPP
