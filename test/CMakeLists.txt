@@ -103,12 +103,14 @@ add_unit_test(NAME testDraineDustProperties
               SOURCES ${TESTDRAINEDUSTPROPERTIES_SOURCES})
 
 ## Unit test for Quicksched library dependency
+if(HAVE_TASKS)
 set(TESTQUICKSCHED_SOURCES
     testQuickSched.cpp
 )
 add_unit_test(NAME testQuickSched
               SOURCES ${TESTQUICKSCHED_SOURCES}
               LIBS ${LIBQUICKSCHED})
+endif(HAVE_TASKS)
 
 ### Done adding unit tests. Create the 'make check' target #####################
 ### Do not touch these lines unless you know what you're doing! ################
