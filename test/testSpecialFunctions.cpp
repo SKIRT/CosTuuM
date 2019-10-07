@@ -25,6 +25,22 @@ const uint_fast32_t TESTSPECIALFUNCTIONS_NMAX = 80;
 const uint_fast32_t TESTSPECIALFUNCTIONS_NGAUSS = 200;
 
 /**
+ * @brief Basic function to test the Gauss-Legendre quadrature routine.
+ *
+ * @param x X value.
+ * @param args Additional arguments (ignored).
+ * @return Test function value.
+ */
+static float_type function(const float_type x, void *args) {
+
+  const float_type cosx = cos(x);
+  const float_type px = 0.5 + 0.1 * (cosx * cosx - 1.);
+  float_type dnx[10], ddnx[10];
+  SpecialFunctions::wigner_dn_0m(cosx, 10, 0, dnx, ddnx);
+  return sin(x) * px * dnx[9];
+}
+
+/**
  * @brief Unit test for the special functions in SpecialFunctions.hpp.
  *
  * We call the functions SpecialFunctions::spherical_j_jdj_array() and
@@ -266,6 +282,13 @@ int main(int argc, char **argv) {
     assert_values_equal_rel(double(w[0]), 0.5, tolerance);
     assert_values_equal_rel(double(x[1]), 0.5 + 0.5 / std::sqrt(3.), tolerance);
     assert_values_equal_rel(double(w[1]), 0.5, tolerance);
+  }
+
+  {
+    // test integration of a simple function
+    const float_type old_quad = SpecialFunctions::gauss_legendre_quadrature(
+        function, 0., M_PI, nullptr, 10, 1000, 1.e-10, 1.e-5);
+    ctm_warning("Quad: %g", double(old_quad));
   }
 
   // now print additional values for a much higher order to analyse with the

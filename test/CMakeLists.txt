@@ -71,6 +71,17 @@ configure_file(${PROJECT_SOURCE_DIR}/test/test_tmatrixcalculator.txt
                ${PROJECT_BINARY_DIR}/bin/test/test_tmatrixcalculator.txt
                COPYONLY)
 
+## Unit test for OrientationDistribution
+set(TESTORIENTATIONDISTRIBUTION_SOURCES
+    testOrientationDistribution.cpp
+)
+add_unit_test(NAME testOrientationDistribution
+              SOURCES ${TESTORIENTATIONDISTRIBUTION_SOURCES})
+configure_file(
+  ${PROJECT_SOURCE_DIR}/test/plot_test_orientationdistribution.py
+  ${PROJECT_BINARY_DIR}/bin/test/plot_test_orientationdistribution.py
+  COPYONLY)
+
 ### Done adding unit tests. Create the 'make check' target #####################
 ### Do not touch these lines unless you know what you're doing! ################
 add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure

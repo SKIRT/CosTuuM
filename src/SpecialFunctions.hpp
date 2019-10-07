@@ -697,6 +697,8 @@ public:
       const uint_fast32_t order, const DATA_TYPE a, const DATA_TYPE b,
       std::vector<DATA_TYPE> &points, std::vector<DATA_TYPE> &weights) {
 
+    ctm_assert(a < b);
+
     get_gauss_legendre_points_and_weights(order, points, weights);
     const double wfac = 0.5 * (b - a);
     const double xterm = 0.5 * (a + b);
@@ -704,6 +706,62 @@ public:
       points[i] = wfac * points[i] + xterm;
       weights[i] *= wfac;
     }
+  }
+
+  /**
+   * @brief Perform the gauss Legendre-quadrature of the given function over
+   * the given integration interval.
+   *
+   * @param function Function to integrate.
+   * @param lower_limit Lower integration limit.
+   * @param upper_limit Upper integration limit.
+   * @param args Additional arguments for the function.
+   * @param starting_order Starting order of the Gauss-Legendre quadrature.
+   * @param maximum_order Maximum order until we bail out of the iterative
+   * scheme.
+   * @param desired_absolute_difference Desired absolute difference between two
+   * successive iterations of the quadrature algorithm with different orders.
+   * @param desired_relative_difference Desired relative difference between two
+   * successive iterations of the quadrature algorithm with different orders.
+   * @return Integral of the given function over the given interval.
+   * @tparam DATA_TYPE Data type of input and output values.
+   */
+  template <typename DATA_TYPE>
+  static inline DATA_TYPE gauss_legendre_quadrature(
+      DATA_TYPE (*function)(const DATA_TYPE, void *),
+      const DATA_TYPE lower_limit, const DATA_TYPE upper_limit, void *args,
+      const uint_fast32_t starting_order, const uint_fast32_t maximum_order,
+      const DATA_TYPE desired_absolute_difference,
+      const DATA_TYPE desired_relative_difference) {
+
+    uint_fast32_t order = starting_order;
+    DATA_TYPE old_quadrature(0.);
+    DATA_TYPE absolute_difference = desired_absolute_difference + 1.;
+    DATA_TYPE relative_difference = desired_relative_difference + 1.;
+    while (order < maximum_order &&
+           absolute_difference > desired_absolute_difference &&
+           relative_difference > desired_relative_difference) {
+      std::vector<DATA_TYPE> x(order), w(order);
+      get_gauss_legendre_points_and_weights_ab(order, lower_limit, upper_limit,
+                                               x, w);
+      DATA_TYPE new_quadrature(0.);
+      for (uint_fast32_t i = 0; i < order; ++i) {
+        new_quadrature += w[i] * function(x[i], args);
+      }
+      absolute_difference = fabs(new_quadrature - old_quadrature);
+      relative_difference =
+          absolute_difference / fabs(new_quadrature + old_quadrature);
+      ctm_warning("%g %g %g %g", new_quadrature, old_quadrature,
+                  absolute_difference, relative_difference);
+      old_quadrature = new_quadrature;
+      ++order;
+    }
+
+    if (order == maximum_order) {
+      ctm_warning("Tolerance for quadrature could not be reached!");
+    }
+
+    return old_quadrature;
   }
 
   /**
