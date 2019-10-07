@@ -960,6 +960,130 @@ public:
       return sign * C[-M * nsize + n1 - m1];
     }
   }
+
+  /**
+   * @brief Compute all the Clebsch-Gordan coefficients for the given quantum
+   * numbers @f$N, n_1, n_2@f$ and @f$M = 0@f$.
+   *
+   * @param n1 First angular momentum quantum number, @f$n_1@f$.
+   * @param n2 Second angular momentum quantum number, @f$n_2@f$.
+   * @param N Total angular momentum quantum number, @f$N@f$.
+   * @return Corresponding Clebsch-Gordan coefficients for @f$M = 0@f$.
+   * @tparam DATA_TYPE Data type of input and output values.
+   */
+  template <typename DATA_TYPE>
+  static inline std::vector<DATA_TYPE>
+  get_clebsch_gordan_coefficients(const int_fast32_t n1, const int_fast32_t n2,
+                                  const int_fast32_t N) {
+
+    // sanity checks on input values
+    ctm_assert(n1 >= 0);
+    ctm_assert(n2 >= 0);
+    ctm_assert(N >= 0);
+    ctm_assert(N <= n1 + n2);
+    ctm_assert(N >= std::abs(n1 - n2));
+
+    // we need to recursively determine all coefficients with M >= 0
+    // there are at most 2 * nmin + 1 non-zero coefficients for any M, with
+    // nmin = min(n1, n2). To avoid having to do complicated maths to determine
+    // the index of a coefficient in the array, we simply assume nmin = n1
+    // (potentially overestimating the number of coefficients) and store
+    // 2 * n1 + 1 coefficients per M, some of which will still be zero
+    const int_fast32_t nsize = 2 * n1 + 1;
+    std::vector<DATA_TYPE> C((N + 1) * nsize, 0.);
+
+    // first use the upper row recursion relation to get the coefficients
+    // for M = N
+    // this is also where we fix the sign
+    // note that the condition N - n1 >= -n2 is guaranteed to hold, since
+    // N >= |n1 - n2|
+    C[N * nsize + n1 + n1] = 1.;
+    // keep track of the norm of the unnormalised coefficients
+    DATA_TYPE norm = 1.;
+    // we need to recurse down in m1 (we use m1temp = m1 - 1)
+    // the condition N - m1 = N - m1temp - 1 <= n2 leads to the second
+    // stop condition m1temp >= N - n2 - 1
+    for (int_fast32_t m1temp = n1 - 1; m1temp >= std::max(-n1, N - n2 - 1);
+         --m1temp) {
+
+      // Cplus = sqrt((n - m) * (n + m + 1))
+      const DATA_TYPE Cplusn2m2 =
+          sqrt((n2 - N + m1temp + 1) * (n2 + N - m1temp));
+      const DATA_TYPE Cplusn1m1m1 = sqrt((n1 - m1temp) * (n1 + m1temp + 1));
+      const DATA_TYPE Cn1m1p1 = C[N * nsize + m1temp + 1 + n1];
+      const DATA_TYPE Cnext = -Cplusn2m2 * Cn1m1p1 / Cplusn1m1m1;
+
+      // make sure the coefficient is not NaN
+      ctm_assert(Cnext == Cnext);
+
+      C[N * nsize + m1temp + n1] = Cnext;
+
+      // add its norm contribution
+      norm += Cnext * Cnext;
+    }
+    // compute the inverse norm
+    const DATA_TYPE inverse_norm = 1. / sqrt(norm);
+    // normalise the coefficients we just computed
+    for (int_fast32_t m1temp = n1; m1temp >= std::max(-n1, N - n2 - 1);
+         --m1temp) {
+      C[N * nsize + m1temp + n1] *= inverse_norm;
+
+      // make sure they are still not NaN
+      ctm_assert(C[N * nsize + m1temp + n1] == C[N * nsize + m1temp + n1]);
+    }
+
+    // now recurse down in M for the other coefficients (we don't explicitly
+    // compute coefficients for M < 0, as we can link those to M > 0
+    // coefficients.
+    for (int_fast32_t Mtemp = N - 1; Mtemp >= 0; --Mtemp) {
+
+      // precompute the inverse ladder coefficient, since it does not change
+      const DATA_TYPE Cmin_inverse = 1. / sqrt((N + Mtemp + 1) * (N - Mtemp));
+
+      // the conditions for a valid element with M = Mtemp are
+      // m1temp >= -n1, m1temp <= n1
+      // m2temp = Mtemp - m1temp >= -n2 => m1temp <= Mtemp + n2
+      // m2temp = Mtemp - m1temp <= n2 => m1temp >= Mtemp - n2
+      for (int_fast32_t m1temp = std::max(-n1, Mtemp - n2);
+           m1temp <= std::min(n1, Mtemp + n2); ++m1temp) {
+
+        // note that the conditions above do not guarantee that the elements
+        // with M = Mtemp + 1 in both terms exist
+        // we hence need an additional check for these
+        const int_fast32_t m2temp = Mtemp - m1temp;
+        DATA_TYPE term1 = 0.;
+        if (m1temp + 1 <= n1) {
+          // Cmin = sqrt((n + m) * (n - m + 1))
+          const DATA_TYPE Cminn1m1p1 = sqrt((n1 + m1temp + 1) * (n1 - m1temp));
+          const DATA_TYPE Cn1m1p1 = C[(Mtemp + 1) * nsize + m1temp + 1 + n1];
+          term1 = Cminn1m1p1 * Cn1m1p1;
+        }
+        DATA_TYPE term2 = 0.;
+        if (m2temp + 1 <= n2) {
+          // Cmin = sqrt((n + m) * (n - m + 1))
+          const DATA_TYPE Cminn2m2p1 = sqrt((n2 + m2temp + 1) * (n2 - m2temp));
+          const DATA_TYPE Cn2m2p2 = C[(Mtemp + 1) * nsize + m1temp + n1];
+          term2 = Cminn2m2p1 * Cn2m2p2;
+        }
+
+        // now compute the element with M = Mtemp
+        const DATA_TYPE Cnext = Cmin_inverse * (term1 + term2);
+
+        // check it is not NaN
+        ctm_assert(Cnext == Cnext);
+
+        C[Mtemp * nsize + m1temp + n1] = Cnext;
+      }
+    }
+
+    const int_fast32_t nmin = std::min(n1, n2);
+    std::vector<DATA_TYPE> CM0(2 * nmin + 1, 0.);
+    for (int_fast32_t i = 0; i < 2 * nmin + 1; ++i) {
+      const int_fast32_t m1 = i - nmin;
+      CM0[i] = C[m1 + n1];
+    }
+    return CM0;
+  }
 };
 
 #endif // SPECIALFUNCTIONS_HPP
