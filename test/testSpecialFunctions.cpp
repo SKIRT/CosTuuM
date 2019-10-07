@@ -275,7 +275,7 @@ int main(int argc, char **argv) {
     const float_type C111122 =
         SpecialFunctions::get_clebsch_gordan_coefficient<float_type>(1, 1, 1, 1,
                                                                      2, 2);
-    assert_condition(double(C111122) == 1.);
+    assert_values_equal_rel(double(C111122), 1., 1.e-10);
 
     const float_type C111021 =
         SpecialFunctions::get_clebsch_gordan_coefficient<float_type>(1, 1, 1, 0,
@@ -385,5 +385,5 @@ int main(int argc, char **argv) {
     assert_condition(double(large_coefficient) == double(large_coefficient));
   }
 
-  return 1;
+  return 0;
 }

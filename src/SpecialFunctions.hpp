@@ -747,126 +747,6 @@ public:
   }
 
   /**
-   * @brief Get the element with the given indices in the given Clebsch-Gordan
-   * array.
-   *
-   * The order in which the coefficients are stored is arbitrary, we choose
-   * to store them in lexical order: the first quantum number acts as outer
-   * index, the second quantum number as middle index and the total quantum
-   * number as outer index. There are @f$(2n+1)@f$ projections @f$m@f$ for each
-   * quantum number @f$n=n_1,n_2,N@f$.
-   *
-   * There is only a very limited subset of quantum numbers for which the
-   * Clebsch-Gordan coefficients are non-zero, so we could dramatically decrease
-   * the memory footprint of the stored coefficients by exploiting this. But as
-   * it is currently Friday evening 19:00, this is currently not one of the
-   * developer's skills.
-   *
-   * @param n1 First angular momentum quantum number, @f$n_1@f$.
-   * @param m1 First angular momentum projection quantum number, @f$m_1@f$.
-   * @param n2 Second angular momentum quantum number, @f$n_2@f$.
-   * @param m2 Second angular momentum projection quantum number, @f$m_2@f$.
-   * @param N Total angular momentum quantum number, @f$N@f$.
-   * @param M Total angular momentum projection quantum number, @f$M@f$.
-   * @param C Array with Clebsch-Gordan coefficients for fixed angular momentum
-   * quantum numbers.
-   * @return Reference to the corresponding Clebsch-Gordan coefficient.
-   * @tparam DATA_TYPE Data type of input and output values.
-   */
-  template <typename DATA_TYPE>
-  static inline DATA_TYPE &
-  get_clebsch_gordan_element(const int_fast32_t n1, const int_fast32_t m1,
-                             const int_fast32_t n2, const int_fast32_t m2,
-                             const int_fast32_t N, const int_fast32_t M,
-                             std::vector<DATA_TYPE> &C) {
-
-    ctm_assert_message(m1 <= n1,
-                       "n1: %" PRIiFAST32 ", m1: %" PRIiFAST32
-                       ", n2: %" PRIiFAST32 ", m2: %" PRIiFAST32
-                       ", N: %" PRIiFAST32 ", M: %" PRIiFAST32,
-                       n1, m1, n2, m2, N, M);
-    ctm_assert_message(m1 >= -n1,
-                       "n1: %" PRIiFAST32 ", m1: %" PRIiFAST32
-                       ", n2: %" PRIiFAST32 ", m2: %" PRIiFAST32
-                       ", N: %" PRIiFAST32 ", M: %" PRIiFAST32,
-                       n1, m1, n2, m2, N, M);
-    ctm_assert_message(m2 <= n2,
-                       "n1: %" PRIiFAST32 ", m1: %" PRIiFAST32
-                       ", n2: %" PRIiFAST32 ", m2: %" PRIiFAST32
-                       ", N: %" PRIiFAST32 ", M: %" PRIiFAST32,
-                       n1, m1, n2, m2, N, M);
-    ctm_assert_message(m2 >= -n2,
-                       "n1: %" PRIiFAST32 ", m1: %" PRIiFAST32
-                       ", n2: %" PRIiFAST32 ", m2: %" PRIiFAST32
-                       ", N: %" PRIiFAST32 ", M: %" PRIiFAST32,
-                       n1, m1, n2, m2, N, M);
-    ctm_assert_message(M <= N,
-                       "n1: %" PRIiFAST32 ", m1: %" PRIiFAST32
-                       ", n2: %" PRIiFAST32 ", m2: %" PRIiFAST32
-                       ", N: %" PRIiFAST32 ", M: %" PRIiFAST32,
-                       n1, m1, n2, m2, N, M);
-    ctm_assert_message(M >= -N,
-                       "n1: %" PRIiFAST32 ", m1: %" PRIiFAST32
-                       ", n2: %" PRIiFAST32 ", m2: %" PRIiFAST32
-                       ", N: %" PRIiFAST32 ", M: %" PRIiFAST32,
-                       n1, m1, n2, m2, N, M);
-
-    const uint_fast32_t i1 = n1 + m1;
-    const uint_fast32_t i2 = n2 + m2;
-    const uint_fast32_t i3 = N + M;
-
-    return C[i1 * (2 * n2 + 1) * (2 * N + 1) + i2 * (2 * N + 1) + i3];
-  }
-
-  /**
-   * @brief Get the positive Clebsch-Gordan ladder coefficient for the given
-   * quantum numbers.
-   *
-   * The positive ladder coefficient is defined as
-   * @f[
-   *   C_{+}(n, m) = \sqrt{(n-m) (n+m+1)}.
-   * @f]
-   *
-   * @param n First angular momentum quantum number, @f$n@f$.
-   * @param m First angular momentum projection quantum number, @f$m@f$.
-   * @return Positive ladder coefficient.
-   * @tparam DATA_TYPE Data type of input and output values.
-   */
-  template <typename DATA_TYPE>
-  static inline DATA_TYPE get_clebsch_gordan_Cplus(const int_fast32_t n,
-                                                   const int_fast32_t m) {
-
-    ctm_assert_message(m <= n, "m: %" PRIiFAST32 ", n: %" PRIiFAST32, m, n);
-    ctm_assert_message(m >= -n, "m: %" PRIiFAST32 ", n: %" PRIiFAST32, m, n);
-
-    return sqrt((n - m) * (n + m + 1));
-  }
-
-  /**
-   * @brief Get the negative Clebsch-Gordan ladder coefficient for the given
-   * quantum numbers.
-   *
-   * The negative ladder coefficient is defined as
-   * @f[
-   *   C_{-}(n, m) = \sqrt{(n+m) (n-m+1)}.
-   * @f]
-   *
-   * @param n First angular momentum quantum number, @f$n@f$.
-   * @param m First angular momentum projection quantum number, @f$m@f$.
-   * @return Negative ladder coefficient.
-   * @tparam DATA_TYPE Data type of input and output values.
-   */
-  template <typename DATA_TYPE>
-  static inline DATA_TYPE get_clebsch_gordan_Cmin(const int_fast32_t n,
-                                                  const int_fast32_t m) {
-
-    ctm_assert_message(m <= n, "m: %" PRIiFAST32 ", n: %" PRIiFAST32, m, n);
-    ctm_assert_message(m >= -n, "m: %" PRIiFAST32 ", n: %" PRIiFAST32, m, n);
-
-    return sqrt((n + m) * (n - m + 1));
-  }
-
-  /**
    * @brief Get the Clebsch-Gordan coefficient @f$C^{NM}_{n_1m_1n_2m_2} =
    * \langle{} n_1 m_1 n_2 m_2 | N M \rangle{}@f$.
    *
@@ -876,7 +756,7 @@ public:
    * (https://en.wikipedia.org/wiki/Clebsch%E2%80%93Gordan_coefficients#Recursion_relations):
    * @f[
    *    C_{+}(n_1, m_1-1) C^{NN}_{n_1(m_1-1)n_2(N-m_1+1)} +
-   *      C_{+}(n2, N-m_1) C^{NN}_{n_1m_1n_2(N-m_1)} = 0
+   *      C_{+}(n_2, N-m_1) C^{NN}_{n_1m_1n_2(N-m_1)} = 0
    * @f]
    * and
    * @f[
@@ -889,8 +769,14 @@ public:
    * @f[
    *    M = m_1 + m_2
    * @f]
-   * are non-zero. The ladder functions @f$C_{-}@f$ and @f$C_{+}@f$ are
-   * implemented in get_clebsch_gordan_Cmin() and get_clebsch_gordan_Cplus().
+   * are non-zero. The ladder functions @f$C_{-}@f$ and @f$C_{+}@f$ given by
+   * @f[
+   *    C_{+}(n, m) = \sqrt{(n - m) (n + m + 1)}
+   * @f]
+   * and
+   * @f[
+   *    C_{-}(n, m) = \sqrt{(n + m) (n - m + 1)}.
+   * @f]
    *
    * The recursion relations themselves are not sufficient to fix the
    * coefficients, since even the first relation still contains two unknowns.
@@ -921,9 +807,12 @@ public:
    * Once we have all the coefficients for the given set of main quantum
    * numbers @f$n_1, n_2, N@f$, we then return the specific values requested.
    *
-   * Note that the current version of this function ignores some obvious
-   * optimisations that exploit the properties of the Clebsch-Gordan
-   * coefficients (see also the note for get_clebsch_gordan_element()).
+   * Note that the Clebsch-Gordan coefficients satisfy the relation
+   * @f[
+   *    C^{NM}_{n_1m_1n_2m_2} =
+   *      (-1)^{N - n_1 - n_2} C^{N(-M)}_{n_1(-m_1)n_2(-m_2)}.
+   * @f]
+   * We exploit this and only compute the coefficients for @f$M\geq{}0@f$.
    *
    * @param n1 First angular momentum quantum number, @f$n_1@f$.
    * @param m1 First angular momentum projection quantum number, @f$m_1@f$.
@@ -940,95 +829,136 @@ public:
                                  const int_fast32_t n2, const int_fast32_t m2,
                                  const int_fast32_t N, const int_fast32_t M) {
 
-    // we compute all coefficients with m1 in [-n1,n1], m2 in [-n2,n2]
-    // and M in [-N, N]
-    std::vector<DATA_TYPE> C((2 * n1 + 1) * (2 * n2 + 1) * (2 * N + 1), 0.);
+    // sanity checks on input values
+    ctm_assert(n1 >= 0);
+    ctm_assert(n2 >= 0);
+    ctm_assert(N >= 0);
+    ctm_assert(N <= n1 + n2);
+    ctm_assert(N >= std::abs(n1 - n2));
+    ctm_assert(m1 <= n1);
+    ctm_assert(m1 >= -n1);
+    ctm_assert(m2 <= n2);
+    ctm_assert(m2 >= -n2);
+    ctm_assert(M <= N);
+    ctm_assert(M >= -N);
+
+    // the Clebsch-Gordan coefficients are only non-zero if m1 + m2 == M
+    if (m1 + m2 != M) {
+      return 0.;
+    }
+
+    // we need to recursively determine all coefficients with M >= 0
+    // there are at most 2 * nmin + 1 non-zero coefficients for any M, with
+    // nmin = min(n1, n2). To avoid having to do complicated maths to determine
+    // the index of a coefficient in the array, we simply assume nmin = n1
+    // (potentially overestimating the number of coefficients) and store
+    // 2 * n1 + 1 coefficients per M, some of which will still be zero
+    const int_fast32_t nsize = 2 * n1 + 1;
+    std::vector<DATA_TYPE> C((N + 1) * nsize, 0.);
 
     // first use the upper row recursion relation to get the coefficients
     // for M = N
     // this is also where we fix the sign
-    ctm_assert(N - n1 <= n2);
-    ctm_assert(N - n1 >= -n2);
-    get_clebsch_gordan_element(n1, n1, n2, N - n1, N, N, C) = 1.;
+    // note that the condition N - n1 >= -n2 is guaranteed to hold, since
+    // N >= |n1 - n2|
+    C[N * nsize + n1 + n1] = 1.;
     // keep track of the norm of the unnormalised coefficients
     DATA_TYPE norm = 1.;
-    // we need to recurse down in m1
-    for (int_fast32_t m1temp = n1 - 1; m1temp >= n2; --m1temp) {
-      // we use a temporary variable, since we also need the coefficient for
-      // the running norm calculation
-      const DATA_TYPE Cplus1 =
-          get_clebsch_gordan_Cplus<DATA_TYPE>(n2, N - m1temp - 1);
-      const DATA_TYPE Cplus2 = get_clebsch_gordan_Cplus<DATA_TYPE>(n1, m1temp);
-      ctm_assert(N - m1temp - 1 <= n2);
-      ctm_assert(N - m1temp - 1 >= -n2);
-      const DATA_TYPE Cn1m1p1 = get_clebsch_gordan_element(
-          n1, m1temp + 1, n2, N - m1temp - 1, N, N, C);
-      const DATA_TYPE Cnext = -Cplus1 * Cn1m1p1 / Cplus2;
-      ctm_assert_message(Cnext == Cnext, "Cplus1: %g, Cplus2: %g, Cn1m1p1: %g",
-                         double(Cplus1), double(Cplus2), double(Cn1m1p1));
-      // set the coefficient
-      ctm_assert_message(N - m1temp <= n2,
-                         "m1temp: %" PRIiFAST32 ", n2: %" PRIiFAST32
-                         ", N: %" PRIiFAST32,
-                         m1temp, n2, N);
-      ctm_assert_message(N - m1temp >= -n2,
-                         "m1temp: %" PRIiFAST32 ", n2: %" PRIiFAST32
-                         ", N: %" PRIiFAST32,
-                         m1temp, n2, N);
-      get_clebsch_gordan_element(n1, m1temp, n2, N - m1temp, N, N, C) = Cnext;
+    // we need to recurse down in m1 (we use m1temp = m1 - 1)
+    // the condition N - m1 = N - m1temp - 1 <= n2 leads to the second
+    // stop condition m1temp >= N - n2 - 1
+    for (int_fast32_t m1temp = n1 - 1; m1temp >= std::max(-n1, N - n2 - 1);
+         --m1temp) {
+
+      // Cplus = sqrt((n - m) * (n + m + 1))
+      const DATA_TYPE Cplusn2m2 =
+          sqrt((n2 - N + m1temp + 1) * (n2 + N - m1temp));
+      const DATA_TYPE Cplusn1m1m1 = sqrt((n1 - m1temp) * (n1 + m1temp + 1));
+      const DATA_TYPE Cn1m1p1 = C[N * nsize + m1temp + 1 + n1];
+      const DATA_TYPE Cnext = -Cplusn2m2 * Cn1m1p1 / Cplusn1m1m1;
+
+      // make sure the coefficient is not NaN
+      ctm_assert(Cnext == Cnext);
+
+      C[N * nsize + m1temp + n1] = Cnext;
+
       // add its norm contribution
       norm += Cnext * Cnext;
     }
     // compute the inverse norm
     const DATA_TYPE inverse_norm = 1. / sqrt(norm);
-    // normalise the coefficients we just computed (there is an obvious
-    // optimisation here)
-    for (int_fast32_t m1temp = -n1; m1temp <= n1; ++m1temp) {
-      for (int_fast32_t m2temp = -n2; m2temp <= n2; ++m2temp) {
-        get_clebsch_gordan_element(n1, m1temp, n2, m2temp, N, N, C) *=
-            inverse_norm;
+    // normalise the coefficients we just computed
+    for (int_fast32_t m1temp = n1; m1temp >= std::max(-n1, N - n2 - 1);
+         --m1temp) {
+      C[N * nsize + m1temp + n1] *= inverse_norm;
 
-        ctm_assert(
-            get_clebsch_gordan_element(n1, m1temp, n2, m2temp, N, N, C) ==
-            get_clebsch_gordan_element(n1, m1temp, n2, m2temp, N, N, C));
-      }
+      // make sure they are still not NaN
+      ctm_assert(C[N * nsize + m1temp + n1] == C[N * nsize + m1temp + n1]);
     }
 
-    // now recurse down in M for the other coefficients
-    for (int_fast32_t Mtemp = N - 1; Mtemp >= -N; --Mtemp) {
-      // precompute the inverse ladder coefficient, since it does not change
-      const DATA_TYPE Cmin_inverse =
-          1. / get_clebsch_gordan_Cmin<DATA_TYPE>(N, Mtemp + 1);
-      // compute all non-trivial m_1 m_2 coefficients (order does not matter
-      // here)
-      for (int_fast32_t m1temp = -n1; m1temp <= n1; ++m1temp) {
-        const DATA_TYPE Cmin1 =
-            get_clebsch_gordan_Cmin<DATA_TYPE>(n1, m1temp + 1);
-        const DATA_TYPE Cmin2 =
-            get_clebsch_gordan_Cmin<DATA_TYPE>(n2, Mtemp + 1 - m1temp);
-        const DATA_TYPE Cn1m1p1 = get_clebsch_gordan_element(
-            n1, m1temp + 1, n2, Mtemp - m1temp, N, Mtemp + 1, C);
-        const DATA_TYPE Cn1m1 = get_clebsch_gordan_element(
-            n1, m1temp, n2, Mtemp + 1 - m1temp, N, Mtemp + 1, C);
-        const DATA_TYPE Cnext =
-            Cmin_inverse * (Cmin1 * Cn1m1p1 + Cmin2 * Cn1m1);
-        get_clebsch_gordan_element(n1, m1temp, n2, Mtemp - m1temp, N, Mtemp,
-                                   C) = Cnext;
+    // now recurse down in M for the other coefficients (we don't explicitly
+    // compute coefficients for M < 0, as we can link those to M > 0
+    // coefficients.
+    for (int_fast32_t Mtemp = N - 1; Mtemp >= 0; --Mtemp) {
 
-        ctm_assert_message(
-            Cnext == Cnext, "Cmin1: %g, Cmin2: %g, Cn1m1p1: %g, Cn1m1: %g",
-            double(Cmin1), double(Cmin2), double(Cn1m1p1), double(Cn1m1));
-        //        ctm_warning("C(%" PRIiFAST32 ", %" PRIiFAST32 ", %" PRIiFAST32
-        //                    ", %" PRIiFAST32 ", %" PRIiFAST32 ", %" PRIiFAST32
-        //                    ") = %g", n1, m1temp, n2, Mtemp - m1temp, N,
-        //                    Mtemp, double(get_clebsch_gordan_element(
-        //                        n1, m1temp, n2, Mtemp - m1temp, N, Mtemp,
-        //                        C)));
+      // precompute the inverse ladder coefficient, since it does not change
+      const DATA_TYPE Cmin_inverse = 1. / sqrt((N + Mtemp + 1) * (N - Mtemp));
+
+      // the conditions for a valid element with M = Mtemp are
+      // m1temp >= -n1, m1temp <= n1
+      // m2temp = Mtemp - m1temp >= -n2 => m1temp <= Mtemp + n2
+      // m2temp = Mtemp - m1temp <= n2 => m1temp >= Mtemp - n2
+      for (int_fast32_t m1temp = std::max(-n1, Mtemp - n2);
+           m1temp <= std::min(n1, Mtemp + n2); ++m1temp) {
+
+        // note that the conditions above do not guarantee that the elements
+        // with M = Mtemp + 1 in both terms exist
+        // we hence need an additional check for these
+        const int_fast32_t m2temp = Mtemp - m1temp;
+        DATA_TYPE term1 = 0.;
+        if (m1temp + 1 <= n1) {
+          // Cmin = sqrt((n + m) * (n - m + 1))
+          const DATA_TYPE Cminn1m1p1 = sqrt((n1 + m1temp + 1) * (n1 - m1temp));
+          const DATA_TYPE Cn1m1p1 = C[(Mtemp + 1) * nsize + m1temp + 1 + n1];
+          term1 = Cminn1m1p1 * Cn1m1p1;
+        }
+        DATA_TYPE term2 = 0.;
+        if (m2temp + 1 <= n2) {
+          // Cmin = sqrt((n + m) * (n - m + 1))
+          const DATA_TYPE Cminn2m2p1 = sqrt((n2 + m2temp + 1) * (n2 - m2temp));
+          const DATA_TYPE Cn2m2p2 = C[(Mtemp + 1) * nsize + m1temp + n1];
+          term2 = Cminn2m2p1 * Cn2m2p2;
+        }
+
+        // now compute the element with M = Mtemp
+        const DATA_TYPE Cnext = Cmin_inverse * (term1 + term2);
+
+        // check it is not NaN
+        ctm_assert(Cnext == Cnext);
+
+        C[Mtemp * nsize + m1temp + n1] = Cnext;
       }
     }
 
     // now return the element that was requested
-    return get_clebsch_gordan_element(n1, m1, n2, m2, N, M, C);
+    // if the requested M is positive, we simply return the right element
+    // if it was negative, then we need to use the additional relation to
+    // link it to a positive M element
+    if (M >= 0) {
+      return C[M * nsize + m1 + n1];
+    } else {
+      // compute N - n1 - n2
+      const int_fast32_t Nmn1mn2 = N - n1 - n2;
+      // (-1)^{N - n1 - n2} is +1 if (N - n1 - n2) is even and -1 if it is odd
+      int_fast8_t sign;
+      if (Nmn1mn2 % 2 == 0) {
+        sign = +1;
+      } else {
+        sign = -1;
+      }
+      // now return the right element with the right sign
+      return sign * C[-M * nsize + n1 - m1];
+    }
   }
 };
 
