@@ -257,6 +257,16 @@ int main(int argc, char **argv) {
     assert_values_equal_rel(double(w[4]), (322. - 13. * std::sqrt(70.)) / 900.,
                             tolerance);
   }
+  {
+    // interval [0, 1], n = 2
+    SpecialFunctions::get_gauss_legendre_points_and_weights_ab(2, 0., 1., x, w);
+    ctm_warning("x: [%g, %g], w: [%g, %g]", double(x[0]), double(x[1]),
+                double(w[0]), double(w[1]));
+    assert_values_equal_rel(double(x[0]), 0.5 - 0.5 / std::sqrt(3.), tolerance);
+    assert_values_equal_rel(double(w[0]), 0.5, tolerance);
+    assert_values_equal_rel(double(x[1]), 0.5 + 0.5 / std::sqrt(3.), tolerance);
+    assert_values_equal_rel(double(w[1]), 0.5, tolerance);
+  }
 
   // now print additional values for a much higher order to analyse with the
   // script

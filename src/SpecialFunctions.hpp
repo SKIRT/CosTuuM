@@ -673,6 +673,40 @@ public:
   }
 
   /**
+   * @brief Get the Gauss-Legendre quadrature coordinates and weights for a
+   * general quadrature with given lower and upper limits @f$a,b@f$.
+   *
+   * We rescale the coordinates @f$x_i@f$ and weights @f$w_i@f$ for the standard
+   * Gauss-Legendre quadrature over the interval @f$[-1,1]@f$ using the relation
+   * @f[
+   *    \int_a^b f(x) dx \approx{} \frac{b-a}{2}
+   *      \sum_{i=1}^n w_i f\left(\frac{b-a}{2} x_i + \frac{a+b}{2}\right).
+   * @f]
+   *
+   * @param order Order of the quadrature, @f$n@f$.
+   * @param a Lower limit for the integral, @f$a@f$.
+   * @param b Upper limit for the integral, @f$b@f$.
+   * @param points Vector to store the resulting coordinates in. This vector
+   * should be preallocated with the correct size, i.e. the order @f$n@f$.
+   * @param weights Vector to store the resulting weights in. This vector
+   * should be preallocated with the correct size, i.e. the order @f$n@f$.
+   * @tparam DATA_TYPE Data type of input and output values.
+   */
+  template <typename DATA_TYPE>
+  static inline void get_gauss_legendre_points_and_weights_ab(
+      const uint_fast32_t order, const DATA_TYPE a, const DATA_TYPE b,
+      std::vector<DATA_TYPE> &points, std::vector<DATA_TYPE> &weights) {
+
+    get_gauss_legendre_points_and_weights(order, points, weights);
+    const double wfac = 0.5 * (b - a);
+    const double xterm = 0.5 * (a + b);
+    for (uint_fast32_t i = 0; i < order; ++i) {
+      points[i] = wfac * points[i] + xterm;
+      weights[i] *= wfac;
+    }
+  }
+
+  /**
    * @brief Get the radius (squared) and derivative w.r.t. azimuthal angle
    * divided by the radius for an spheroid with the given equal volume sphere
    * radius and axis ratio, for the given input azimuthal angles.
@@ -964,6 +998,15 @@ public:
   /**
    * @brief Compute all the Clebsch-Gordan coefficients for the given quantum
    * numbers @f$N, n_1, n_2@f$ and @f$M = 0@f$.
+   *
+   * Coefficients are calculated as in get_clebsch_gordan_coefficient().
+   *
+   * The output is provided as a @f$2 n_{min} + 1@f$ element array, with
+   * @f$n_{min} = \min(n_1, n_2)@f$. The first element of this array contains
+   * the coefficient for the lowest value of @f$m_1@f$ for which @f$m_2 =
+   * -m_1@f$ is a valid index (@f$-n_2\leq{}m_2\leq{}n_2@f$). Successive
+   * elements then correspond to successive @f$m_1@f$ values, until the
+   * highest value for which @f$m_2=-m_1@f$ is still a valid index.
    *
    * @param n1 First angular momentum quantum number, @f$n_1@f$.
    * @param n2 Second angular momentum quantum number, @f$n_2@f$.
