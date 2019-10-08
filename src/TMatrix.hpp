@@ -1792,14 +1792,14 @@ public:
         alpha_radians, beta_radians, theta_in_radians, phi_in_radians,
         theta_out_radians, phi_out_radians);
 
-    ctm_warning("S11: %g + i%g", double(S(0, 0).real()),
-                double(S(0, 0).imag()));
-    ctm_warning("S12: %g + i%g", double(S(0, 1).real()),
-                double(S(0, 1).imag()));
-    ctm_warning("S21: %g + i%g", double(S(1, 0).real()),
-                double(S(1, 0).imag()));
-    ctm_warning("S22: %g + i%g", double(S(1, 1).real()),
-                double(S(1, 1).imag()));
+    //    ctm_warning("S11: %g + i%g", double(S(0, 0).real()),
+    //                double(S(0, 0).imag()));
+    //    ctm_warning("S12: %g + i%g", double(S(0, 1).real()),
+    //                double(S(0, 1).imag()));
+    //    ctm_warning("S21: %g + i%g", double(S(1, 0).real()),
+    //                double(S(1, 0).imag()));
+    //    ctm_warning("S22: %g + i%g", double(S(1, 1).real()),
+    //                double(S(1, 1).imag()));
 
     const std::complex<float_type> icompl(0., 1.);
 

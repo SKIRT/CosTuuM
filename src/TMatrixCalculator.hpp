@@ -226,14 +226,20 @@ public:
             const float_type pN = orientation_distribution.get_coefficient(N);
             uint_fast8_t mm1sign = -msign;
             for (uint_fast32_t m1 = 0; m1 < M; ++m1) {
+              float_type factor(2.);
+              if (m1 == 0) {
+                factor = 1.;
+              }
               // mm1sign now contains (-1)^{m+m1}
               mm1sign = -mm1sign;
               const float_type CGfac =
-                  mm1sign * pN * CGcoeff[M + m] * CGcoeff[M + m1];
-              for (uint_fast8_t i = 0; i < 2; ++i) {
-                for (uint_fast8_t j = 0; j < 2; ++j) {
-                  Tn1n2[i][j] += CGfac * T_single(i, n1, m1, j, n2, m1);
-                }
+                  mm1sign * factor * pN * CGcoeff[M + m] * CGcoeff[M + m1];
+              if ((N + n12max) % 2 == 0) {
+                Tn1n2[0][0] += CGfac * T_single(0, n1, m1, 0, n2, m1);
+                Tn1n2[1][1] += CGfac * T_single(1, n1, m1, 1, n2, m1);
+              } else {
+                Tn1n2[0][1] += CGfac * T_single(0, n1, m1, 1, n2, m1);
+                Tn1n2[1][0] += CGfac * T_single(1, n1, m1, 0, n2, m1);
               }
             }
           }

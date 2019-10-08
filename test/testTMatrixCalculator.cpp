@@ -38,6 +38,10 @@ int main(int argc, char **argv) {
   while (getline(ifile, line)) {
     ++counter;
 
+    if (counter == 1) {
+      break;
+    }
+
     ctm_warning("Line %" PRIuFAST32, counter);
 
     std::istringstream linestream(line);
@@ -100,20 +104,48 @@ int main(int argc, char **argv) {
         TMatrixCalculator::apply_orientation_distribution(
             *Tmatrix_single, orientation_distribution);
 
+    // check backscattering matrix property
+    {
+      Matrix<float_type> Zsingle = Tmatrix_single->get_scattering_matrix(
+          0., 0., 0.5 * M_PI, 0., 0.5 * M_PI, M_PI);
+      const float_type Zsingle_sum =
+          Zsingle(0, 0) - Zsingle(1, 1) + Zsingle(2, 2) - Zsingle(3, 3);
+      assert_values_equal_tol(Zsingle_sum, 0., 1.e-10);
+    }
+    {
+      Matrix<float_type> Zensemble = Tmatrix_ensemble->get_scattering_matrix(
+          0., 0., 0.5 * M_PI, 0., 0.5 * M_PI, M_PI);
+      const float_type Zsingle_sum =
+          Zensemble(0, 0) - Zensemble(1, 1) + Zensemble(2, 2) - Zensemble(3, 3);
+      assert_values_equal_tol(Zsingle_sum, 0., 1.e-10);
+    }
+
+    std::vector<float_type> xphi(100), wphi(100);
+    SpecialFunctions::get_gauss_legendre_points_and_weights_ab(
+        100, 0., 2. * M_PI, xphi, wphi);
+    std::vector<float_type> xtheta(100), wtheta(100);
+    SpecialFunctions::get_gauss_legendre_points_and_weights_ab(100, 0., M_PI,
+                                                               xtheta, wtheta);
+    float_type Zsinglequad = 0.;
+    float_type Zensemblequad = 0.;
     std::ofstream ofile("test_tmatrixcalculator_result.txt");
     ofile << "# theta\tphi\tZ00\n";
     for (uint_fast32_t i = 0; i < 100; ++i) {
-      const float_type theta_out = 0.01 * (i + 0.5) * M_PI;
+      const float_type theta_out = xtheta[i];
+      const float_type sintheta = sin(theta_out);
       for (uint_fast32_t j = 0; j < 100; ++j) {
-        const float_type phi_out = 0.02 * (j + 0.5) * M_PI;
+        const float_type phi_out = xphi[j];
         Matrix<float_type> Zsingle = Tmatrix_single->get_scattering_matrix(
             0., 0., 0.5 * M_PI, 0., theta_out, phi_out);
         Matrix<float_type> Zensemble = Tmatrix_ensemble->get_scattering_matrix(
             0., 0., 0.5 * M_PI, 0., theta_out, phi_out);
         ofile << theta_out << "\t" << phi_out << "\t" << Zsingle(0, 0) << "\t"
               << Zensemble(0, 0) << "\n";
+        Zsinglequad += wphi[j] * wtheta[i] * sintheta * Zsingle(0, 0);
+        Zensemblequad += wphi[j] * wtheta[i] * sintheta * Zensemble(0, 0);
       }
     }
+    ctm_warning("Quad: %g %g", double(Zsinglequad), double(Zensemblequad));
   }
 
   return 0;
