@@ -64,9 +64,6 @@ public:
   }
 
 private:
-  /*! @brief Highest order for which we store a coefficient. */
-  const uint_fast32_t _maximum_order;
-
   /*! @brief Coefficients. */
   std::vector<float_type> _coefficients;
 
@@ -149,7 +146,7 @@ public:
    * @param nmax Highest order for which we store a coefficient.
    */
   inline OrientationDistribution(const uint_fast32_t nmax)
-      : _maximum_order(nmax + 1), _coefficients(_maximum_order, 0.) {
+      : _coefficients(nmax + 1, 0.) {
 
     for (uint_fast32_t i = 0; i < _coefficients.size(); ++i) {
       IntegrandArguments arguments(i, *this);
@@ -168,6 +165,15 @@ public:
    */
   inline float_type get_coefficient(const uint_fast32_t n) const {
     return _coefficients[n];
+  }
+
+  /**
+   * @brief Get the highest order of coefficients stored in this object.
+   *
+   * @return Maximum order that is stored in this object.
+   */
+  inline uint_fast32_t get_maximum_order() const {
+    return _coefficients.size() - 1;
   }
 };
 

@@ -200,7 +200,13 @@ public:
     TMatrix *T_ensemble_ptr = new TMatrix(T_single);
 
     const uint_fast32_t nmax = T_single.get_nmax();
+
+    ctm_assert(orientation_distribution.get_maximum_order() >= 2 * nmax);
+
+    uint_fast8_t msign = -1;
     for (uint_fast32_t m = 0; m < nmax + 1; ++m) {
+      // msign now contains (-1)^m
+      msign = -msign;
       const uint_fast32_t nmin = std::max(m, static_cast<uint_fast32_t>(1));
       for (uint_fast32_t n1 = nmin; n1 < nmax + 1; ++n1) {
         for (uint_fast32_t n2 = nmin; n2 < nmax + 1; ++n2) {
@@ -218,9 +224,12 @@ public:
                 SpecialFunctions::get_clebsch_gordan_coefficients<float_type>(
                     n1, n2, N);
             const float_type pN = orientation_distribution.get_coefficient(N);
+            uint_fast8_t mm1sign = -msign;
             for (uint_fast32_t m1 = 0; m1 < M; ++m1) {
-              // figure out the sign (-1)^{m+m1}
-              const float_type CGfac = pN * CGcoeff[n1 + m] * CGcoeff[n1 + m1];
+              // mm1sign now contains (-1)^{m+m1}
+              mm1sign = -mm1sign;
+              const float_type CGfac =
+                  mm1sign * pN * CGcoeff[M + m] * CGcoeff[M + m1];
               for (uint_fast8_t i = 0; i < 2; ++i) {
                 for (uint_fast8_t j = 0; j < 2; ++j) {
                   Tn1n2[i][j] += CGfac * T_single(i, n1, m1, j, n2, m1);

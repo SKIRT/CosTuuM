@@ -7,6 +7,7 @@
  */
 
 #include "Assert.hpp"
+#include "OrientationDistribution.hpp"
 #include "TMatrixCalculator.hpp"
 #include "UnitConverter.hpp"
 
@@ -76,6 +77,13 @@ int main(int argc, char **argv) {
       for (uint_fast8_t j = 0; j < 4; ++j) {
         assert_values_equal_rel(double(Z(i, j)), double(refZ[i][j]), 2.e-2);
       }
+    }
+
+    if (counter == 1) {
+      OrientationDistribution orientation_distribution(2 * Tmat->get_nmax());
+      TMatrix *T_ensemble = TMatrixCalculator::apply_orientation_distribution(
+          *Tmat, orientation_distribution);
+      delete T_ensemble;
     }
 
     delete Tmat;
