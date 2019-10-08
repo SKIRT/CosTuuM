@@ -70,6 +70,9 @@ add_unit_test(NAME testTMatrixCalculator
 configure_file(${PROJECT_SOURCE_DIR}/test/test_tmatrixcalculator.txt
                ${PROJECT_BINARY_DIR}/bin/test/test_tmatrixcalculator.txt
                COPYONLY)
+configure_file(${PROJECT_SOURCE_DIR}/test/plot_tmatrixcalculator_result.py
+               ${PROJECT_BINARY_DIR}/bin/test/plot_tmatrixcalculator_result.py
+               COPYONLY)
 
 ## Unit test for OrientationDistribution
 set(TESTORIENTATIONDISTRIBUTION_SOURCES

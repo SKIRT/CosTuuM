@@ -18,6 +18,10 @@
  * expansion of an orientation distribution.
  */
 class OrientationDistribution {
+private:
+  /*! @brief Normalisation factor for the distribution function. */
+  float_type _normalisation_factor;
+
 public:
   /**
    * @brief Virtual function that contains an actual expression for the
@@ -43,7 +47,7 @@ public:
   virtual float_type operator()(const float_type beta, const float_type cosbeta,
                                 const float_type sinbeta) const {
 
-    return 0.5 + 0.1 * (cosbeta * cosbeta - 1.);
+    return 0.5 + 0.2 * (cosbeta * cosbeta - 1.);
   }
 
   /**
@@ -60,7 +64,7 @@ public:
 
     const float_type cosbeta = cos(beta);
     const float_type sinbeta = sin(beta);
-    return (*this)(beta, cosbeta, sinbeta);
+    return _normalisation_factor * (*this)(beta, cosbeta, sinbeta);
   }
 
 private:
@@ -113,7 +117,7 @@ private:
    *
    * @param beta Angle, @f$\beta{}@f$.
    * @param args Additional arguments: the order of the Wigner D function in the
-   * integrand.
+   * integrand and a reference to the orientation distribution itself.
    * @return Value of the integrand.
    */
   static float_type integrand(const float_type beta, void *args) {
@@ -135,8 +139,29 @@ private:
     } else {
       wigner_d_n = 1.;
     }
-    const float_type px = orientation_distribution(beta, cosbeta, sinbeta);
-    return sinbeta * px * wigner_d_n;
+    const float_type pbeta = orientation_distribution._normalisation_factor *
+                             orientation_distribution(beta, cosbeta, sinbeta);
+    return sinbeta * pbeta * wigner_d_n;
+  }
+
+  /**
+   * @brief Integrand used in the normalisation integral for @f$p(\beta{})@f$.
+   *
+   * @param beta Angle @f$\beta{}@f$.
+   * @param args Additional arguments: reference to the orientation
+   * distribution itself.
+   * @return Value of the integrand, @f$\sin(\beta{})p(\beta{})@f$.
+   */
+  static float_type normalisation_integrand(const float_type beta, void *args) {
+    const IntegrandArguments &arguments =
+        *reinterpret_cast<IntegrandArguments *>(args);
+    const OrientationDistribution &orientation_distribution =
+        arguments.get_orientation_distribution();
+
+    const float_type cosbeta = cos(beta);
+    const float_type sinbeta = sin(beta);
+    const float_type pbeta = orientation_distribution(beta, cosbeta, sinbeta);
+    return sinbeta * pbeta;
   }
 
 public:
@@ -147,6 +172,16 @@ public:
    */
   inline OrientationDistribution(const uint_fast32_t nmax)
       : _coefficients(nmax + 1, 0.) {
+
+    // compute the normalisation factor
+    {
+      IntegrandArguments arguments(0, *this);
+      const float_type norm =
+          SpecialFunctions::gauss_legendre_quadrature<float_type>(
+              normalisation_integrand, 0., M_PI, &arguments, 100, 1000, 1.e-10,
+              1.e-5);
+      _normalisation_factor = 1. / norm;
+    }
 
     for (uint_fast32_t i = 0; i < _coefficients.size(); ++i) {
       IntegrandArguments arguments(i, *this);

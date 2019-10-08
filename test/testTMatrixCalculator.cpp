@@ -89,5 +89,32 @@ int main(int argc, char **argv) {
     delete Tmat;
   }
 
+  /// output forward scattering coefficients for a single and ensemble T-matrix
+  {
+    TMatrix *Tmatrix_single = TMatrixCalculator::calculate_TMatrix(
+        0.1, 0.5, 10., 2. * M_PI, 200, 1.e-4, 2,
+        std::complex<float_type>(1.5, 0.02), 500);
+    OrientationDistribution orientation_distribution(
+        2 * Tmatrix_single->get_nmax());
+    TMatrix *Tmatrix_ensemble =
+        TMatrixCalculator::apply_orientation_distribution(
+            *Tmatrix_single, orientation_distribution);
+
+    std::ofstream ofile("test_tmatrixcalculator_result.txt");
+    ofile << "# theta\tphi\tZ00\n";
+    for (uint_fast32_t i = 0; i < 100; ++i) {
+      const float_type theta_out = 0.01 * (i + 0.5) * M_PI;
+      for (uint_fast32_t j = 0; j < 100; ++j) {
+        const float_type phi_out = 0.02 * (j + 0.5) * M_PI;
+        Matrix<float_type> Zsingle = Tmatrix_single->get_scattering_matrix(
+            0., 0., 0.5 * M_PI, 0., theta_out, phi_out);
+        Matrix<float_type> Zensemble = Tmatrix_ensemble->get_scattering_matrix(
+            0., 0., 0.5 * M_PI, 0., theta_out, phi_out);
+        ofile << theta_out << "\t" << phi_out << "\t" << Zsingle(0, 0) << "\t"
+              << Zensemble(0, 0) << "\n";
+      }
+    }
+  }
+
   return 0;
 }
