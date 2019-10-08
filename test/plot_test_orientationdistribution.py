@@ -6,10 +6,6 @@ import matplotlib.pyplot as pl
 import scipy.special as special
 
 
-def p(beta):
-    return 0.5 + 0.1 * (np.cos(beta) ** 2 - 1.0)
-
-
 def p_exp(beta, pn):
     result = np.zeros(beta.shape)
     for i in range(len(pn)):
@@ -19,13 +15,14 @@ def p_exp(beta, pn):
     return result
 
 
+ref = np.loadtxt("test_orientationdistribution_ref.txt")
 pn = np.loadtxt("test_orientationdistribution.txt")
 
 fig, ax = pl.subplots(2, 1, sharex=True)
 
-xrange = np.linspace(0.0, np.pi, 1000)
+xrange = ref[:, 0]
 perange = p_exp(xrange, pn)
-prange = p(xrange)
+prange = ref[:, 1]
 ax[0].plot(xrange, perange, "o", label="code")
 ax[0].plot(xrange, prange, label="ref")
 ax[0].legend(loc="best")

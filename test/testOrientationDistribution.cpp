@@ -33,5 +33,12 @@ int main(int argc, char **argv) {
     ofile << i << "\t" << od.get_coefficient(i) << "\n";
   }
 
+  std::ofstream rfile("test_orientationdistribution_ref.txt");
+  rfile << "# beta\tp(beta)\n";
+  for (uint_fast32_t i = 0; i < 1000; ++i) {
+    const float_type beta = 0.001 * (i + 0.5) * M_PI;
+    rfile << beta << "\t" << od(beta) << "\n";
+  }
+
   return 0;
 }
