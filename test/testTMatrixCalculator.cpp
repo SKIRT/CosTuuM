@@ -38,10 +38,6 @@ int main(int argc, char **argv) {
   while (getline(ifile, line)) {
     ++counter;
 
-    if (counter == 1) {
-      break;
-    }
-
     ctm_warning("Line %" PRIuFAST32, counter);
 
     std::istringstream linestream(line);
@@ -118,6 +114,20 @@ int main(int argc, char **argv) {
       const float_type Zsingle_sum =
           Zensemble(0, 0) - Zensemble(1, 1) + Zensemble(2, 2) - Zensemble(3, 3);
       assert_values_equal_tol(Zsingle_sum, 0., 1.e-10);
+    }
+
+    // check that extinction matrix satisfies theoretical criterion
+    {
+      Matrix<float_type> K =
+          Tmatrix_ensemble->get_extinction_matrix(0., 0., 0.5 * M_PI, 0.);
+      assert_values_equal_tol(double(K(0, 2)), 0., 1.e-10);
+      assert_values_equal_tol(double(K(0, 3)), 0., 1.e-10);
+      assert_values_equal_tol(double(K(1, 2)), 0., 1.e-10);
+      assert_values_equal_tol(double(K(1, 3)), 0., 1.e-10);
+      assert_values_equal_tol(double(K(2, 0)), 0., 1.e-10);
+      assert_values_equal_tol(double(K(3, 0)), 0., 1.e-10);
+      assert_values_equal_tol(double(K(2, 1)), 0., 1.e-10);
+      assert_values_equal_tol(double(K(3, 1)), 0., 1.e-10);
     }
 
     std::vector<float_type> xphi(100), wphi(100);
