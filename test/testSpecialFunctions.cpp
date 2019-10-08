@@ -275,7 +275,8 @@ int main(int argc, char **argv) {
   }
   {
     // interval [0, 1], n = 2
-    SpecialFunctions::get_gauss_legendre_points_and_weights_ab(2, 0., 1., x, w);
+    SpecialFunctions::get_gauss_legendre_points_and_weights_ab<float_type>(
+        2, 0., 1., x, w);
     ctm_warning("x: [%g, %g], w: [%g, %g]", double(x[0]), double(x[1]),
                 double(w[0]), double(w[1]));
     assert_values_equal_rel(double(x[0]), 0.5 - 0.5 / std::sqrt(3.), tolerance);
@@ -286,8 +287,9 @@ int main(int argc, char **argv) {
 
   {
     // test integration of a simple function
-    const float_type old_quad = SpecialFunctions::gauss_legendre_quadrature(
-        function, 0., M_PI, nullptr, 10, 1000, 1.e-10, 1.e-5);
+    const float_type old_quad =
+        SpecialFunctions::gauss_legendre_quadrature<float_type>(
+            function, 0., M_PI, nullptr, 10, 1000, 1.e-10, 1.e-5);
     ctm_warning("Quad: %g", double(old_quad));
   }
 
@@ -429,23 +431,23 @@ int main(int argc, char **argv) {
     std::vector<float_type> C213 =
         SpecialFunctions::get_clebsch_gordan_coefficients<float_type>(2, 1, 3);
     assert_condition(C213.size() == 3);
-    assert_values_equal_rel(C213[0], std::sqrt(1. / 5.), 1.e-10);
-    assert_values_equal_rel(C213[1], std::sqrt(3. / 5.), 1.e-10);
-    assert_values_equal_rel(C213[2], std::sqrt(1. / 5.), 1.e-10);
+    assert_values_equal_rel(double(C213[0]), std::sqrt(1. / 5.), 1.e-10);
+    assert_values_equal_rel(double(C213[1]), std::sqrt(3. / 5.), 1.e-10);
+    assert_values_equal_rel(double(C213[2]), std::sqrt(1. / 5.), 1.e-10);
 
     std::vector<float_type> C212 =
         SpecialFunctions::get_clebsch_gordan_coefficients<float_type>(2, 1, 2);
     assert_condition(C213.size() == 3);
-    assert_values_equal_rel(C212[0], -std::sqrt(0.5), 1.e-10);
-    assert_values_equal_tol(C212[1], 0., 1.e-10);
-    assert_values_equal_rel(C212[2], std::sqrt(0.5), 1.e-10);
+    assert_values_equal_rel(double(C212[0]), -std::sqrt(0.5), 1.e-10);
+    assert_values_equal_tol(double(C212[1]), 0., 1.e-10);
+    assert_values_equal_rel(double(C212[2]), std::sqrt(0.5), 1.e-10);
 
     std::vector<float_type> C122 =
         SpecialFunctions::get_clebsch_gordan_coefficients<float_type>(1, 2, 2);
     assert_condition(C213.size() == 3);
-    assert_values_equal_rel(C122[0], -std::sqrt(0.5), 1.e-10);
-    assert_values_equal_tol(C122[1], 0., 1.e-10);
-    assert_values_equal_rel(C122[2], std::sqrt(0.5), 1.e-10);
+    assert_values_equal_rel(double(C122[0]), -std::sqrt(0.5), 1.e-10);
+    assert_values_equal_tol(double(C122[1]), 0., 1.e-10);
+    assert_values_equal_rel(double(C122[2]), std::sqrt(0.5), 1.e-10);
   }
 
   return 0;

@@ -751,8 +751,6 @@ public:
       absolute_difference = fabs(new_quadrature - old_quadrature);
       relative_difference =
           absolute_difference / fabs(new_quadrature + old_quadrature);
-      ctm_warning("%g %g %g %g", new_quadrature, old_quadrature,
-                  absolute_difference, relative_difference);
       old_quadrature = new_quadrature;
       ++order;
     }
