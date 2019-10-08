@@ -734,6 +734,14 @@ public:
   }
 
   /**
+   * @brief Get the maximum order in the spherical basis function expansion for
+   * this T-matrix.
+   *
+   * @return Maximum order, @f$n_{max}@f$.
+   */
+  inline uint_fast32_t get_nmax() const { return _nmax; }
+
+  /**
    * @brief Compute the missing elements of the T-matrix.
    */
   inline void compute_additional_elements() {
@@ -1024,6 +1032,40 @@ public:
       return _T[m1](i1 * nm + n1 - m1, i2 * nm + n2 - m2);
     } else {
       return _T[m1](i1 * _nmax + n1 - m1 - 1, i2 * _nmax + n2 - m2 - 1);
+    }
+  }
+
+  /**
+   * @brief Set the T-matrix element with the given indices to the given value.
+   *
+   * See operator()() for detailed documentation about how elements are stored.
+   *
+   * @param i1 Row index of the desired T-matrix quarter, @f$i_1@f$.
+   * @param n1 Order of the row index of the element, @f$n_1@f$.
+   * @param m1 Degree of the row index of the element, @f$m_1@f$.
+   * @param i2 Column index of the desired T-matrix quarter, @f$i_2@f$.
+   * @param n2 Order of the column index of the element, @f$n_2@f$.
+   * @param m2 Degree of the column index of the element, @f$m_2@f$.
+   * @param value New value for the corresponding element,
+   * @f$T^{(i_1i_2)}_{n_1n_2m_1m_2}@f$.
+   */
+  inline void set_element(const uint_fast8_t i1, const uint_fast32_t n1,
+                          const uint_fast32_t m1, const uint_fast8_t i2,
+                          const uint_fast32_t n2, const uint_fast32_t m2,
+                          const std::complex<float_type> &value) {
+
+    ctm_assert(m1 == m2);
+    ctm_assert(m1 <= _nmax);
+    ctm_assert(m2 <= _nmax);
+    ctm_assert(n1 > 0);
+    ctm_assert(n1 <= _nmax);
+    ctm_assert(n2 > 0);
+    ctm_assert(n2 <= _nmax);
+    if (m1 > 0) {
+      const uint_fast32_t nm = _nmax + 1 - m1;
+      _T[m1](i1 * nm + n1 - m1, i2 * nm + n2 - m2) = value;
+    } else {
+      _T[m1](i1 * _nmax + n1 - m1 - 1, i2 * _nmax + n2 - m2 - 1) = value;
     }
   }
 

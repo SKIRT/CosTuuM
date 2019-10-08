@@ -10,6 +10,7 @@
 
 #include "Configuration.hpp"
 #include "Error.hpp"
+#include "OrientationDistribution.hpp"
 #include "SpecialFunctions.hpp"
 #include "TMatrix.hpp"
 
@@ -179,6 +180,63 @@ public:
     ctm_warning("walb: %g", double(-old_qsca / old_qext));
 
     return active_Tmatrix;
+  }
+
+  /**
+   * @brief Compute the T-matrix for an ensemble of dust particles with the
+   * given individual T-matrix, distributed according to the given orientation
+   * distribution.
+   *
+   * @param T_single T-matrix for a single dust particle in the ensemble.
+   * @param orientation_distribution Orientation distribution for the dust
+   * particles in the ensemble.
+   * @return Pointer to the T-matrix for the ensemble of dust particles.
+   * Memory management for this pointer is transferred to the caller.
+   */
+  inline static TMatrix *apply_orientation_distribution(
+      const TMatrix &T_single,
+      const OrientationDistribution &orientation_distribution) {
+
+    TMatrix *T_ensemble_ptr = new TMatrix(T_single);
+
+    const uint_fast32_t nmax = T_single.get_nmax();
+    for (uint_fast32_t m = 0; m < nmax + 1; ++m) {
+      const uint_fast32_t nmin = std::max(m, static_cast<uint_fast32_t>(1));
+      for (uint_fast32_t n1 = nmin; n1 < nmax + 1; ++n1) {
+        for (uint_fast32_t n2 = nmin; n2 < nmax + 1; ++n2) {
+          std::complex<float_type> Tn1n2[2][2];
+          uint_fast32_t n12min;
+          if (n1 > n2) {
+            n12min = n1 - n2;
+          } else {
+            n12min = n2 - n1;
+          }
+          const uint_fast32_t n12max = n1 + n2;
+          const uint_fast32_t M = std::min(n1, n2);
+          for (uint_fast32_t N = n12min; N < n12max; ++N) {
+            const std::vector<float_type> CGcoeff =
+                SpecialFunctions::get_clebsch_gordan_coefficients<float_type>(
+                    n1, n2, N);
+            const float_type pN = orientation_distribution.get_coefficient(N);
+            for (uint_fast32_t m1 = 0; m1 < M; ++m1) {
+              // figure out the sign (-1)^{m+m1}
+              const float_type CGfac = pN * CGcoeff[n1 + m] * CGcoeff[n1 + m1];
+              for (uint_fast8_t i = 0; i < 2; ++i) {
+                for (uint_fast8_t j = 0; j < 2; ++j) {
+                  Tn1n2[i][j] += CGfac * T_single(i, n1, m1, j, n2, m1);
+                }
+              }
+            }
+          }
+          T_ensemble_ptr->set_element(0, n1, m, 0, n2, m, Tn1n2[0][0]);
+          T_ensemble_ptr->set_element(0, n1, m, 1, n2, m, Tn1n2[0][1]);
+          T_ensemble_ptr->set_element(1, n1, m, 0, n2, m, Tn1n2[1][0]);
+          T_ensemble_ptr->set_element(1, n1, m, 1, n2, m, Tn1n2[1][1]);
+        }
+      }
+    }
+
+    return T_ensemble_ptr;
   }
 };
 
