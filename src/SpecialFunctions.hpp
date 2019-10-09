@@ -700,8 +700,8 @@ public:
     ctm_assert(a < b);
 
     get_gauss_legendre_points_and_weights(order, points, weights);
-    const double wfac = 0.5 * (b - a);
-    const double xterm = 0.5 * (a + b);
+    const DATA_TYPE wfac = 0.5 * (b - a);
+    const DATA_TYPE xterm = 0.5 * (a + b);
     for (uint_fast32_t i = 0; i < order; ++i) {
       points[i] = wfac * points[i] + xterm;
       weights[i] *= wfac;

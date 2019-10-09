@@ -47,7 +47,7 @@ public:
   virtual float_type operator()(const float_type beta, const float_type cosbeta,
                                 const float_type sinbeta) const {
 
-    return 0.5 + 0.2 * (cosbeta * cosbeta - 1.);
+    return 0.2 + 0.2 * (cosbeta * cosbeta - 1.);
   }
 
   /**

@@ -106,14 +106,14 @@ int main(int argc, char **argv) {
           0., 0., 0.5 * M_PI, 0., 0.5 * M_PI, M_PI);
       const float_type Zsingle_sum =
           Zsingle(0, 0) - Zsingle(1, 1) + Zsingle(2, 2) - Zsingle(3, 3);
-      assert_values_equal_tol(Zsingle_sum, 0., 1.e-10);
+      assert_values_equal_tol(double(Zsingle_sum), 0., 1.e-10);
     }
     {
       Matrix<float_type> Zensemble = Tmatrix_ensemble->get_scattering_matrix(
           0., 0., 0.5 * M_PI, 0., 0.5 * M_PI, M_PI);
       const float_type Zsingle_sum =
           Zensemble(0, 0) - Zensemble(1, 1) + Zensemble(2, 2) - Zensemble(3, 3);
-      assert_values_equal_tol(Zsingle_sum, 0., 1.e-10);
+      assert_values_equal_tol(double(Zsingle_sum), 0., 1.e-10);
     }
 
     // check that extinction matrix satisfies theoretical criterion
@@ -131,11 +131,11 @@ int main(int argc, char **argv) {
     }
 
     std::vector<float_type> xphi(100), wphi(100);
-    SpecialFunctions::get_gauss_legendre_points_and_weights_ab(
+    SpecialFunctions::get_gauss_legendre_points_and_weights_ab<float_type>(
         100, 0., 2. * M_PI, xphi, wphi);
     std::vector<float_type> xtheta(100), wtheta(100);
-    SpecialFunctions::get_gauss_legendre_points_and_weights_ab(100, 0., M_PI,
-                                                               xtheta, wtheta);
+    SpecialFunctions::get_gauss_legendre_points_and_weights_ab<float_type>(
+        100, 0., M_PI, xtheta, wtheta);
     float_type Zsinglequad = 0.;
     float_type Zensemblequad = 0.;
     std::ofstream ofile("test_tmatrixcalculator_result.txt");
@@ -156,6 +156,9 @@ int main(int argc, char **argv) {
       }
     }
     ctm_warning("Quad: %g %g", double(Zsinglequad), double(Zensemblequad));
+
+    delete Tmatrix_single;
+    delete Tmatrix_ensemble;
   }
 
   return 0;

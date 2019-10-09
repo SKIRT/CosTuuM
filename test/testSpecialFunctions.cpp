@@ -448,6 +448,27 @@ int main(int argc, char **argv) {
     assert_values_equal_rel(double(C122[0]), -std::sqrt(0.5), 1.e-10);
     assert_values_equal_tol(double(C122[1]), 0., 1.e-10);
     assert_values_equal_rel(double(C122[2]), std::sqrt(0.5), 1.e-10);
+
+    // test the normalisation and symmetry of the Clebsch-Gordan function for
+    // large n
+    std::vector<float_type> large_coefficients =
+        SpecialFunctions::get_clebsch_gordan_coefficients<float_type>(100, 120,
+                                                                      220);
+    float_type norm = 0.;
+    for (uint_fast32_t i = 0; i < large_coefficients.size(); ++i) {
+      norm += large_coefficients[i] * large_coefficients[i];
+      ctm_warning(
+          "large coefficient %" PRIuFAST32 ": %g (%g)", i,
+          double(large_coefficients[i]),
+          double(large_coefficients[large_coefficients.size() - 1 - i]));
+      if (i != large_coefficients.size() / 2) {
+        assert_values_equal_rel(
+            double(large_coefficients[i]),
+            double(large_coefficients[large_coefficients.size() - 1 - i]),
+            1.e-10);
+      }
+    }
+    assert_values_equal_rel(norm, 1., 1.e-10);
   }
 
   return 0;

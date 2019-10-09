@@ -197,7 +197,7 @@ public:
       const TMatrix &T_single,
       const OrientationDistribution &orientation_distribution) {
 
-    TMatrix *T_ensemble_ptr = new TMatrix(T_single);
+    TMatrix *T_ensemble = new TMatrix(T_single);
 
     const uint_fast32_t nmax = T_single.get_nmax();
 
@@ -211,6 +211,8 @@ public:
       for (uint_fast32_t n1 = nmin; n1 < nmax + 1; ++n1) {
         for (uint_fast32_t n2 = nmin; n2 < nmax + 1; ++n2) {
           std::complex<float_type> Tn1n2[2][2];
+          // std::abs does not seem to work well in this context when quad
+          // precision is activated, so we just mimic it ourselves
           uint_fast32_t n12min;
           if (n1 > n2) {
             n12min = n1 - n2;
@@ -219,13 +221,13 @@ public:
           }
           const uint_fast32_t n12max = n1 + n2;
           const uint_fast32_t M = std::min(n1, n2);
-          for (uint_fast32_t N = n12min; N < n12max; ++N) {
+          for (uint_fast32_t N = n12min; N < n12max + 1; ++N) {
             const std::vector<float_type> CGcoeff =
                 SpecialFunctions::get_clebsch_gordan_coefficients<float_type>(
                     n1, n2, N);
             const float_type pN = orientation_distribution.get_coefficient(N);
             uint_fast8_t mm1sign = -msign;
-            for (uint_fast32_t m1 = 0; m1 < M; ++m1) {
+            for (uint_fast32_t m1 = 0; m1 < M + 1; ++m1) {
               float_type factor(2.);
               if (m1 == 0) {
                 factor = 1.;
@@ -243,15 +245,15 @@ public:
               }
             }
           }
-          T_ensemble_ptr->set_element(0, n1, m, 0, n2, m, Tn1n2[0][0]);
-          T_ensemble_ptr->set_element(0, n1, m, 1, n2, m, Tn1n2[0][1]);
-          T_ensemble_ptr->set_element(1, n1, m, 0, n2, m, Tn1n2[1][0]);
-          T_ensemble_ptr->set_element(1, n1, m, 1, n2, m, Tn1n2[1][1]);
+          T_ensemble->set_element(0, n1, m, 0, n2, m, Tn1n2[0][0]);
+          T_ensemble->set_element(0, n1, m, 1, n2, m, Tn1n2[0][1]);
+          T_ensemble->set_element(1, n1, m, 0, n2, m, Tn1n2[1][0]);
+          T_ensemble->set_element(1, n1, m, 1, n2, m, Tn1n2[1][1]);
         }
       }
     }
 
-    return T_ensemble_ptr;
+    return T_ensemble;
   }
 };
 
