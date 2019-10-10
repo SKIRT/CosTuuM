@@ -13,5 +13,5 @@ done
 echo "Done."
 
 echo "Formatting Python files using black..."
-python3 -m black -l 80 test/*.py
+python3 -m black -l 80 {test,tools}/*.py
 echo "Done."
