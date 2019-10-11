@@ -137,7 +137,6 @@ int main(int argc, char **argv) {
     SpecialFunctions::get_gauss_legendre_points_and_weights_ab<float_type>(
         100, 0., M_PI, xtheta, wtheta);
     float_type Zsinglequad = 0.;
-    float_type Zensemblequad = 0.;
     std::ofstream ofile("test_tmatrixcalculator_result.txt");
     ofile << "# theta\tphi\tZ00\n";
     for (uint_fast32_t i = 0; i < 100; ++i) {
@@ -147,18 +146,66 @@ int main(int argc, char **argv) {
         const float_type phi_out = xphi[j];
         Matrix<float_type> Zsingle = Tmatrix_single->get_scattering_matrix(
             0., 0., 0.5 * M_PI, 0., theta_out, phi_out);
-        Matrix<float_type> Zensemble = Tmatrix_ensemble->get_scattering_matrix(
-            0., 0., 0.5 * M_PI, 0., theta_out, phi_out);
-        ofile << theta_out << "\t" << phi_out << "\t" << Zsingle(0, 0) << "\t"
-              << Zensemble(0, 0) << "\n";
+        Matrix<float_type> Ksingle =
+            Tmatrix_single->get_extinction_matrix(0., 0., theta_out, phi_out);
+        ofile << theta_out << "\t" << phi_out;
+        for (uint_fast8_t irow = 0; irow < 4; ++irow) {
+          for (uint_fast8_t icol = 0; icol < 4; ++icol) {
+            ofile << "\t" << Zsingle(irow, icol);
+          }
+        }
+        for (uint_fast8_t irow = 0; irow < 4; ++irow) {
+          for (uint_fast8_t icol = 0; icol < 4; ++icol) {
+            ofile << "\t" << Ksingle(irow, icol);
+          }
+        }
+        ofile << "\n";
         Zsinglequad += wphi[j] * wtheta[i] * sintheta * Zsingle(0, 0);
-        Zensemblequad += wphi[j] * wtheta[i] * sintheta * Zensemble(0, 0);
       }
     }
-    ctm_warning("Quad: %g %g", double(Zsinglequad), double(Zensemblequad));
+    ctm_warning("Quad: %g", double(Zsinglequad));
 
     delete Tmatrix_single;
     delete Tmatrix_ensemble;
+  }
+
+  /// astrophysically relevant T-matrix
+  {
+    TMatrix *Tmatrix = TMatrixCalculator::calculate_TMatrix(
+        1., 0.5, 0.2, 100., 200, 1.e-4, 2, std::complex<float_type>(4., 0.1),
+        500);
+    std::vector<float_type> xphi(100), wphi(100);
+
+    SpecialFunctions::get_gauss_legendre_points_and_weights_ab<float_type>(
+        100, 0., 2. * M_PI, xphi, wphi);
+    std::vector<float_type> xtheta(100), wtheta(100);
+    SpecialFunctions::get_gauss_legendre_points_and_weights_ab<float_type>(
+        100, 0., M_PI, xtheta, wtheta);
+    std::ofstream ofile("test_tmatrixcalculator_ISM.txt");
+    ofile << "# theta\tphi\tZ\tK\n";
+    for (uint_fast32_t i = 0; i < 100; ++i) {
+      const float_type theta_out = xtheta[i];
+      for (uint_fast32_t j = 0; j < 100; ++j) {
+        const float_type phi_out = xphi[j];
+        Matrix<float_type> Zsingle = Tmatrix->get_scattering_matrix(
+            0., 0., 0.5 * M_PI, 0., theta_out, phi_out);
+        Matrix<float_type> Ksingle =
+            Tmatrix->get_extinction_matrix(0., 0., theta_out, phi_out);
+        ofile << theta_out << "\t" << phi_out;
+        for (uint_fast8_t irow = 0; irow < 4; ++irow) {
+          for (uint_fast8_t icol = 0; icol < 4; ++icol) {
+            ofile << "\t" << Zsingle(irow, icol);
+          }
+        }
+        for (uint_fast8_t irow = 0; irow < 4; ++irow) {
+          for (uint_fast8_t icol = 0; icol < 4; ++icol) {
+            ofile << "\t" << Ksingle(irow, icol);
+          }
+        }
+        ofile << "\n";
+      }
+    }
+    delete Tmatrix;
   }
 
   return 0;

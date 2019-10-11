@@ -32,6 +32,7 @@ if __name__ == "__main__":
     argparser.add_argument("--resolution", "-r", type=int, default=500)
     argparser.add_argument("--output-folder", "-o", required=True)
     argparser.add_argument("--output-prefix", "-x", default="render")
+    argparser.add_argument("--column", "-c", type=int, default=2)
     # make sure only the arguments for the Python script are parsed by argparse
     args = argparser.parse_args(sys.argv[sys.argv.index("--") + 1 :])
 
@@ -42,6 +43,7 @@ if __name__ == "__main__":
     filename = args.file
     output_folder = args.output_folder
     output_prefix = args.output_prefix
+    column = args.column
 
     # initialise the frame count
     framecount = 0
@@ -154,7 +156,7 @@ if __name__ == "__main__":
     # parse the data columns
     theta = data[:, 0]
     phi = data[:, 1]
-    Zsingle = data[:, 2]
+    dataval = data[:, column]
     # convert theta to sin(theta - pi/2) to account for curvature
     theta = np.sin(theta - 0.5 * np.pi)
 
@@ -164,11 +166,11 @@ if __name__ == "__main__":
         np.linspace(theta.min(), theta.max(), npix),
     )
     grid = interpol.griddata(
-        (phi, theta), np.log10(Zsingle), (gx, gy), method="cubic"
+        (phi, theta), np.log10(dataval), (gx, gy), method="cubic"
     )
     # convert the mapped Z values to RGBA colours using a matplotlib colormap
     norm = mpl.colors.Normalize(
-        vmin=min(np.log10(Zsingle)), vmax=max(np.log10(Zsingle))
+        vmin=min(np.log10(dataval)), vmax=max(np.log10(dataval))
     )
     mapper = cm.ScalarMappable(norm=norm)
     # create a texture image in blender and overwrite its pixels with the
