@@ -30,7 +30,7 @@ echo "Creating ${output_file} from ${input_file}"
 
 echo "Generating 100 sphere frames..."
 # call blender with the script and reroute its output to /dev/null
-blender -b -P blender_pyplot_rewrite.py -- \
+blender -b -P rotating_sphere.py -- \
   --file $input_file --output-folder $tfolder --output-prefix "frame" \
   > /dev/null 2> /dev/null
 echo "Done."
