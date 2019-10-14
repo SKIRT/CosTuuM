@@ -11,6 +11,29 @@ configure_file(${PROJECT_SOURCE_DIR}/src/ConfigurationInfo.hpp.in
 set_source_files_properties(${PROJECT_BINARY_DIR}/src/CompilerInfo.cpp
                             PROPERTIES GENERATED TRUE)
 
+# Configured data files
+configure_file(${PROJECT_SOURCE_DIR}/data/callindex.out_CpaD03_0.01
+               ${PROJECT_BINARY_DIR}/data/callindex.out_CpaD03_0.01
+               COPYONLY)
+configure_file(${PROJECT_SOURCE_DIR}/data/callindex.out_CpaD03_0.10
+               ${PROJECT_BINARY_DIR}/data/callindex.out_CpaD03_0.10
+               COPYONLY)
+configure_file(${PROJECT_SOURCE_DIR}/data/callindex.out_CpeD03_0.01
+               ${PROJECT_BINARY_DIR}/data/callindex.out_CpeD03_0.01
+               COPYONLY)
+configure_file(${PROJECT_SOURCE_DIR}/data/callindex.out_CpeD03_0.10
+               ${PROJECT_BINARY_DIR}/data/callindex.out_CpeD03_0.10
+               COPYONLY)
+configure_file(${PROJECT_SOURCE_DIR}/data/callindex.out_silD03
+               ${PROJECT_BINARY_DIR}/data/callindex.out_silD03
+               COPYONLY)
+set(DRAINEDUSTPROPERTIESDATALOCATION ${PROJECT_BINARY_DIR}/data/)
+message(STATUS
+  "DraineDustPropertiesDataLocation.hpp: ${DRAINEDUSTPROPERTIESDATALOCATION}")
+configure_file(${PROJECT_SOURCE_DIR}/src/DraineDustPropertiesDataLocation.hpp.in
+               ${PROJECT_BINARY_DIR}/src/DraineDustPropertiesDataLocation.hpp
+               @ONLY)
+
 set(CosTuuM_SOURCES
     CommandLineOption.cpp
     CommandLineParser.cpp

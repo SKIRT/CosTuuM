@@ -1,0 +1,17 @@
+/**
+ * @file DraineDustPropertiesDataLocation.hpp
+ *
+ * @brief CMake configured file storing the location of the Draine dust
+ * properties data files on the local system.
+ *
+ * This file should never be edited directly. Instead, edit
+ * DraineDustPropertiesDataLocation.hpp.in.
+ *
+ * @author Bert Vandenbroucke (bert.vandenbroucke@ugent.be)
+ */
+#ifndef DRAINEDUSTPROPERTIESDATALOCATION_HPP
+#define DRAINEDUSTPROPERTIESDATALOCATION_HPP
+
+#define DRAINEDUSTPROPERTIESDATALOCATION "@DRAINEDUSTPROPERTIESDATALOCATION@"
+
+#endif // DRAINEDUSTPROPERTIESDATALOCATION_HPP

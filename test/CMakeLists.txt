@@ -85,6 +85,16 @@ configure_file(
   ${PROJECT_BINARY_DIR}/bin/test/plot_test_orientationdistribution.py
   COPYONLY)
 
+## Unit test for Table
+set(TESTTABLE_SOURCES
+    testTable.cpp
+)
+add_unit_test(NAME testTable
+              SOURCES ${TESTTABLE_SOURCES})
+configure_file(${PROJECT_SOURCE_DIR}/test/test_table.txt
+               ${PROJECT_BINARY_DIR}/bin/test/test_table.txt
+               COPYONLY)
+
 ### Done adding unit tests. Create the 'make check' target #####################
 ### Do not touch these lines unless you know what you're doing! ################
 add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
