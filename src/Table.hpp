@@ -81,8 +81,7 @@ public:
    * @param row Row index.
    * @return Corresponding row of the table.
    */
-  inline virtual TableRow<NUMBER_OF_COLUMNS, DATA_TYPE> &
-  operator[](const size_t row) {
+  inline TableRow<NUMBER_OF_COLUMNS, DATA_TYPE> &operator[](const size_t row) {
     ctm_assert(row < _rows.size());
     return _rows[row];
   }
@@ -93,7 +92,7 @@ public:
    * @param row Row index.
    * @return Corresponding row of the table.
    */
-  inline virtual const TableRow<NUMBER_OF_COLUMNS, DATA_TYPE> &
+  inline const TableRow<NUMBER_OF_COLUMNS, DATA_TYPE> &
   operator[](const size_t row) const {
     ctm_assert(row < _rows.size());
     return _rows[row];
@@ -105,7 +104,7 @@ public:
    *
    * @param filename Name of the file.
    */
-  inline virtual void from_ascii_file(const std::string filename) {
+  inline void from_ascii_file(const std::string filename) {
     std::ifstream ifile(filename);
     if (!ifile.good()) {
       ctm_error("Unable to open file: \"%s\"!", filename.c_str());
@@ -129,6 +128,19 @@ public:
    * @return Number of rows in the table.
    */
   inline virtual size_t size() const { return _rows.size(); }
+
+  /**
+   * @brief Multiply all elements in a column with the given factor.
+   *
+   * @param factor Multiplicative factor.
+   * @tparam COLUMN_NUMBER Column that needs to be multiplied.
+   */
+  template <uint_fast8_t COLUMN_NUMBER>
+  inline void multiply_column(const DATA_TYPE factor) {
+    for (uint_fast32_t i = 0; i < _rows.size(); ++i) {
+      _rows[i][COLUMN_NUMBER] *= factor;
+    }
+  }
 };
 
 /**
@@ -163,18 +175,36 @@ public:
         Table<NUMBER_OF_COLUMNS, DATA_TYPE>::_rows[ilow][INTERPOLATING_COLUMN];
     DATA_TYPE xhigh =
         Table<NUMBER_OF_COLUMNS, DATA_TYPE>::_rows[ihigh][INTERPOLATING_COLUMN];
-    while (ilow + 1 != ihigh) {
-      const size_t inext = (ilow + ihigh) >> 1;
-      const DATA_TYPE xnext =
-          Table<NUMBER_OF_COLUMNS, DATA_TYPE>::_rows[inext]
-                                                    [INTERPOLATING_COLUMN];
-      if (xnext <= xvalue) {
-        xlow = xnext;
-        ilow = inext;
-      } else {
-        xhigh = xnext;
-        ihigh = inext;
+    if (xlow < xhigh) {
+      while (ilow + 1 != ihigh) {
+        const size_t inext = (ilow + ihigh) >> 1;
+        const DATA_TYPE xnext =
+            Table<NUMBER_OF_COLUMNS, DATA_TYPE>::_rows[inext]
+                                                      [INTERPOLATING_COLUMN];
+        if (xnext <= xvalue) {
+          xlow = xnext;
+          ilow = inext;
+        } else {
+          xhigh = xnext;
+          ihigh = inext;
+        }
       }
+    } else if (xlow > xhigh) {
+      while (ilow + 1 != ihigh) {
+        const size_t inext = (ilow + ihigh) >> 1;
+        const DATA_TYPE xnext =
+            Table<NUMBER_OF_COLUMNS, DATA_TYPE>::_rows[inext]
+                                                      [INTERPOLATING_COLUMN];
+        if (xnext >= xvalue) {
+          xlow = xnext;
+          ilow = inext;
+        } else {
+          xhigh = xnext;
+          ihigh = inext;
+        }
+      }
+    } else {
+      ctm_error("Table endpoints are the same!");
     }
 
     const float_type xfac = (xvalue - xlow) / (xhigh - xlow);

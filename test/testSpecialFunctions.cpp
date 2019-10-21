@@ -468,7 +468,7 @@ int main(int argc, char **argv) {
             1.e-10);
       }
     }
-    assert_values_equal_rel(norm, 1., 1.e-10);
+    assert_values_equal_rel(double(norm), 1., 1.e-10);
   }
 
   return 0;
