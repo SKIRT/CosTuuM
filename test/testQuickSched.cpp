@@ -38,25 +38,70 @@ void matmul(const uint_fast32_t m, const uint_fast32_t n, const uint_fast32_t k,
 }
 
 /**
- * @brief Data struct used to store data for the test tasks.
+ * @brief Task that multiplies a single block in the result matrix.
  */
-struct task_data {
+class MatrixMultiplicationTask {
+private:
   /*! @brief Offsets of a block to calculate in the result matrix. */
-  uint_fast32_t d[2];
+  const uint_fast32_t _d[2];
+
   /*! @brief Number of rows in the first matrix. */
-  uint_fast32_t m;
+  const uint_fast32_t _m;
+
   /*! @brief Number of columns in the first matrix and rows in the second
    *  matrix. */
-  uint_fast32_t n;
+  const uint_fast32_t _n;
+
   /*! @brief Number of columns in the second matrix. */
-  uint_fast32_t k;
+  const uint_fast32_t _k;
+
   /*! @brief First matrix. */
-  double *a;
+  const double *_a;
+
   /*! @brief Second matrix. */
-  double *b;
+  const double *_b;
+
   /*! @brief Result matrix. */
-  double *c;
+  double *_c;
+
+public:
+  /**
+   * @brief MatrixMultiplicationTask
+   *
+   * @param i
+   * @param j
+   * @param m
+   * @param n
+   * @param k
+   * @param a
+   * @param b
+   * @param c
+   */
+  MatrixMultiplicationTask(const uint_fast32_t i, const uint_fast32_t j,
+                           const uint_fast32_t m, const uint_fast32_t n,
+                           const uint_fast32_t k, double *a, double *b,
+                           double *c)
+      : _d{i, j}, _m(m), _n(n), _k(k), _a(a), _b(b), _c(c) {}
+
+  /**
+   * @brief execute
+   */
+  void execute() {
+    matmul(32, 32, _k * 32, &_a[_d[0] * 32], _m * 32, &_b[_k * 32 * _d[1] * 32],
+           _k * 32, &_c[_d[0] * 32 + _m * 32 * _d[1] * 32], _m * 32);
+  }
 };
+
+/**
+ * @brief Execute the given void-wrapped task.
+ *
+ * @param data Void wrapped task data.
+ * @tparam TASK_TYPE Type of task to execute.
+ */
+template <typename TASK_TYPE> inline void execute(void *data) {
+  TASK_TYPE *task = static_cast<TASK_TYPE *>(data);
+  task->execute();
+}
 
 /**
  * @brief Runner function to pass on to the scheduler.
@@ -66,23 +111,12 @@ struct task_data {
  */
 void runner(int type, void *data) {
 
-  /* Decode the task data. */
-  struct task_data *tdata = (struct task_data *)data;
-  const uint_fast32_t k = tdata->k;
-  const uint_fast32_t m = tdata->m;
-  const double *a = tdata->a;
-  const double *b = tdata->b;
-  double *c = tdata->b;
-  const uint_fast32_t *d = tdata->d;
-
-  /* Decode and execute the task. */
   switch (type) {
   case 1:
-    matmul(32, 32, k * 32, &a[d[0] * 32], m * 32, &b[k * 32 * d[1] * 32],
-           k * 32, &c[d[0] * 32 + m * 32 * d[1] * 32], m * 32);
+    execute<MatrixMultiplicationTask>(data);
     break;
   default:
-    ctm_error("Unknown task type.");
+    ctm_error("Unknown task type: %i", type);
   }
 }
 
@@ -131,18 +165,10 @@ int main(int argc, char **argv) {
   /* Build a task for each tile of the matrix c. */
   for (uint_fast32_t i = 0; i < m; ++i)
     for (uint_fast32_t j = 0; j < n; ++j) {
-      struct task_data tdata;
-      tdata.d[0] = i;
-      tdata.d[1] = j;
-      tdata.m = m;
-      tdata.n = n;
-      tdata.k = k;
-      tdata.a = a;
-      tdata.b = b;
-      tdata.c = c;
+      MatrixMultiplicationTask task(i, j, m, n, k, a, b, c);
       rid = qsched_addres(&s, qsched_owner_none, qsched_res_none);
-      tid = qsched_addtask(&s, 1, task_flag_none, &tdata,
-                           sizeof(struct task_data), 1);
+      tid = qsched_addtask(&s, 1, task_flag_none, &task,
+                           sizeof(MatrixMultiplicationTask), 1);
       qsched_addlock(&s, tid, rid);
     }
 
