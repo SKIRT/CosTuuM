@@ -210,8 +210,8 @@ endif(ACTIVATE_QUAD_PRECISION)
 
 if(ACTIVATE_TASKS)
   add_configuration_option(HAVE_TASKS True)
-  include_directories(/home/bv7/Programs/quicksched/src)
-  set(LIBQUICKSCHED /home/bv7/Programs/quicksched/src/.libs/libquicksched.a)
+  set(LIBQUICKSCHED quicksched)
+  include_directories(${PROJECT_SOURCE_DIR}/quicksched)
   message(STATUS "Using task-based parallel algorithm.")
 else(ACTIVATE_TASKS)
   add_configuration_option(HAVE_TASKS False)
@@ -257,6 +257,10 @@ add_subdirectory(src)
 
 # Enter the folder containing the unit tests
 add_subdirectory(test)
+
+if(HAVE_TASKS)
+  add_subdirectory(quicksched)
+endif(HAVE_TASKS)
 
 ## Documentation configuration #################################################
 
