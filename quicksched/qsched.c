@@ -306,7 +306,6 @@ void qsched_run_openmp(struct qsched *s, int nr_threads, qsched_funtype fun) {
 
     /* Get the ID of the current thread. */
     int qid = omp_get_thread_num() % s->nr_queues;
-    quicksched_message("Thread %i up and running!", qid);
 
     /* Loop as long as there are tasks. */
     while ((t = qsched_gettask(s, qid)) != NULL) {

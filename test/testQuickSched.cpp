@@ -100,9 +100,9 @@ public:
 int main(int argc, char **argv) {
 
   double *a, *b, *c, irm = 1.0 / RAND_MAX;
-  const uint_fast32_t m = 20;
-  const uint_fast32_t n = 20;
-  const uint_fast32_t k = 20;
+  const uint_fast32_t m = 30;
+  const uint_fast32_t n = 30;
+  const uint_fast32_t k = 30;
 
   a = new double[32 * 32 * m * k];
   b = new double[32 * 32 * k * n];

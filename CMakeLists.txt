@@ -151,6 +151,7 @@ if(MAX_NUM_THREADS GREATER 1)
     add_configuration_option(HAVE_OPENMP True)
     message(STATUS "OpenMP found. Shared memory parallelization will work.")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
   else(OPENMP_FOUND)
     add_configuration_option(HAVE_OPENMP False)
     message(WARNING
