@@ -197,7 +197,7 @@ using namespace std;
  *        \left(
  *          \vec{\nabla{}} \times{} Rg\vec{X}_{m'n'}(km_rr, \theta{}, \phi{})
  *        \right) \times{} \vec{X}_{mn}(kr, \theta{}, \phi{})
- *        - Rg\vec{X}_{m'n'}(km_rr, \theta{}, \phi{}) \times{} \left(
+ *        + Rg\vec{X}_{m'n'}(km_rr, \theta{}, \phi{}) \times{} \left(
  *          \vec{\nabla{}} \times{} \vec{X}_{mn}(kr, \theta{}, \phi{})
  *        \right)
  *    \right],
@@ -222,6 +222,13 @@ using namespace std;
  *      \hat{r} - \frac{1}{r}\frac{d}{d\theta{}} r(\theta{}) \hat{\theta{}}
  *    \right).
  * @f]
+ * Note that the @f$Q@f$ matrix given here differs from the one given in
+ * Waterman (1971): both terms in the integral have the same sign, while in
+ * Waterman they have opposite signs. Although I am not sure, it looks like this
+ * is actually a mistake in Waterman, as his expression for the @f$Q@f$ matrix
+ * for a perfectly conducting object does not include a minus sign in what is
+ * essentially the same expression as the more general expression for the
+ * @f$Q@f$ matrix given here.
  *
  * To compute the matrix @f$Q@f$, it makes sense to decompose it into four
  * quarters:
@@ -237,13 +244,13 @@ using namespace std;
  *        \left(
  *          \vec{\nabla{}} \times{} Rg\vec{M}_{m'n'}(km_rr, \theta{}, \phi{})
  *        \right) \times{} \vec{M}_{mn}(kr, \theta{}, \phi{})
- *        - Rg\vec{M}_{m'n'}(km_rr, \theta{}, \phi{}) \times{} \left(
+ *        + Rg\vec{M}_{m'n'}(km_rr, \theta{}, \phi{}) \times{} \left(
  *          \vec{\nabla{}} \times{} \vec{M}_{mn}(kr, \theta{}, \phi{})
  *        \right)
  *    \right] \\ = k^2 \int{} d\vec{\sigma{}} . \left[
- *      Rg\vec{N}_{m'n'}(km_rr, \theta{}, \phi{})
+ *      m_r Rg\vec{N}_{m'n'}(km_rr, \theta{}, \phi{})
  *        \times{} \vec{M}_{mn}(kr, \theta{}, \phi{})
- *        - Rg\vec{M}_{m'n'}(km_rr, \theta{}, \phi{}) \times{}
+ *        + Rg\vec{M}_{m'n'}(km_rr, \theta{}, \phi{}) \times{}
  *          \vec{N}_{mn}(kr, \theta{}, \phi{})
  *    \right],
  * @f]
@@ -252,13 +259,13 @@ using namespace std;
  *        \left(
  *          \vec{\nabla{}} \times{} Rg\vec{N}_{m'n'}(km_rr, \theta{}, \phi{})
  *        \right) \times{} \vec{M}_{mn}(kr, \theta{}, \phi{})
- *        - Rg\vec{N}_{m'n'}(km_rr, \theta{}, \phi{}) \times{} \left(
+ *        + Rg\vec{N}_{m'n'}(km_rr, \theta{}, \phi{}) \times{} \left(
  *          \vec{\nabla{}} \times{} \vec{M}_{mn}(kr, \theta{}, \phi{})
  *        \right)
  *      \right] \\ = k^2 \int{} d\vec{\sigma{}} . \left[
- *        Rg\vec{M}_{m'n'}(km_rr, \theta{}, \phi{})
+ *        m_r Rg\vec{M}_{m'n'}(km_rr, \theta{}, \phi{})
  *        \times{} \vec{M}_{mn}(kr, \theta{}, \phi{})
- *        - Rg\vec{N}_{m'n'}(km_rr, \theta{}, \phi{}) \times{}
+ *        + Rg\vec{N}_{m'n'}(km_rr, \theta{}, \phi{}) \times{}
  *          \vec{N}_{mn}(kr, \theta{}, \phi{})
  *      \right],
  * @f]
@@ -267,13 +274,13 @@ using namespace std;
  *        \left(
  *          \vec{\nabla{}} \times{} Rg\vec{M}_{m'n'}(km_rr, \theta{}, \phi{})
  *        \right) \times{} \vec{N}_{mn}(kr, \theta{}, \phi{})
- *        - Rg\vec{M}_{m'n'}(km_rr, \theta{}, \phi{}) \times{} \left(
+ *        + Rg\vec{M}_{m'n'}(km_rr, \theta{}, \phi{}) \times{} \left(
  *          \vec{\nabla{}} \times{} \vec{N}_{mn}(kr, \theta{}, \phi{})
  *        \right)
  *      \right] \\ = k^2 \int{} d\vec{\sigma{}} . \left[
- *        Rg\vec{N}_{m'n'}(km_rr, \theta{}, \phi{})
+ *        m_r Rg\vec{N}_{m'n'}(km_rr, \theta{}, \phi{})
  *        \times{} \vec{N}_{mn}(kr, \theta{}, \phi{})
- *        - Rg\vec{M}_{m'n'}(km_rr, \theta{}, \phi{}) \times{}
+ *        + Rg\vec{M}_{m'n'}(km_rr, \theta{}, \phi{}) \times{}
  *        \vec{M}_{mn}(kr, \theta{}, \phi{})
  *    \right],
  * @f]
@@ -283,13 +290,13 @@ using namespace std;
  *        \left(
  *          \vec{\nabla{}} \times{} Rg\vec{N}_{m'n'}(km_rr, \theta{}, \phi{})
  *        \right) \times{} \vec{N}_{mn}(kr, \theta{}, \phi{})
- *        - Rg\vec{N}_{m'n'}(km_rr, \theta{}, \phi{}) \times{} \left(
+ *        + Rg\vec{N}_{m'n'}(km_rr, \theta{}, \phi{}) \times{} \left(
  *          \vec{\nabla{}} \times{} \vec{N}_{mn}(kr, \theta{}, \phi{})
  *        \right)
  *      \right] \\ = k^2 \int{} d\vec{\sigma{}} . \left[
- *        Rg\vec{M}_{m'n'}(km_rr, \theta{}, \phi{})
+ *        m_r Rg\vec{M}_{m'n'}(km_rr, \theta{}, \phi{})
  *        \times{} \vec{N}_{mn}(kr, \theta{}, \phi{})
- *        - Rg\vec{N}_{m'n'}(km_rr, \theta{}, \phi{}) \times{}
+ *        + Rg\vec{N}_{m'n'}(km_rr, \theta{}, \phi{}) \times{}
  *          \vec{M}_{mn}(kr, \theta{}, \phi{})
  *      \right].
  * @f]
