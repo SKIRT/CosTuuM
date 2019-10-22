@@ -99,7 +99,7 @@ void qsched_ensure(struct qsched *s, int nr_tasks, int nr_res, int nr_deps,
     struct task *tasks_new;
     if ((tasks_new = (struct task *)malloc(sizeof(struct task) * nr_tasks)) ==
         NULL)
-      error("Failed to allocate new task buffer.");
+      quicksched_error("Failed to allocate new task buffer.");
     memcpy(tasks_new, s->tasks, sizeof(struct task) * s->count);
     free(s->tasks);
     s->tasks = tasks_new;
@@ -111,7 +111,7 @@ void qsched_ensure(struct qsched *s, int nr_tasks, int nr_res, int nr_deps,
     dirty = 1;
     struct res *res_new;
     if ((res_new = (struct res *)malloc(sizeof(struct res) * nr_res)) == NULL)
-      error("Failed to allocate new res buffer.");
+      quicksched_error("Failed to allocate new res buffer.");
     memcpy(res_new, s->res, sizeof(struct res) * s->count_res);
     free(s->res);
     s->res = res_new;
@@ -126,7 +126,7 @@ void qsched_ensure(struct qsched *s, int nr_tasks, int nr_res, int nr_deps,
             NULL ||
         (deps_key_new =
              (qsched_task_t *)malloc(sizeof(qsched_task_t) * nr_deps)) == NULL)
-      error("Failed to allocate new deps buffer.");
+      quicksched_error("Failed to allocate new deps buffer.");
     memcpy(deps_new, s->deps, sizeof(qsched_task_t) * s->count_deps);
     memcpy(deps_key_new, s->deps_key, sizeof(qsched_task_t) * s->count_deps);
     free(s->deps);
@@ -145,7 +145,7 @@ void qsched_ensure(struct qsched *s, int nr_tasks, int nr_res, int nr_deps,
             NULL ||
         (locks_key_new =
              (qsched_task_t *)malloc(sizeof(qsched_task_t) * nr_locks)) == NULL)
-      error("Failed to allocate new locks buffer.");
+      quicksched_error("Failed to allocate new locks buffer.");
     memcpy(locks_new, s->locks, sizeof(qsched_res_t) * s->count_locks);
     memcpy(locks_key_new, s->locks_key, sizeof(qsched_task_t) * s->count_locks);
     free(s->locks);
@@ -164,7 +164,7 @@ void qsched_ensure(struct qsched *s, int nr_tasks, int nr_res, int nr_deps,
             NULL ||
         (uses_key_new =
              (qsched_task_t *)malloc(sizeof(qsched_task_t) * nr_uses)) == NULL)
-      error("Failed to allocate new uses buffer.");
+      quicksched_error("Failed to allocate new uses buffer.");
     memcpy(uses_new, s->uses, sizeof(qsched_res_t) * s->count_uses);
     memcpy(uses_key_new, s->uses_key, sizeof(qsched_task_t) * s->count_uses);
     free(s->uses);
@@ -179,7 +179,7 @@ void qsched_ensure(struct qsched *s, int nr_tasks, int nr_res, int nr_deps,
     dirty = 1;
     char *data_new;
     if ((data_new = (char *)malloc(size_data)) == NULL)
-      error("Failed to allocate new data buffer.");
+      quicksched_error("Failed to allocate new data buffer.");
     memcpy(data_new, s->data, s->count_data);
     free(s->data);
     s->data = data_new;
@@ -216,7 +216,7 @@ void qsched_addtask_dynamic(struct qsched *s, int type, unsigned int flags,
 
   /* Allocate a new task. */
   if ((tid = atomic_inc(&s->count)) >= s->size)
-    error("Task buffer overflow.");
+    quicksched_error("Task buffer overflow.");
   t = &s->tasks[tid];
 
   /* Set the task data. */
@@ -230,13 +230,13 @@ void qsched_addtask_dynamic(struct qsched *s, int type, unsigned int flags,
   data_size2 = (data_size + (qsched_data_round - 1)) & ~(qsched_data_round - 1);
   if ((ind = atomic_add(&s->count_data, data_size2)) + data_size2 >
       s->size_data)
-    error("Data buffer overflow.");
+    quicksched_error("Data buffer overflow.");
   memcpy(&s->data[ind], data, data_size);
   t->data = ind;
 
   /* Add the locks. */
   if ((ind = atomic_add(&s->count_locks, nr_locks)) + nr_locks > s->size_locks)
-    error("Locks buffer overflow.");
+    quicksched_error("Locks buffer overflow.");
   memcpy(&s->locks[ind], locks, sizeof(qsched_res_t) * nr_locks);
   for (k = 0; k < nr_locks; k++)
     s->locks_key[ind + k] = tid;
@@ -244,7 +244,7 @@ void qsched_addtask_dynamic(struct qsched *s, int type, unsigned int flags,
 
   /* Add the uses. */
   if ((ind = atomic_add(&s->count_uses, nr_uses)) + nr_uses > s->size_uses)
-    error("uses buffer overflow.");
+    quicksched_error("uses buffer overflow.");
   memcpy(&s->uses[ind], uses, sizeof(qsched_res_t) * nr_uses);
   for (k = 0; k < nr_uses; k++)
     s->uses_key[ind + k] = tid;
@@ -306,6 +306,7 @@ void qsched_run_openmp(struct qsched *s, int nr_threads, qsched_funtype fun) {
 
     /* Get the ID of the current thread. */
     int qid = omp_get_thread_num() % s->nr_queues;
+    quicksched_message("Thread %i up and running!", qid);
 
     /* Loop as long as there are tasks. */
     while ((t = qsched_gettask(s, qid)) != NULL) {
@@ -338,7 +339,7 @@ void qsched_barrier_wait(struct qsched *s, int tid) {
 #if defined(HAVE_PTHREAD)
   /* First, get the barrier mutex. */
   if (pthread_mutex_lock(&s->barrier_mutex) != 0)
-    error("Failed to get barrier mutex.");
+    quicksched_error("Failed to get barrier mutex.");
 
   /* The callee's thread stops running. */
   s->barrier_running -= 1;
@@ -346,12 +347,12 @@ void qsched_barrier_wait(struct qsched *s, int tid) {
   /* If all threads are in, send a signal... */
   if (s->barrier_running == 0)
     if (pthread_cond_broadcast(&s->barrier_cond) != 0)
-      error("Failed to broadcast barrier full condition.");
+      quicksched_error("Failed to broadcast barrier full condition.");
 
   /* Wait for the barrier to open. */
   while (s->barrier_count == 0 || tid >= s->barrier_launchcount)
     if (pthread_cond_wait(&s->barrier_cond, &s->barrier_mutex) != 0)
-      error("Eror waiting for barrier to close.");
+      quicksched_error("Eror waiting for barrier to close.");
 
   /* This thread is leaving, decrease the barrier count, increase
      the number of threads running. */
@@ -361,11 +362,11 @@ void qsched_barrier_wait(struct qsched *s, int tid) {
   /* If I'm the last one out, signal the condition again. */
   if (s->barrier_count == 0)
     if (pthread_cond_broadcast(&s->barrier_cond) != 0)
-      error("Failed to broadcast empty barrier condition.");
+      quicksched_error("Failed to broadcast empty barrier condition.");
 
   /* Last but not least, release the mutex. */
   if (pthread_mutex_unlock(&s->barrier_mutex) != 0)
-    error("Failed to get unlock the barrier mutex.");
+    quicksched_error("Failed to get unlock the barrier mutex.");
 #endif
 }
 
@@ -385,18 +386,18 @@ void qsched_launch_threads(struct qsched *s, int nr_threads) {
   /* Wait for all the runners to have entered the barrier. */
   while (s->barrier_running)
     if (pthread_cond_wait(&s->barrier_cond, &s->barrier_mutex) != 0)
-      error("Error while waiting for barrier.");
+      quicksched_error("Error while waiting for barrier.");
 
   /* Cry havoc and let loose the dogs of war. */
   s->barrier_count = nr_threads;
   s->barrier_launchcount = nr_threads;
   if (pthread_cond_broadcast(&s->barrier_cond) != 0)
-    error("Failed to broadcast barrier open condition.");
+    quicksched_error("Failed to broadcast barrier open condition.");
 
   /* Lean back and wait for the runners to come home. */
   while (s->barrier_count || s->barrier_running)
     if (pthread_cond_wait(&s->barrier_cond, &s->barrier_mutex) != 0)
-      error("Error while waiting for barrier.");
+      quicksched_error("Error while waiting for barrier.");
 #endif
 }
 
@@ -462,7 +463,7 @@ void qsched_run_pthread(struct qsched *s, int nr_threads, qsched_funtype fun) {
       struct qsched_pthread_runner *runners_new;
       if ((runners_new = malloc(sizeof(struct qsched_pthread_runner) *
                                 runners_size_new)) == NULL)
-        error("Failed to allocate new thread array.");
+        quicksched_error("Failed to allocate new thread array.");
       memcpy(runners_new, s->runners, sizeof(pthread_t) * s->runners_count);
       free(s->runners);
       s->runners = runners_new;
@@ -476,7 +477,7 @@ void qsched_run_pthread(struct qsched *s, int nr_threads, qsched_funtype fun) {
       s->runners[tid].s = s;
       if (pthread_create(&s->runners[tid].thread, NULL, qsched_pthread_run,
                          (void *)&s->runners[tid]) != 0)
-        error("Failed to create pthread.");
+        quicksched_error("Failed to create pthread.");
       s->runners_count += 1;
     }
   }
@@ -519,7 +520,7 @@ void qsched_run(struct qsched *s, int nr_threads, qsched_funtype fun) {
     qsched_run_openmp(s, nr_threads, fun);
 
   else
-    error("QuickSched was not compiled with OpenMP or pthreads.");
+    quicksched_error("QuickSched was not compiled with OpenMP or pthreads.");
 }
 
 /**
@@ -798,11 +799,11 @@ struct task *qsched_gettask(struct qsched *s, int qid) {
 
   /* Check if the sched is ok. */
   if (s->flags & qsched_flag_dirty || !(s->flags & qsched_flag_ready))
-    error("Calling gettask with dirty or unprepared sched.");
+    quicksched_error("Calling gettask with dirty or unprepared sched.");
 
   /* Check if the queue ID is ok. */
   if (qid < 0 || qid >= s->nr_queues)
-    error("Invalid queue ID.");
+    quicksched_error("Invalid queue ID.");
 
   /* Main loop. */
   while (s->waiting) {
@@ -892,10 +893,10 @@ void qsched_sort(int *restrict data, int *restrict ind, int N, int min,
     return;
   new_data = (int *)malloc(sizeof(int) * N);
   if (new_data == NULL)
-    error("Failed to allocate new_data");
+    quicksched_error("Failed to allocate new_data");
   new_ind = (int *)malloc(sizeof(int) * N);
   if (new_ind == NULL)
-    error("Failed to allocate new_ind");
+    quicksched_error("Failed to allocate new_ind");
 
   /*Create buckets of size ? - Ideally <16 elements per bucket. Use max-min / N
    * * 10 ? Should give average of 10 elements per bucket */
@@ -905,7 +906,7 @@ void qsched_sort(int *restrict data, int *restrict ind, int N, int min,
   int num_buckets = (max - min) / bucketsize + 1;
   int *bucket_inds = (int *)malloc(sizeof(int) * num_buckets);
   if (bucket_inds == NULL)
-    error("Failed to allocate bucket_inds");
+    quicksched_error("Failed to allocate bucket_inds");
   memset(bucket_inds, 0, sizeof(int) * num_buckets);
   for (i = 0; i < N; i++) {
     bucket_inds[(ind[i] - min)]++;
@@ -1097,7 +1098,7 @@ void qsched_prepare(struct qsched *s) {
       }
   }
   if (k < count)
-    error("Circular dependencies detected.");
+    quicksched_error("Circular dependencies detected.");
 
   /* Run through the topologically sorted tasks backwards and
      set their weights, re-setting the waits while we're at it. */
@@ -1160,7 +1161,7 @@ int qsched_addres(struct qsched *s, int owner, int parent) {
 
     /* Allocate a new task list. */
     if ((res_new = malloc(sizeof(struct res) * s->size_res)) == NULL)
-      error("Failed to allocate new res lists.");
+      quicksched_error("Failed to allocate new res lists.");
 
     /* Copy the res and owners over to the new list. */
     memcpy(res_new, s->res, sizeof(struct res) * s->count_res);
@@ -1213,7 +1214,7 @@ void qsched_addlock(struct qsched *s, int t, int res) {
     /* Allocate a new task list. */
     if ((temp1 = malloc(sizeof(int) * s->size_locks)) == NULL ||
         (temp2 = malloc(sizeof(int) * s->size_locks)) == NULL)
-      error("Failed to allocate new locks lists.");
+      quicksched_error("Failed to allocate new locks lists.");
 
     /* Copy the locks and keys over to the new list. */
     memcpy(temp1, s->locks, sizeof(int) * s->count_locks);
@@ -1267,7 +1268,7 @@ void qsched_adduse(struct qsched *s, int t, int res) {
     /* Allocate a new task list. */
     if ((temp1 = malloc(sizeof(int) * s->size_uses)) == NULL ||
         (temp2 = malloc(sizeof(int) * s->size_uses)) == NULL)
-      error("Failed to allocate new uses lists.");
+      quicksched_error("Failed to allocate new uses lists.");
 
     /* Copy the uses and keys over to the new list. */
     memcpy(temp1, s->uses, sizeof(int) * s->count_uses);
@@ -1323,7 +1324,7 @@ void qsched_addunlock(struct qsched *s, int ta, int tb) {
     /* Allocate a new task list. */
     if ((temp1 = malloc(sizeof(int) * s->size_deps)) == NULL ||
         (temp2 = malloc(sizeof(int) * s->size_deps)) == NULL)
-      error("Failed to allocate new deps lists.");
+      quicksched_error("Failed to allocate new deps lists.");
 
     /* Copy the deps and keys over to the new list. */
     memcpy(temp1, s->deps, sizeof(int) * s->count_deps);
@@ -1382,7 +1383,7 @@ int qsched_addtask(struct qsched *s, int type, unsigned int flags, void *data,
 
     /* Allocate a new task list. */
     if ((temp = malloc(sizeof(struct task) * s->size)) == NULL)
-      error("Failed to allocate new task list.");
+      quicksched_error("Failed to allocate new task list.");
 
     /* Copy the tasks over to the new list. */
     memcpy(temp, s->tasks, sizeof(struct task) * s->count);
@@ -1405,7 +1406,7 @@ int qsched_addtask(struct qsched *s, int type, unsigned int flags, void *data,
 
     /* Allocate a new task list. */
     if ((temp = malloc(s->size_data)) == NULL)
-      error("Failed to allocate new task list.");
+      quicksched_error("Failed to allocate new task list.");
 
     /* Copy the tasks over to the new list. */
     memcpy(temp, s->data, s->count_data);
@@ -1510,20 +1511,20 @@ void qsched_free(struct qsched *s) {
     s->barrier_launchcount = s->runners_count;
     if (pthread_mutex_unlock(&s->barrier_mutex) != 0 ||
         pthread_cond_broadcast(&s->barrier_cond) != 0)
-      error("Failed to open the barrier.");
+      quicksched_error("Failed to open the barrier.");
 
     /* Wait for each thread to have terminated. */
     for (k = 0; k < s->runners_count; k++)
       if (pthread_join(s->runners[k].thread, NULL) != 0)
-        error("Failed to join on thread %i.", k);
+        quicksched_error("Failed to join on thread %i.", k);
 
     /* Clean up the mutexes and barriers. */
     if (pthread_cond_destroy(&s->cond) != 0 ||
         pthread_mutex_destroy(&s->mutex) != 0)
-      error("Error destroying pthread cond/mutex pair.");
+      quicksched_error("Error destroying pthread cond/mutex pair.");
     if (pthread_mutex_destroy(&s->barrier_mutex) != 0 ||
         pthread_cond_destroy(&s->barrier_cond) != 0)
-      error("Error destroying pthread barrier cond/mutex pair.");
+      quicksched_error("Error destroying pthread barrier cond/mutex pair.");
     free(s->runners);
     s->runners_size = 0;
     s->runners_count = 0;
@@ -1553,47 +1554,47 @@ void qsched_init(struct qsched *s, int nr_queues, int flags) {
      finalized. */
   if ((s->queues = (struct queue *)malloc(sizeof(struct queue) * nr_queues)) ==
       NULL)
-    error("Failed to allocate memory for queues.");
+    quicksched_error("Failed to allocate memory for queues.");
   bzero(s->queues, sizeof(struct queue) * nr_queues);
   s->nr_queues = nr_queues;
 
   /* Allocate the task list. */
   s->size = qsched_size_init;
   if ((s->tasks = (struct task *)malloc(sizeof(struct task) * s->size)) == NULL)
-    error("Failed to allocate memory for tasks.");
+    quicksched_error("Failed to allocate memory for tasks.");
   s->count = 0;
 
   /* Allocate the initial deps. */
   s->size_deps = qsched_init_depspertask * s->size;
   if ((s->deps = (int *)malloc(sizeof(int) * s->size_deps)) == NULL ||
       (s->deps_key = (int *)malloc(sizeof(int) * s->size_deps)) == NULL)
-    error("Failed to allocate memory for deps.");
+    quicksched_error("Failed to allocate memory for deps.");
   s->count_deps = 0;
 
   /* Allocate the initial locks. */
   s->size_locks = qsched_init_lockspertask * s->size;
   if ((s->locks = (int *)malloc(sizeof(int) * s->size_locks)) == NULL ||
       (s->locks_key = (int *)malloc(sizeof(int) * s->size_locks)) == NULL)
-    error("Failed to allocate memory for locks.");
+    quicksched_error("Failed to allocate memory for locks.");
   s->count_locks = 0;
 
   /* Allocate the initial res. */
   s->size_res = qsched_init_respertask * s->size;
   if ((s->res = (struct res *)malloc(sizeof(struct res) * s->size_res)) == NULL)
-    error("Failed to allocate memory for res.");
+    quicksched_error("Failed to allocate memory for res.");
   s->count_res = 0;
 
   /* Allocate the initial uses. */
   s->size_uses = qsched_init_usespertask * s->size;
   if ((s->uses = (int *)malloc(sizeof(int) * s->size_uses)) == NULL ||
       (s->uses_key = (int *)malloc(sizeof(int) * s->size_uses)) == NULL)
-    error("Failed to allocate memory for uses.");
+    quicksched_error("Failed to allocate memory for uses.");
   s->count_uses = 0;
 
   /* Allocate the initial data. */
   s->size_data = qsched_init_datapertask * s->size;
   if ((s->data = malloc(s->size_data)) == NULL)
-    error("Failed to allocate memory for data.");
+    quicksched_error("Failed to allocate memory for data.");
   s->count_data = 0;
 
 /* Init the pthread stuff. */
@@ -1601,20 +1602,20 @@ void qsched_init(struct qsched *s, int nr_queues, int flags) {
   if (flags & qsched_flag_pthread) {
     if (pthread_cond_init(&s->cond, NULL) != 0 ||
         pthread_mutex_init(&s->mutex, NULL) != 0)
-      error("Error initializing yield cond/mutex pair.");
+      quicksched_error("Error initializing yield cond/mutex pair.");
     if (pthread_cond_init(&s->barrier_cond, NULL) != 0 ||
         pthread_mutex_init(&s->barrier_mutex, NULL) != 0)
-      error("Error initializing barrier cond/mutex pair.");
+      quicksched_error("Error initializing barrier cond/mutex pair.");
     s->runners_count = 0;
     s->runners_size = qsched_init_runners;
     if ((s->runners = malloc(sizeof(struct qsched_pthread_runner) *
                              s->runners_size)) == NULL)
-      error("Failed to allocate runners.");
+      quicksched_error("Failed to allocate runners.");
     s->barrier_running = 0;
     s->barrier_count = 0;
     s->barrier_launchcount = 0;
     if (pthread_mutex_lock(&s->barrier_mutex) != 0)
-      error("Failed to lock barrier mutex.");
+      quicksched_error("Failed to lock barrier mutex.");
   }
 #endif
 

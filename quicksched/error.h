@@ -18,7 +18,7 @@
  ******************************************************************************/
 
 /* Error macro. */
-#define error(s, ...)                                                          \
+#define quicksched_error(s, ...)                                               \
   {                                                                            \
     fprintf(stderr, "%s:%s():%i: " s "\n", __FILE__, __FUNCTION__, __LINE__,   \
             ##__VA_ARGS__);                                                    \
@@ -26,7 +26,7 @@
   }
 
 /* Message macro. */
-#define message(s, ...)                                                        \
+#define quicksched_message(s, ...)                                             \
   {                                                                            \
     printf("%s: " s "\n", __FUNCTION__, ##__VA_ARGS__);                        \
     fflush(stdout);                                                            \

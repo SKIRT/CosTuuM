@@ -57,7 +57,7 @@ int queue_get(struct queue *q, struct qsched *s, int insist) {
   TIMER_TIC
   if (insist) {
     if (lock_lock(&q->lock) != 0)
-      error("Failed to lock queue.");
+      quicksched_error("Failed to lock queue.");
   } else if (lock_trylock(&q->lock) != 0)
     return qsched_task_none;
   TIMER_TOC(s, qsched_timer_qlock);
@@ -141,7 +141,7 @@ void queue_put(struct queue *q, struct qsched *s, int tid) {
 
   /* Lock this queue. */
   if (lock_lock(&q->lock) != 0)
-    error("Failed to lock queue.");
+    quicksched_error("Failed to lock queue.");
 
   /* Get a pointer to the indices. */
   inds = q->inds;
@@ -157,7 +157,7 @@ void queue_put(struct queue *q, struct qsched *s, int tid) {
 
     /* Allocate the new indices. */
     if ((inds_new = (int *)malloc(sizeof(int) * q->size)) == NULL)
-      error("Failed to allocate new indices.");
+      quicksched_error("Failed to allocate new indices.");
 
     /* Copy the old indices. */
     memcpy(inds_new, inds, sizeof(int) * q->count);
@@ -214,7 +214,7 @@ void queue_init(struct queue *q, int size) {
       free((int *)q->inds);
     q->size = size;
     if ((q->inds = (int *)malloc(sizeof(int) * size)) == NULL)
-      error("Failed to allocate queue inds.");
+      quicksched_error("Failed to allocate queue inds.");
   }
   q->size = size;
 
