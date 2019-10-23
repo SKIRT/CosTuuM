@@ -415,9 +415,6 @@ private:
   /*! @brief Number of Gauss-Legendre quadrature points, @f$n_{GL}@f$. */
   const uint_fast32_t _ngauss;
 
-  /*! @brief Precomputed factors @f$n(n+1)@f$ (array of size @f$n_{max}@f$). */
-  std::vector<float_type> _an;
-
   /*! @brief Precomputed factors @f$\sqrt{\frac{2n+1}{n(n+1)}}@f$ (array of size
    *  @f$n_{max}@f$). */
   std::vector<float_type> _dd;
@@ -518,9 +515,8 @@ public:
                  const std::complex<float_type> refractive_index,
                  const float_type R_V, const float_type axis_ratio,
                  const uint_fast32_t nmax, const uint_fast32_t ngauss)
-      : _nmax(nmax), _ngauss(ngauss), _an(nmax, float_type(0.)),
-        _dd(nmax, float_type(0.)), _ann(nmax, nmax),
-        _costheta(2 * ngauss, float_type(0.)),
+      : _nmax(nmax), _ngauss(ngauss), _dd(nmax, float_type(0.)),
+        _ann(nmax, nmax), _costheta(2 * ngauss, float_type(0.)),
         _sinthetainv(2 * ngauss, float_type(0.)),
         _sintheta2inv(2 * ngauss, float_type(0.)),
         _weights(2 * ngauss, float_type(0.)), _r2(2 * ngauss, float_type(0.)),
@@ -540,7 +536,6 @@ public:
 
     for (uint_fast32_t ni = 0; ni < nmax; ++ni) {
       const float_type nn((ni + 2.) * (ni + 1.));
-      _an[ni] = nn;
       const float_type d = sqrt((2. * (ni + 1.) + 1.) / nn);
       _dd[ni] = d;
       for (uint_fast32_t nj = 0; nj < ni + 1; ++nj) {
@@ -616,10 +611,10 @@ public:
     }
     for (uint_fast32_t n1 = 1; n1 < nmax + 1; ++n1) {
       // n1 * (n1 + 1)
-      const float_type n1n1p1 = _an[n1 - 1];
+      const float_type n1n1p1 = n1 * (n1 + 1.);
       for (uint_fast32_t n2 = 1; n2 < nmax + 1; ++n2) {
         // n2 * (n2 + 1)
-        const float_type n2n2p1 = _an[n2 - 1];
+        const float_type n2n2p1 = n2 * (n2 + 1.);
 
         std::complex<float_type> this_J12, this_J21, this_RgJ12, this_RgJ21;
         // filter out half the components because of symmetry
@@ -804,10 +799,10 @@ public:
       }
       for (uint_fast32_t n1 = m; n1 < _nmax + 1; ++n1) {
         // n1 * (n1 + 1)
-        const float_type n1n1p1 = _an[n1 - 1];
+        const float_type n1n1p1 = n1 * (n1 + 1.);
         for (uint_fast32_t n2 = m; n2 < _nmax + 1; ++n2) {
           // n2 * (n2 + 1)
-          const float_type n2n2p1 = _an[n2 - 1];
+          const float_type n2n2p1 = n2 * (n2 + 1.);
 
           std::complex<float_type> this_J11, this_J12, this_J21, this_J22,
               this_RgJ11, this_RgJ12, this_RgJ21, this_RgJ22;

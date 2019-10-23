@@ -7,7 +7,10 @@
  */
 
 #include "Error.hpp"
+#include "GaussBasedResources.hpp"
+#include "NBasedResources.hpp"
 #include "QuickSchedWrapper.hpp"
+#include "WignerDResources.hpp"
 
 #include <cinttypes>
 #include <fstream>
@@ -99,57 +102,94 @@ public:
  */
 int main(int argc, char **argv) {
 
-  double *a, *b, *c, irm = 1.0 / RAND_MAX;
-  const uint_fast32_t m = 30;
-  const uint_fast32_t n = 30;
-  const uint_fast32_t k = 30;
+  /// basic test (copied from QuickSched itself)
+  {
+    double *a, *b, *c, irm = 1.0 / RAND_MAX;
+    const uint_fast32_t m = 30;
+    const uint_fast32_t n = 30;
+    const uint_fast32_t k = 30;
 
-  a = new double[32 * 32 * m * k];
-  b = new double[32 * 32 * k * n];
-  c = new double[32 * 32 * m * n];
+    a = new double[32 * 32 * m * k];
+    b = new double[32 * 32 * k * n];
+    c = new double[32 * 32 * m * n];
 
-  /* Fill the matrices. */
-  for (uint_fast32_t i = 0; i < m * k * 32 * 32; ++i) {
-    a[i] = rand() * irm;
-  }
-  for (uint_fast32_t i = 0; i < k * n * 32 * 32; ++i) {
-    b[i] = rand() * irm;
-  }
-  for (uint_fast32_t i = 0; i < k * n * 32 * 32; ++i) {
-    c[i] = 0.;
-  }
-
-  std::vector<MatrixMultiplicationTask> tasks;
-  // the resources are simple dummies in this case
-  std::vector<Resource> resources(m * n);
-  for (uint_fast32_t i = 0; i < m; ++i) {
-    for (uint_fast32_t j = 0; j < n; ++j) {
-      tasks.push_back(MatrixMultiplicationTask(i, j, m, k, a, b, c));
+    /* Fill the matrices. */
+    for (uint_fast32_t i = 0; i < m * k * 32 * 32; ++i) {
+      a[i] = rand() * irm;
     }
+    for (uint_fast32_t i = 0; i < k * n * 32 * 32; ++i) {
+      b[i] = rand() * irm;
+    }
+    for (uint_fast32_t i = 0; i < k * n * 32 * 32; ++i) {
+      c[i] = 0.;
+    }
+
+    std::vector<MatrixMultiplicationTask> tasks;
+    // the resources are simple dummies in this case
+    std::vector<Resource> resources(m * n);
+    for (uint_fast32_t i = 0; i < m; ++i) {
+      for (uint_fast32_t j = 0; j < n; ++j) {
+        tasks.push_back(MatrixMultiplicationTask(i, j, m, k, a, b, c));
+      }
+    }
+
+    QuickSched quicksched(4);
+    /* Build a task for each tile of the matrix c. */
+    for (uint_fast32_t i = 0; i < tasks.size(); ++i) {
+      quicksched.register_resource(resources[i]);
+      quicksched.register_task(tasks[i]);
+      quicksched.link_task_and_resource(tasks[i], resources[i], true);
+    }
+
+    quicksched.execute_tasks(4);
+
+    delete[] a;
+    delete[] b;
+    delete[] c;
   }
 
-  QuickSched quicksched(4);
-  /* Build a task for each tile of the matrix c. */
-  for (uint_fast32_t i = 0; i < tasks.size(); ++i) {
-    quicksched.register_resource(resources[i]);
-    quicksched.register_task(tasks[i]);
-    quicksched.link_task_and_resource(tasks[i], resources[i], true);
+  {
+    QuickSched quicksched(4);
+
+    NBasedResources nfactors(200);
+    quicksched.register_resource(nfactors);
+    quicksched.register_task(nfactors);
+    quicksched.link_task_and_resource(nfactors, nfactors, true);
+
+    std::vector<GaussBasedResources *> gaussfactors(100, nullptr);
+    std::vector<WignerDResources *> wignerfactors(100, nullptr);
+    for (uint_fast32_t ig = 0; ig < 100; ++ig) {
+      gaussfactors[ig] = new GaussBasedResources(ig + 20);
+      quicksched.register_resource(*gaussfactors[ig]);
+      quicksched.register_task(*gaussfactors[ig]);
+      quicksched.link_task_and_resource(*gaussfactors[ig], *gaussfactors[ig],
+                                        true);
+
+      wignerfactors[ig] = new WignerDResources(100, ig + 20, *gaussfactors[ig]);
+      quicksched.register_resource(*wignerfactors[ig]);
+      quicksched.register_task(*wignerfactors[ig]);
+      quicksched.link_task_and_resource(*wignerfactors[ig], *wignerfactors[ig],
+                                        true);
+      quicksched.link_task_and_resource(*wignerfactors[ig], *gaussfactors[ig],
+                                        false);
+      quicksched.link_tasks(*gaussfactors[ig], *wignerfactors[ig]);
+    }
+
+    quicksched.execute_tasks(4);
+
+    std::ofstream taskfile("test_quicksched_tasks.txt");
+    taskfile << "# thread\tstart\tend\ttype\n";
+    quicksched.print_task(nfactors, taskfile);
+    for (uint_fast32_t ig = 0; ig < 100; ++ig) {
+      quicksched.print_task(*gaussfactors[ig], taskfile);
+      delete gaussfactors[ig];
+      quicksched.print_task(*wignerfactors[ig], taskfile);
+      delete wignerfactors[ig];
+    }
+    std::ofstream typefile("test_quicksched_types.txt");
+    typefile << "# type\tlabel\n";
+    quicksched.print_type_dict(typefile);
   }
-
-  quicksched.execute_tasks(4);
-
-  std::ofstream taskfile("test_quicksched_tasks.txt");
-  taskfile << "# thread\tstart\tend\ttype\n";
-  for (uint_fast32_t i = 0; i < tasks.size(); ++i) {
-    quicksched.print_task(tasks[i], taskfile);
-  }
-  std::ofstream typefile("test_quicksched_types.txt");
-  typefile << "# type\tlabel\n";
-  quicksched.print_type_dict(typefile);
-
-  delete[] a;
-  delete[] b;
-  delete[] c;
 
   return 0;
 }
