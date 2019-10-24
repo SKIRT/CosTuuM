@@ -27,6 +27,9 @@ using namespace std;
  */
 class WignerDResources : public Resource, public Task {
 private:
+  /*! @brief @f$m@f$ value for which the factors are computed. */
+  const uint_fast32_t _m;
+
   /*! @brief Maximum order, @f$n_{max}@f$. */
   const uint_fast32_t _nmax;
 
@@ -46,14 +49,16 @@ public:
   /**
    * @brief Constructor.
    *
+   * @param m @f$m@f$ value for which the factors are computed.
    * @param nmax Maximum order, @f$n_{max}@f$.
    * @param ngauss Number of Gauss-Legendre quadrature points, @f$n_{GL}@f$.
    * @param quadrature_points Gauss-Legendre quadrature points (to be computed
    * before this task is executed!).
    */
-  inline WignerDResources(const uint_fast32_t nmax, const uint_fast32_t ngauss,
+  inline WignerDResources(const uint_fast32_t m, const uint_fast32_t nmax,
+                          const uint_fast32_t ngauss,
                           GaussBasedResources &quadrature_points)
-      : _nmax(nmax), _ngauss(ngauss), _wigner_d(2 * ngauss, nmax),
+      : _m(m), _nmax(nmax), _ngauss(ngauss), _wigner_d(2 * ngauss, nmax),
         _dwigner_d(2 * ngauss, nmax), _quadrature_points(quadrature_points) {}
 
   virtual ~WignerDResources() {}
@@ -67,7 +72,7 @@ public:
       const uint_fast32_t i2 = _ngauss - ig + 1;
       std::vector<float_type> dv1(_nmax), dv2(_nmax);
       SpecialFunctions::wigner_dn_0m(_quadrature_points.get_costheta(i1 - 1),
-                                     _nmax, 0, &dv1[0], &dv2[0]);
+                                     _nmax, _m, &dv1[0], &dv2[0]);
       int_fast8_t sign = 1;
       for (uint_fast32_t n = 0; n < _nmax; ++n) {
         sign = -sign;
@@ -77,6 +82,32 @@ public:
         _dwigner_d(i2 - 1, n) = -sign * dv2[n];
       }
     }
+  }
+
+  /**
+   * @brief Get the Wigner D function for the given Gauss-Legendre quadrature
+   * point.
+   *
+   * @param ig Index of the Gauss-Legendre quadrature point.
+   * @param n Order, @f$n@f$.
+   * @return Corresponding Wigner D function value.
+   */
+  inline float_type get_wigner_d(const uint_fast32_t ig,
+                                 const uint_fast32_t n) const {
+    return _wigner_d(ig, n - 1);
+  }
+
+  /**
+   * @brief Get the derivative of the Wigner D function for the given Gauss-
+   * Legendre quadrature point.
+   *
+   * @param ig Index of the Gauss-Legendre quadrature point.
+   * @param n Order, @f$n@f$.
+   * @return Corresponding Wigner D function derivative value.
+   */
+  inline float_type get_dwigner_d(const uint_fast32_t ig,
+                                  const uint_fast32_t n) const {
+    return _dwigner_d(ig, n - 1);
   }
 };
 

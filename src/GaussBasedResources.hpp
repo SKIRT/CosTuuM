@@ -94,6 +94,15 @@ public:
   }
 
   /**
+   * @brief Get read-only access to the @f$\cos(\theta{})@f$ array.
+   *
+   * @return Reference to the @f$\cos(\theta{})@f$ array.
+   */
+  inline const std::vector<float_type> &get_costhetas() const {
+    return _costheta;
+  }
+
+  /**
    * @brief Get the precomputed @f$\frac{1}{\sin(\theta{})}@f$ value for the
    * Gauss-Legendre quadrature point with the given index.
    *

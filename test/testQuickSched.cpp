@@ -8,8 +8,11 @@
 
 #include "Error.hpp"
 #include "GaussBasedResources.hpp"
+#include "InteractionResource.hpp"
 #include "NBasedResources.hpp"
+#include "ParticleGeometryResource.hpp"
 #include "QuickSchedWrapper.hpp"
+#include "TMatrixResource.hpp"
 #include "WignerDResources.hpp"
 
 #include <cinttypes>
@@ -157,7 +160,10 @@ int main(int argc, char **argv) {
     quicksched.link_task_and_resource(nfactors, nfactors, true);
 
     std::vector<GaussBasedResources *> gaussfactors(100, nullptr);
-    std::vector<WignerDResources *> wignerfactors(100, nullptr);
+    std::vector<WignerDResources *> wignerm0factors(100, nullptr);
+    std::vector<WignerDResources *> wignerm1factors(100, nullptr);
+    std::vector<ParticleGeometryResource *> geometryfactors(100, nullptr);
+    std::vector<InteractionResource *> interactionfactors(100, nullptr);
     for (uint_fast32_t ig = 0; ig < 100; ++ig) {
       gaussfactors[ig] = new GaussBasedResources(ig + 20);
       quicksched.register_resource(*gaussfactors[ig]);
@@ -165,14 +171,48 @@ int main(int argc, char **argv) {
       quicksched.link_task_and_resource(*gaussfactors[ig], *gaussfactors[ig],
                                         true);
 
-      wignerfactors[ig] = new WignerDResources(100, ig + 20, *gaussfactors[ig]);
-      quicksched.register_resource(*wignerfactors[ig]);
-      quicksched.register_task(*wignerfactors[ig]);
-      quicksched.link_task_and_resource(*wignerfactors[ig], *wignerfactors[ig],
-                                        true);
-      quicksched.link_task_and_resource(*wignerfactors[ig], *gaussfactors[ig],
+      wignerm0factors[ig] =
+          new WignerDResources(0, 100, ig + 20, *gaussfactors[ig]);
+      quicksched.register_resource(*wignerm0factors[ig]);
+      quicksched.register_task(*wignerm0factors[ig]);
+      quicksched.link_task_and_resource(*wignerm0factors[ig],
+                                        *wignerm0factors[ig], true);
+      quicksched.link_task_and_resource(*wignerm0factors[ig], *gaussfactors[ig],
                                         false);
-      quicksched.link_tasks(*gaussfactors[ig], *wignerfactors[ig]);
+      quicksched.link_tasks(*gaussfactors[ig], *wignerm0factors[ig]);
+
+      wignerm1factors[ig] =
+          new WignerDResources(1, 100, ig + 20, *gaussfactors[ig]);
+      quicksched.register_resource(*wignerm1factors[ig]);
+      quicksched.register_task(*wignerm1factors[ig]);
+      quicksched.link_task_and_resource(*wignerm1factors[ig],
+                                        *wignerm1factors[ig], true);
+      quicksched.link_task_and_resource(*wignerm1factors[ig], *gaussfactors[ig],
+                                        false);
+      quicksched.link_tasks(*gaussfactors[ig], *wignerm1factors[ig]);
+
+      geometryfactors[ig] =
+          new ParticleGeometryResource(10., 0.5, ig + 20, *gaussfactors[ig]);
+      quicksched.register_resource(*geometryfactors[ig]);
+      quicksched.register_task(*geometryfactors[ig]);
+      quicksched.link_task_and_resource(*geometryfactors[ig],
+                                        *geometryfactors[ig], true);
+      quicksched.link_task_and_resource(*geometryfactors[ig], *gaussfactors[ig],
+                                        false);
+      quicksched.link_tasks(*gaussfactors[ig], *geometryfactors[ig]);
+
+      interactionfactors[ig] = new InteractionResource(
+          100., std::complex<float_type>(1., 0.02), 100, ig + 20,
+          *gaussfactors[ig], *geometryfactors[ig]);
+      quicksched.register_resource(*interactionfactors[ig]);
+      quicksched.register_task(*interactionfactors[ig]);
+      quicksched.link_task_and_resource(*interactionfactors[ig],
+                                        *interactionfactors[ig], true);
+      quicksched.link_task_and_resource(*interactionfactors[ig],
+                                        *gaussfactors[ig], false);
+      quicksched.link_task_and_resource(*interactionfactors[ig],
+                                        *geometryfactors[ig], false);
+      quicksched.link_tasks(*geometryfactors[ig], *interactionfactors[ig]);
     }
 
     quicksched.execute_tasks(4);
@@ -183,8 +223,14 @@ int main(int argc, char **argv) {
     for (uint_fast32_t ig = 0; ig < 100; ++ig) {
       quicksched.print_task(*gaussfactors[ig], taskfile);
       delete gaussfactors[ig];
-      quicksched.print_task(*wignerfactors[ig], taskfile);
-      delete wignerfactors[ig];
+      quicksched.print_task(*wignerm0factors[ig], taskfile);
+      delete wignerm0factors[ig];
+      quicksched.print_task(*wignerm1factors[ig], taskfile);
+      delete wignerm1factors[ig];
+      quicksched.print_task(*geometryfactors[ig], taskfile);
+      delete geometryfactors[ig];
+      quicksched.print_task(*interactionfactors[ig], taskfile);
+      delete interactionfactors[ig];
     }
     std::ofstream typefile("test_quicksched_types.txt");
     typefile << "# type\tlabel\n";
