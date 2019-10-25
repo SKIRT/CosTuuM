@@ -576,7 +576,6 @@ public:
 
     const uint_fast32_t nmax2 = 2 * nmax;
 
-    std::vector<int_fast8_t> signs(nmax2);
     Matrix<float_type> wigner_d(2 * ngauss, nmax);
     Matrix<float_type> dwigner_d(2 * ngauss, nmax);
     std::vector<float_type> wr2(ngauss);
@@ -587,19 +586,15 @@ public:
     Matrix<std::complex<float_type>> Q(nmax2, nmax2);
     Matrix<std::complex<float_type>> RgQ(nmax2, nmax2);
 
-    int_fast8_t si = 1;
-    for (uint_fast32_t m = 0; m < nmax2; ++m) {
-      si = -si;
-      signs[m] = si;
-    }
     for (uint_fast32_t ig = 1; ig < ngauss + 1; ++ig) {
       const uint_fast32_t i1 = ngauss + ig;
       const uint_fast32_t i2 = ngauss - ig + 1;
       std::vector<float_type> dv1(nmax), dv2(nmax);
       SpecialFunctions::wigner_dn_0m(_costheta[i1 - 1], nmax, 0, &dv1[0],
                                      &dv2[0]);
+      int_fast8_t si = 1;
       for (uint_fast32_t n = 0; n < nmax; ++n) {
-        si = signs[n];
+        si = -si;
         wigner_d(i1 - 1, n) = dv1[n];
         wigner_d(i2 - 1, n) = si * dv1[n];
         dwigner_d(i1 - 1, n) = dv2[n];
@@ -618,7 +613,7 @@ public:
 
         std::complex<float_type> this_J12, this_J21, this_RgJ12, this_RgJ21;
         // filter out half the components because of symmetry
-        if (signs[n1 + n2 - 1] > 0) {
+        if ((n1 + n2) % 2 == 0) {
           for (uint_fast32_t ig = 1; ig < ngauss + 1; ++ig) {
             const float_type wigner_n1 = wigner_d(ig - 1, n1 - 1);
             const float_type dwigner_n1 = dwigner_d(ig - 1, n1 - 1);
@@ -751,11 +746,9 @@ public:
     for (uint_fast32_t m = 1; m < _nmax + 1; ++m) {
 
       const float_type m2 = m * m;
-      const uint_fast32_t nmax2 = 2 * _nmax;
       const uint_fast32_t nm = _nmax + 1 - m;
       const uint_fast32_t nm2 = 2 * nm;
 
-      std::vector<int_fast8_t> signs(nmax2);
       Matrix<float_type> wigner_d(2 * _ngauss, _nmax);
       Matrix<float_type> dwigner_d(2 * _ngauss, _nmax);
       std::vector<float_type> wr2(_ngauss);
@@ -772,23 +765,19 @@ public:
       std::vector<float_type> ds(_ngauss);
       std::vector<float_type> dss(_ngauss);
 
-      int_fast8_t si = 1;
-      for (uint_fast32_t n = 0; n < nmax2; ++n) {
-        si = -si;
-        signs[n] = si;
-      }
       for (uint_fast32_t ig = 1; ig < _ngauss + 1; ++ig) {
         const uint_fast32_t i1 = _ngauss + ig;
         const uint_fast32_t i2 = _ngauss + 1 - ig;
         std::vector<float_type> dv1(_nmax), dv2(_nmax);
         SpecialFunctions::wigner_dn_0m(_costheta[i1 - 1], _nmax, m, &dv1[0],
                                        &dv2[0]);
+        int_fast8_t sign = 1;
         for (uint_fast32_t n = 0; n < _nmax; ++n) {
-          si = signs[n];
+          sign = -sign;
           wigner_d(i1 - 1, n) = dv1[n];
-          wigner_d(i2 - 1, n) = si * dv1[n];
+          wigner_d(i2 - 1, n) = sign * dv1[n];
           dwigner_d(i1 - 1, n) = dv2[n];
-          dwigner_d(i2 - 1, n) = -si * dv2[n];
+          dwigner_d(i2 - 1, n) = -sign * dv2[n];
         }
       }
       for (uint_fast32_t ig = 0; ig < _ngauss; ++ig) {
@@ -806,7 +795,7 @@ public:
 
           std::complex<float_type> this_J11, this_J12, this_J21, this_J22,
               this_RgJ11, this_RgJ12, this_RgJ21, this_RgJ22;
-          const int_fast8_t si = signs[n1 + n2 - 1];
+          const int_fast8_t si = ((n1 + n2) % 2 == 0) ? 1 : -1;
           for (uint_fast32_t ig = 0; ig < _ngauss; ++ig) {
             const float_type wigner_n1 = wigner_d(ig, n1 - 1);
             const float_type dwigner_n1 = dwigner_d(ig, n1 - 1);

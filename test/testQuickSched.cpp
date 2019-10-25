@@ -209,7 +209,7 @@ int main(int argc, char **argv) {
     NBasedResources nfactors(maximum_order);
     quicksched.register_resource(nfactors);
     quicksched.register_task(nfactors);
-    quicksched.link_task_and_resource(nfactors, nfactors, true);
+    nfactors.link_resources(quicksched);
 
     std::vector<TMatrixAuxiliarySpace *> auxspace(auxsize, nullptr);
     for (uint_fast32_t i = 0; i < auxsize; ++i) {
@@ -227,63 +227,40 @@ int main(int argc, char **argv) {
       gaussfactors[ig] = new GaussBasedResources(ig + 20);
       quicksched.register_resource(*gaussfactors[ig]);
       quicksched.register_task(*gaussfactors[ig]);
-      quicksched.link_task_and_resource(*gaussfactors[ig], *gaussfactors[ig],
-                                        true);
+      gaussfactors[ig]->link_resources(quicksched);
 
       wignerm0factors[ig] =
           new WignerDResources(0, maximum_order, ig + 20, *gaussfactors[ig]);
       quicksched.register_resource(*wignerm0factors[ig]);
       quicksched.register_task(*wignerm0factors[ig]);
-      quicksched.link_task_and_resource(*wignerm0factors[ig],
-                                        *wignerm0factors[ig], true);
-      quicksched.link_task_and_resource(*wignerm0factors[ig], *gaussfactors[ig],
-                                        false);
+      wignerm0factors[ig]->link_resources(quicksched);
       quicksched.link_tasks(*gaussfactors[ig], *wignerm0factors[ig]);
 
       geometryfactors[ig] =
           new ParticleGeometryResource(10., 0.5, ig + 20, *gaussfactors[ig]);
       quicksched.register_resource(*geometryfactors[ig]);
       quicksched.register_task(*geometryfactors[ig]);
-      quicksched.link_task_and_resource(*geometryfactors[ig],
-                                        *geometryfactors[ig], true);
-      quicksched.link_task_and_resource(*geometryfactors[ig], *gaussfactors[ig],
-                                        false);
+      geometryfactors[ig]->link_resources(quicksched);
       quicksched.link_tasks(*gaussfactors[ig], *geometryfactors[ig]);
 
-      interactionfactors[ig] = new InteractionResource(
-          100., std::complex<float_type>(1., 0.02), maximum_order, ig + 20,
-          *gaussfactors[ig], *geometryfactors[ig]);
+      interactionfactors[ig] =
+          new InteractionResource(100., std::complex<float_type>(1., 0.02),
+                                  maximum_order, ig + 20, *geometryfactors[ig]);
       quicksched.register_resource(*interactionfactors[ig]);
       quicksched.register_task(*interactionfactors[ig]);
-      quicksched.link_task_and_resource(*interactionfactors[ig],
-                                        *interactionfactors[ig], true);
-      quicksched.link_task_and_resource(*interactionfactors[ig],
-                                        *gaussfactors[ig], false);
-      quicksched.link_task_and_resource(*interactionfactors[ig],
-                                        *geometryfactors[ig], false);
+      interactionfactors[ig]->link_resources(quicksched);
       quicksched.link_tasks(*geometryfactors[ig], *interactionfactors[ig]);
 
       tmatrices[ig] = new TMatrixResource(maximum_order);
-      quicksched.register_resource(*tmatrices[ig]);
+      quicksched.register_resource(tmatrices[ig]->get_m_resource(0));
 
-      tmatrixm0tasks[ig] = new TMatrixM0Task(
-          50, ig + 20, nfactors, *gaussfactors[ig], *geometryfactors[ig],
-          *interactionfactors[ig], *wignerm0factors[ig],
-          *auxspace[ig % auxsize], *tmatrices[ig]);
+      tmatrixm0tasks[ig] =
+          new TMatrixM0Task(1.e-4, 50, ig + 20, nfactors, *gaussfactors[ig],
+                            *geometryfactors[ig], *interactionfactors[ig],
+                            *wignerm0factors[ig], *auxspace[ig % auxsize],
+                            *tmatrices[ig], tmatrices[ig]->get_m_resource(0));
       quicksched.register_task(*tmatrixm0tasks[ig]);
-      quicksched.link_task_and_resource(*tmatrixm0tasks[ig], *tmatrices[ig],
-                                        true);
-      quicksched.link_task_and_resource(*tmatrixm0tasks[ig],
-                                        *auxspace[ig % auxsize], true);
-      quicksched.link_task_and_resource(*tmatrixm0tasks[ig], nfactors, false);
-      quicksched.link_task_and_resource(*tmatrixm0tasks[ig], *gaussfactors[ig],
-                                        false);
-      quicksched.link_task_and_resource(*tmatrixm0tasks[ig],
-                                        *geometryfactors[ig], false);
-      quicksched.link_task_and_resource(*tmatrixm0tasks[ig],
-                                        *interactionfactors[ig], false);
-      quicksched.link_task_and_resource(*tmatrixm0tasks[ig],
-                                        *wignerm0factors[ig], false);
+      tmatrixm0tasks[ig]->link_resources(quicksched);
       quicksched.link_tasks(nfactors, *tmatrixm0tasks[ig]);
       quicksched.link_tasks(*interactionfactors[ig], *tmatrixm0tasks[ig]);
       quicksched.link_tasks(*wignerm0factors[ig], *tmatrixm0tasks[ig]);

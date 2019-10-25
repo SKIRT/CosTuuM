@@ -88,9 +88,6 @@ private:
    *  matrix). */
   Matrix<std::complex<float_type>> _djkrmr;
 
-  /*! @brief Gauss-Legendre quadrature points (read only). */
-  const GaussBasedResources &_quadrature_points;
-
   /*! @brief Geometrical factors for this particle (read only). */
   const ParticleGeometryResource &_geometry;
 
@@ -102,14 +99,12 @@ public:
    * @param refractive_index Refractive index of the material, @f$m_r@f$.
    * @param nmax Maximum order of spherical basis, @f$n_{max}@f$.
    * @param ngauss Number of Gauss-Legendre quadrature points, @f$n_{GL}@f$.
-   * @param quadrature_points Gauss-Legendre quadrature points (read only).
    * @param geometry Geometrical factors for this particle (read only).
    */
   inline InteractionResource(const float_type wavelength,
                              const std::complex<float_type> refractive_index,
                              const uint_fast32_t nmax,
                              const uint_fast32_t ngauss,
-                             const GaussBasedResources &quadrature_points,
                              const ParticleGeometryResource &geometry)
       : _nmax(nmax), _ngauss(ngauss), _k(2. * M_PI / wavelength), _k2(_k * _k),
         _kmr(refractive_index * _k), _k2mr(refractive_index * _k2),
@@ -117,8 +112,7 @@ public:
         _krmr(2 * ngauss, float_type(0.)), _krmrinv(2 * ngauss, float_type(0.)),
         _jkr(2 * ngauss, nmax), _ykr(2 * ngauss, nmax), _djkr(2 * ngauss, nmax),
         _dykr(2 * ngauss, nmax), _jkrmr(2 * ngauss, nmax),
-        _djkrmr(2 * ngauss, nmax), _quadrature_points(quadrature_points),
-        _geometry(geometry) {}
+        _djkrmr(2 * ngauss, nmax), _geometry(geometry) {}
 
   virtual ~InteractionResource() {}
 
@@ -154,6 +148,19 @@ public:
     // djkrmr
     size += 4 * ngauss * nmax * sizeof(float_type);
     return size;
+  }
+
+  /**
+   * @brief Link the resources for this task.
+   *
+   * @param quicksched QuickSched library.
+   */
+  inline void link_resources(QuickSched &quicksched) {
+    // write access
+    quicksched.link_task_and_resource(*this, *this, true);
+
+    // read access
+    quicksched.link_task_and_resource(*this, _geometry, false);
   }
 
   /**
@@ -204,7 +211,10 @@ public:
    * @param ig Index of a Gauss-Legendre quadrature point.
    * @return Corresponding value of @f$kr@f$.
    */
-  inline float_type get_kr(const uint_fast32_t ig) const { return _kr[ig]; }
+  inline float_type get_kr(const uint_fast32_t ig) const {
+    ctm_assert(ig < 2 * _ngauss);
+    return _kr[ig];
+  }
 
   /**
    * @brief Get @f$\frac{1}{kr}@f$ for the given Gauss-Legendre quadrature
@@ -214,6 +224,7 @@ public:
    * @return Corresponding value of @f$\frac{1}{kr}@f$.
    */
   inline float_type get_krinv(const uint_fast32_t ig) const {
+    ctm_assert(ig < 2 * _ngauss);
     return _krinv[ig];
   }
 
@@ -225,6 +236,7 @@ public:
    * @return Corresponding value of @f$km_rr@f$.
    */
   inline std::complex<float_type> get_krmr(const uint_fast32_t ig) const {
+    ctm_assert(ig < 2 * _ngauss);
     return _krmr[ig];
   }
 
@@ -236,6 +248,7 @@ public:
    * @return Corresponding value of @f$\frac{1}{km_rr}@f$.
    */
   inline std::complex<float_type> get_krmrinv(const uint_fast32_t ig) const {
+    ctm_assert(ig < 2 * _ngauss);
     return _krmrinv[ig];
   }
 
@@ -249,6 +262,8 @@ public:
    */
   inline float_type get_jkr(const uint_fast32_t ig,
                             const uint_fast32_t n) const {
+    ctm_assert(ig < 2 * _ngauss);
+    ctm_assert(n - 1 < _nmax);
     return _jkr(ig, n - 1);
   }
 
@@ -262,6 +277,8 @@ public:
    */
   inline float_type get_ykr(const uint_fast32_t ig,
                             const uint_fast32_t n) const {
+    ctm_assert(ig < 2 * _ngauss);
+    ctm_assert(n - 1 < _nmax);
     return _ykr(ig, n - 1);
   }
 
@@ -275,6 +292,8 @@ public:
    */
   inline float_type get_djkr(const uint_fast32_t ig,
                              const uint_fast32_t n) const {
+    ctm_assert(ig < 2 * _ngauss);
+    ctm_assert(n - 1 < _nmax);
     return _djkr(ig, n - 1);
   }
 
@@ -288,6 +307,8 @@ public:
    */
   inline float_type get_dykr(const uint_fast32_t ig,
                              const uint_fast32_t n) const {
+    ctm_assert(ig < 2 * _ngauss);
+    ctm_assert(n - 1 < _nmax);
     return _dykr(ig, n - 1);
   }
 
@@ -301,6 +322,8 @@ public:
    */
   inline std::complex<float_type> get_jkrmr(const uint_fast32_t ig,
                                             const uint_fast32_t n) const {
+    ctm_assert(ig < 2 * _ngauss);
+    ctm_assert(n - 1 < _nmax);
     return _jkrmr(ig, n - 1);
   }
 
@@ -314,6 +337,8 @@ public:
    */
   inline std::complex<float_type> get_djkrmr(const uint_fast32_t ig,
                                              const uint_fast32_t n) const {
+    ctm_assert(ig < 2 * _ngauss);
+    ctm_assert(n - 1 < _nmax);
     return _djkrmr(ig, n - 1);
   }
 };

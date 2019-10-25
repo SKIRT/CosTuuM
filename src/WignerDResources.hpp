@@ -82,6 +82,19 @@ public:
   }
 
   /**
+   * @brief Link the resources for this task.
+   *
+   * @param quicksched QuickSched library.
+   */
+  inline void link_resources(QuickSched &quicksched) {
+    // write access
+    quicksched.link_task_and_resource(*this, *this, true);
+
+    // read access
+    quicksched.link_task_and_resource(*this, _quadrature_points, false);
+  }
+
+  /**
    * @brief Compute the factors.
    */
   virtual void execute() {
