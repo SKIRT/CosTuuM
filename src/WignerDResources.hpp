@@ -64,6 +64,24 @@ public:
   virtual ~WignerDResources() {}
 
   /**
+   * @brief Get the size in memory of a hypothetical WignerDResources object
+   * with the given parameters.
+   *
+   * @param nmax Maximum order, @f$n_{max}@f$.
+   * @param ngauss Number of Gauss-Legendre quadrature points, @f$n_{GL}@f$.
+   * @return Size in bytes that the object would occupy.
+   */
+  static inline size_t get_memory_size(const uint_fast32_t nmax,
+                                       const uint_fast32_t ngauss) {
+    size_t size = sizeof(WignerDResources);
+    // wigner_d
+    size += 2 * ngauss * nmax * sizeof(float_type);
+    // dwigner_d
+    size += 2 * ngauss * nmax * sizeof(float_type);
+    return size;
+  }
+
+  /**
    * @brief Compute the factors.
    */
   virtual void execute() {

@@ -61,10 +61,13 @@ task_types = np.loadtxt(
 )
 task_types.sort(0)
 task_names = task_types["label"]
+# GCC tends to prepend typeinfo strings with the number of characters in the
+# string. We remove this bit from the task name.
 for i in range(len(task_names)):
-    task_names[i] = "".join(
-        [c for c in task_names[i].decode("utf-8") if not c.isdigit()]
-    )
+    if len(task_names[i]) > 10:
+        task_names[i] = task_names[i][2:]
+    else:
+        task_names[i] = task_names[i][1:]
 task_colors = pl.cm.ScalarMappable(cmap="tab20").to_rgba(
     np.linspace(0.0, 1.0, len(task_names))
 )

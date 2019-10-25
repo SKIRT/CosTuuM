@@ -123,6 +123,40 @@ public:
   virtual ~InteractionResource() {}
 
   /**
+   * @brief Get the size in memory of a hypothetical InteractionResource object
+   * with the given parameters.
+   *
+   * @param nmax Maximum order, @f$n_{max}@f$.
+   * @param ngauss Number of Gauss-Legendre quadrature points, @f$n_{GL}@f$.
+   * @return Size in bytes that the object would occupy.
+   */
+  static inline size_t get_memory_size(const uint_fast32_t nmax,
+                                       const uint_fast32_t ngauss) {
+    size_t size = sizeof(InteractionResource);
+    // kr
+    size += 2 * ngauss * sizeof(float_type);
+    // krinv
+    size += 2 * ngauss * sizeof(float_type);
+    // krmr
+    size += 4 * ngauss * sizeof(float_type);
+    // krmrinv
+    size += 4 * ngauss * sizeof(float_type);
+    // jkr
+    size += 2 * ngauss * nmax * sizeof(float_type);
+    // ykr
+    size += 2 * ngauss * nmax * sizeof(float_type);
+    // djkr
+    size += 2 * ngauss * nmax * sizeof(float_type);
+    // dykr
+    size += 2 * ngauss * nmax * sizeof(float_type);
+    // jkrmr
+    size += 4 * ngauss * nmax * sizeof(float_type);
+    // djkrmr
+    size += 4 * ngauss * nmax * sizeof(float_type);
+    return size;
+  }
+
+  /**
    * @brief Compute the factors.
    */
   virtual void execute() {

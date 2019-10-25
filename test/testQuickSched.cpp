@@ -13,6 +13,7 @@
 #include "ParticleGeometryResource.hpp"
 #include "QuickSchedWrapper.hpp"
 #include "TMatrixResource.hpp"
+#include "Utilities.hpp"
 #include "WignerDResources.hpp"
 
 #include <cinttypes>
@@ -152,19 +153,77 @@ int main(int argc, char **argv) {
   }
 
   {
+    const uint_fast32_t auxsize = 100;
+    const uint_fast32_t maxgauss = 200;
+    const uint_fast32_t maximum_order = 100;
+
+    size_t size = 0;
+
+    const size_t nbasedresourcessize =
+        NBasedResources::get_memory_size(maximum_order);
+    ctm_warning("NBasedResources: %s",
+                Utilities::human_readable_bytes(nbasedresourcessize).c_str());
+    size += nbasedresourcessize;
+
+    const size_t auxiliarysize =
+        TMatrixAuxiliarySpace::get_memory_size(maximum_order);
+    ctm_warning("TMatrixAuxiliarySpace: %s",
+                Utilities::human_readable_bytes(auxiliarysize).c_str());
+    size += auxsize * auxiliarysize;
+
+    const size_t gaussresourcesize =
+        GaussBasedResources::get_memory_size(maxgauss);
+    ctm_warning("GaussBasedResources: %s",
+                Utilities::human_readable_bytes(gaussresourcesize).c_str());
+    size += maxgauss * gaussresourcesize;
+
+    const size_t wignerm0resourcesize =
+        WignerDResources::get_memory_size(maximum_order, maxgauss);
+    ctm_warning("WignerDResources: %s",
+                Utilities::human_readable_bytes(wignerm0resourcesize).c_str());
+    size += maxgauss * wignerm0resourcesize;
+
+    const size_t geometryresourcesize =
+        ParticleGeometryResource::get_memory_size(maxgauss);
+    ctm_warning("ParticleGeometryResource: %s",
+                Utilities::human_readable_bytes(geometryresourcesize).c_str());
+    size += maxgauss * geometryresourcesize;
+
+    const size_t interactionresourcesize =
+        InteractionResource::get_memory_size(maximum_order, maxgauss);
+    ctm_warning(
+        "InteractionResource: %s",
+        Utilities::human_readable_bytes(interactionresourcesize).c_str());
+    size += maxgauss * interactionresourcesize;
+
+    const size_t tmatrixresourcesize =
+        TMatrixResource::get_memory_size(maximum_order);
+    ctm_warning("TMatrixResource: %s",
+                Utilities::human_readable_bytes(tmatrixresourcesize).c_str());
+    size += maxgauss * tmatrixresourcesize;
+
+    ctm_warning("Total: %s", Utilities::human_readable_bytes(size).c_str());
+
     QuickSched quicksched(4);
 
-    NBasedResources nfactors(200);
+    NBasedResources nfactors(maximum_order);
     quicksched.register_resource(nfactors);
     quicksched.register_task(nfactors);
     quicksched.link_task_and_resource(nfactors, nfactors, true);
 
-    std::vector<GaussBasedResources *> gaussfactors(100, nullptr);
-    std::vector<WignerDResources *> wignerm0factors(100, nullptr);
-    std::vector<WignerDResources *> wignerm1factors(100, nullptr);
-    std::vector<ParticleGeometryResource *> geometryfactors(100, nullptr);
-    std::vector<InteractionResource *> interactionfactors(100, nullptr);
-    for (uint_fast32_t ig = 0; ig < 100; ++ig) {
+    std::vector<TMatrixAuxiliarySpace *> auxspace(auxsize, nullptr);
+    for (uint_fast32_t i = 0; i < auxsize; ++i) {
+      auxspace[i] = new TMatrixAuxiliarySpace(maximum_order);
+      quicksched.register_resource(*auxspace[i]);
+    }
+
+    std::vector<GaussBasedResources *> gaussfactors(maxgauss, nullptr);
+    std::vector<WignerDResources *> wignerm0factors(maxgauss, nullptr);
+    std::vector<ParticleGeometryResource *> geometryfactors(maxgauss, nullptr);
+    std::vector<InteractionResource *> interactionfactors(maxgauss, nullptr);
+    std::vector<TMatrixResource *> tmatrices(maxgauss, nullptr);
+    std::vector<TMatrixM0Task *> tmatrixm0tasks(maxgauss, nullptr);
+    for (uint_fast32_t ig = 0; ig < maxgauss; ++ig) {
       gaussfactors[ig] = new GaussBasedResources(ig + 20);
       quicksched.register_resource(*gaussfactors[ig]);
       quicksched.register_task(*gaussfactors[ig]);
@@ -172,7 +231,7 @@ int main(int argc, char **argv) {
                                         true);
 
       wignerm0factors[ig] =
-          new WignerDResources(0, 100, ig + 20, *gaussfactors[ig]);
+          new WignerDResources(0, maximum_order, ig + 20, *gaussfactors[ig]);
       quicksched.register_resource(*wignerm0factors[ig]);
       quicksched.register_task(*wignerm0factors[ig]);
       quicksched.link_task_and_resource(*wignerm0factors[ig],
@@ -180,16 +239,6 @@ int main(int argc, char **argv) {
       quicksched.link_task_and_resource(*wignerm0factors[ig], *gaussfactors[ig],
                                         false);
       quicksched.link_tasks(*gaussfactors[ig], *wignerm0factors[ig]);
-
-      wignerm1factors[ig] =
-          new WignerDResources(1, 100, ig + 20, *gaussfactors[ig]);
-      quicksched.register_resource(*wignerm1factors[ig]);
-      quicksched.register_task(*wignerm1factors[ig]);
-      quicksched.link_task_and_resource(*wignerm1factors[ig],
-                                        *wignerm1factors[ig], true);
-      quicksched.link_task_and_resource(*wignerm1factors[ig], *gaussfactors[ig],
-                                        false);
-      quicksched.link_tasks(*gaussfactors[ig], *wignerm1factors[ig]);
 
       geometryfactors[ig] =
           new ParticleGeometryResource(10., 0.5, ig + 20, *gaussfactors[ig]);
@@ -202,7 +251,7 @@ int main(int argc, char **argv) {
       quicksched.link_tasks(*gaussfactors[ig], *geometryfactors[ig]);
 
       interactionfactors[ig] = new InteractionResource(
-          100., std::complex<float_type>(1., 0.02), 100, ig + 20,
+          100., std::complex<float_type>(1., 0.02), maximum_order, ig + 20,
           *gaussfactors[ig], *geometryfactors[ig]);
       quicksched.register_resource(*interactionfactors[ig]);
       quicksched.register_task(*interactionfactors[ig]);
@@ -213,6 +262,31 @@ int main(int argc, char **argv) {
       quicksched.link_task_and_resource(*interactionfactors[ig],
                                         *geometryfactors[ig], false);
       quicksched.link_tasks(*geometryfactors[ig], *interactionfactors[ig]);
+
+      tmatrices[ig] = new TMatrixResource(maximum_order);
+      quicksched.register_resource(*tmatrices[ig]);
+
+      tmatrixm0tasks[ig] = new TMatrixM0Task(
+          50, ig + 20, nfactors, *gaussfactors[ig], *geometryfactors[ig],
+          *interactionfactors[ig], *wignerm0factors[ig],
+          *auxspace[ig % auxsize], *tmatrices[ig]);
+      quicksched.register_task(*tmatrixm0tasks[ig]);
+      quicksched.link_task_and_resource(*tmatrixm0tasks[ig], *tmatrices[ig],
+                                        true);
+      quicksched.link_task_and_resource(*tmatrixm0tasks[ig],
+                                        *auxspace[ig % auxsize], true);
+      quicksched.link_task_and_resource(*tmatrixm0tasks[ig], nfactors, false);
+      quicksched.link_task_and_resource(*tmatrixm0tasks[ig], *gaussfactors[ig],
+                                        false);
+      quicksched.link_task_and_resource(*tmatrixm0tasks[ig],
+                                        *geometryfactors[ig], false);
+      quicksched.link_task_and_resource(*tmatrixm0tasks[ig],
+                                        *interactionfactors[ig], false);
+      quicksched.link_task_and_resource(*tmatrixm0tasks[ig],
+                                        *wignerm0factors[ig], false);
+      quicksched.link_tasks(nfactors, *tmatrixm0tasks[ig]);
+      quicksched.link_tasks(*interactionfactors[ig], *tmatrixm0tasks[ig]);
+      quicksched.link_tasks(*wignerm0factors[ig], *tmatrixm0tasks[ig]);
     }
 
     quicksched.execute_tasks(4);
@@ -220,17 +294,21 @@ int main(int argc, char **argv) {
     std::ofstream taskfile("test_quicksched_tasks.txt");
     taskfile << "# thread\tstart\tend\ttype\n";
     quicksched.print_task(nfactors, taskfile);
-    for (uint_fast32_t ig = 0; ig < 100; ++ig) {
+    for (uint_fast32_t ig = 0; ig < maxgauss; ++ig) {
       quicksched.print_task(*gaussfactors[ig], taskfile);
       delete gaussfactors[ig];
       quicksched.print_task(*wignerm0factors[ig], taskfile);
       delete wignerm0factors[ig];
-      quicksched.print_task(*wignerm1factors[ig], taskfile);
-      delete wignerm1factors[ig];
       quicksched.print_task(*geometryfactors[ig], taskfile);
       delete geometryfactors[ig];
       quicksched.print_task(*interactionfactors[ig], taskfile);
       delete interactionfactors[ig];
+      quicksched.print_task(*tmatrixm0tasks[ig], taskfile);
+      delete tmatrices[ig];
+      delete tmatrixm0tasks[ig];
+    }
+    for (uint_fast32_t i = 0; i < auxsize; ++i) {
+      delete auxspace[i];
     }
     std::ofstream typefile("test_quicksched_types.txt");
     typefile << "# type\tlabel\n";

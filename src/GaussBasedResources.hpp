@@ -63,6 +63,26 @@ public:
   virtual ~GaussBasedResources() {}
 
   /**
+   * @brief Get the size in memory of a hypothetical GaussBasedResources object
+   * with the given parameters.
+   *
+   * @param ngauss Number of Gauss-Legendre quadrature points, @f$n_{GL}@f$.
+   * @return Size in bytes that the object would occupy.
+   */
+  static inline size_t get_memory_size(const uint_fast32_t ngauss) {
+    size_t size = sizeof(GaussBasedResources);
+    // costheta
+    size += 2 * ngauss * sizeof(float_type);
+    // sinthetainv
+    size += 2 * ngauss * sizeof(float_type);
+    // sintheta2inv
+    size += 2 * ngauss * sizeof(float_type);
+    // weights
+    size += 2 * ngauss * sizeof(float_type);
+    return size;
+  }
+
+  /**
    * @brief Compute the factors.
    */
   virtual void execute() {

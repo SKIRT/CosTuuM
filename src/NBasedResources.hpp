@@ -49,6 +49,22 @@ public:
   }
 
   /**
+   * @brief Get the size in memory of a hypothetical NBasedResources object with
+   * the given parameters.
+   *
+   * @param maximum_order Maximum order of the hypothetical object.
+   * @return Size in bytes that the object would occupy.
+   */
+  static inline size_t get_memory_size(const uint_fast32_t maximum_order) {
+    size_t size = sizeof(NBasedResources);
+    // dd:
+    size += maximum_order * sizeof(float_type);
+    // ann
+    size += maximum_order * maximum_order;
+    return size;
+  }
+
+  /**
    * @brief Compute the factors.
    */
   virtual void execute() {

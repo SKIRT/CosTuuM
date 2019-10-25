@@ -63,6 +63,24 @@ public:
       _T.push_back(Matrix<std::complex<float_type>>(2 * nm, 2 * nm));
     }
   }
+
+  /**
+   * @brief Get the size in memory of a hypothetical TMatrixResource object with
+   * the given parameters.
+   *
+   * @param maximum_order Maximum order of the hypothetical object.
+   * @return Size in bytes that the object would occupy.
+   */
+  static inline size_t get_memory_size(const uint_fast32_t maximum_order) {
+    // storage space for class variables
+    size_t size = sizeof(TMatrixResource);
+    // storage space occupied by T matrix elements
+    for (uint_fast32_t m = 0; m < maximum_order + 1; ++m) {
+      const uint_fast32_t nm = maximum_order + 1 - m;
+      size += 8 * nm * nm * sizeof(float_type);
+    }
+    return size;
+  }
 };
 
 /**
@@ -120,6 +138,27 @@ public:
         _RgJ22(maximum_order, maximum_order),
         _Q(2 * maximum_order, 2 * maximum_order),
         _RgQ(2 * maximum_order, 2 * maximum_order) {}
+
+  /**
+   * @brief Get the size in memory of a hypothetical TMatrixAuxiliarySpace
+   * object with the given parameters.
+   *
+   * @param maximum_order Maximum order of the hypothetical object.
+   * @return Size in bytes that the object would occupy.
+   */
+  static inline size_t get_memory_size(const uint_fast32_t maximum_order) {
+    // storage space for class variables
+    size_t size = sizeof(TMatrixAuxiliarySpace);
+    // Js
+    size += 8 * maximum_order * maximum_order * sizeof(float_type);
+    // RgJs
+    size += 8 * maximum_order * maximum_order * sizeof(float_type);
+    // Q
+    size += 8 * maximum_order * maximum_order * sizeof(float_type);
+    // RgQ
+    size += 8 * maximum_order * maximum_order * sizeof(float_type);
+    return size;
+  }
 };
 
 /**
@@ -182,6 +221,8 @@ public:
         _quadrature_points(quadrature_points), _geometry(geometry),
         _interaction(interaction), _wigner(wigner), _aux(aux),
         _Tmatrix(Tmatrix) {}
+
+  virtual ~TMatrixM0Task() {}
 
   /**
    * @brief Compute the @f$m=0@f$ elements of the T-matrix.
@@ -271,7 +312,7 @@ public:
             this_RgJ21 += f1 * c4 + f3 * c5;
           }
           // prefactor sqrt{(2n1+1)*(2n2+1)/[n1*(n1+1)*n2*(n2+1)]}
-          const float_type an12 = 2. * _nfactors.get_ann(n1 - 1, n2 - 1);
+          const float_type an12 = 2. * _nfactors.get_ann(n1, n2);
           _aux._J12(n1 - 1, n2 - 1) = an12 * this_J12;
           _aux._J21(n1 - 1, n2 - 1) = an12 * this_J21;
           _aux._RgJ12(n1 - 1, n2 - 1) = an12 * this_RgJ12;
