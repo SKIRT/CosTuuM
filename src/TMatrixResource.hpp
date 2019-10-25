@@ -631,6 +631,13 @@ public:
    */
   virtual void execute() {
 
+    // since we don't know how many elements the T matrix will have before
+    // we create the tasks, we might have tasks for elements of the T matrix
+    // that we don't need. We make sure they don't waste computing time.
+    if (_m > _Tmatrix._nmax) {
+      return;
+    }
+
     const float_type m2 = _m * _m;
     const uint_fast32_t nm = _Tmatrix._nmax + 1 - _m;
     const uint_fast32_t nm2 = 2 * nm;
