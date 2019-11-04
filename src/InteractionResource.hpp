@@ -170,8 +170,8 @@ public:
     for (uint_fast32_t ig = 0; ig < 2 * _ngauss; ++ig) {
       _kr[ig] = _k * _geometry.get_r(ig);
       _krmr[ig] = _kmr * _geometry.get_r(ig);
-      _krinv[ig] = 1. / _kr[ig];
-      _krmrinv[ig] = 1. / _krmr[ig];
+      _krinv[ig] = float_type(1.) / _kr[ig];
+      _krmrinv[ig] = float_type(1.) / _krmr[ig];
     }
     for (uint_fast32_t ig = 0; ig < 2 * _ngauss; ++ig) {
       SpecialFunctions::spherical_j_jdj_array(_nmax, _kr[ig], _jkr.get_row(ig),

@@ -203,22 +203,15 @@ public:
 
     ctm_assert(orientation_distribution.get_maximum_order() >= 2 * nmax);
 
-    uint_fast8_t msign = -1;
     for (uint_fast32_t m = 0; m < nmax + 1; ++m) {
-      // msign now contains (-1)^m
-      msign = -msign;
+      const int_fast8_t msign = (m % 2 == 0) ? 1 : -1;
       const uint_fast32_t nmin = std::max(m, static_cast<uint_fast32_t>(1));
       for (uint_fast32_t n1 = nmin; n1 < nmax + 1; ++n1) {
         for (uint_fast32_t n2 = nmin; n2 < nmax + 1; ++n2) {
           std::complex<float_type> Tn1n2[2][2];
           // std::abs does not seem to work well in this context when quad
           // precision is activated, so we just mimic it ourselves
-          uint_fast32_t n12min;
-          if (n1 > n2) {
-            n12min = n1 - n2;
-          } else {
-            n12min = n2 - n1;
-          }
+          const uint_fast32_t n12min = (n1 > n2) ? n1 - n2 : n2 - n1;
           const uint_fast32_t n12max = n1 + n2;
           const uint_fast32_t M = std::min(n1, n2);
           for (uint_fast32_t N = n12min; N < n12max + 1; ++N) {
@@ -226,14 +219,15 @@ public:
                 SpecialFunctions::get_clebsch_gordan_coefficients<float_type>(
                     n1, n2, N);
             const float_type pN = orientation_distribution.get_coefficient(N);
-            uint_fast8_t mm1sign = -msign;
             for (uint_fast32_t m1 = 0; m1 < M + 1; ++m1) {
               float_type factor(2.);
               if (m1 == 0) {
                 factor = 1.;
               }
-              // mm1sign now contains (-1)^{m+m1}
-              mm1sign = -mm1sign;
+              const int_fast8_t m1sign = (m1 % 2 == 0) ? 1 : -1;
+              const int_fast8_t mm1sign = m1sign * msign;
+              ctm_assert(M + m < CGcoeff.size());
+              ctm_assert(M + m1 < CGcoeff.size());
               const float_type CGfac =
                   mm1sign * factor * pN * CGcoeff[M + m] * CGcoeff[M + m1];
               if ((N + n12max) % 2 == 0) {
