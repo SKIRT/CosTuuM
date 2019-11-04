@@ -29,11 +29,17 @@ using namespace std;
  */
 int main(int argc, char **argv) {
 
+  // control which tests are performed
+  // ideally, this is all of them, but sometimes (temporarily) disabling some
+  // can be useful
   const bool do_benchmark_test = true;
   const bool do_ensemble_test = true;
   const bool do_astro_test = true;
 
+  /// benchmark test: check T matrix results against some results obtained
+  /// with Mishchenko's original T matrix code for the same input values
   if (do_benchmark_test) {
+    // file containing the benchmark test data
     std::ifstream ifile("test_tmatrixcalculator.txt");
     std::string line;
     // skip the first comment line
@@ -45,6 +51,7 @@ int main(int argc, char **argv) {
 
       ctm_warning("Line %" PRIuFAST32, counter);
 
+      // read the input parameters and reference output
       std::istringstream linestream(line);
       float_type axi, rat, lam, mrr, mri, eps, ddelt, alpha, beta, thet0, thet,
           phi0, phi, refqsca, refqext, refwalb, refZ[4][4];
@@ -56,14 +63,33 @@ int main(int argc, char **argv) {
           refZ[2][1] >> refZ[2][2] >> refZ[2][3] >> refZ[3][0] >> refZ[3][1] >>
           refZ[3][2] >> refZ[3][3];
 
+      // convert the input parameters to SI units
+      axi = UnitConverter::to_SI<QUANTITY_LENGTH>(double(axi), "micron");
+      lam = UnitConverter::to_SI<QUANTITY_LENGTH>(double(lam), "micron");
+      // convert the reference results to SI units
+      for (uint_fast8_t i = 0; i < 4; ++i) {
+        for (uint_fast8_t j = 0; j < 4; ++j) {
+          refZ[i][j] = UnitConverter::to_SI<QUANTITY_SURFACE_AREA>(
+              double(refZ[i][j]), "micron^2");
+        }
+      }
+
+      // construct the T matrix for the same input parameters
       const TMatrix *Tmat = TMatrixCalculator::calculate_TMatrix(
           rat, eps, axi, lam, 200, ddelt * 0.1, ndgs,
           std::complex<float_type>(mrr, mri), 500);
 
+      // check that the extinction and scattering coefficients match the
+      // expected values
       const float_type qext = Tmat->get_extinction_coefficient();
       const float_type qsca = Tmat->get_scattering_coefficient();
       const float_type walb = -qsca / qext;
 
+      assert_values_equal_rel(double(qext), double(refqext), 1.e-5);
+      assert_values_equal_rel(double(qsca), double(refqsca), 1.e-5);
+      assert_values_equal_rel(double(walb), double(refwalb), 1.e-5);
+
+      // convert the input parameter angles to radians
       alpha = UnitConverter::to_SI<QUANTITY_ANGLE>(double(alpha), "degrees");
       beta = UnitConverter::to_SI<QUANTITY_ANGLE>(double(beta), "degrees");
       thet0 = UnitConverter::to_SI<QUANTITY_ANGLE>(double(thet0), "degrees");
@@ -71,26 +97,15 @@ int main(int argc, char **argv) {
       phi0 = UnitConverter::to_SI<QUANTITY_ANGLE>(double(phi0), "degrees");
       phi = UnitConverter::to_SI<QUANTITY_ANGLE>(double(phi), "degrees");
 
-      assert_values_equal_rel(double(qext), double(refqext), 1.e-5);
-      assert_values_equal_rel(double(qsca), double(refqsca), 1.e-5);
-      assert_values_equal_rel(double(walb), double(refwalb), 1.e-5);
-
+      // compute the scattering matrix
       const Matrix<float_type> Z =
           Tmat->get_scattering_matrix(alpha, beta, thet0, phi0, thet, phi);
 
+      // compare the result with the reference
       for (uint_fast8_t i = 0; i < 4; ++i) {
         for (uint_fast8_t j = 0; j < 4; ++j) {
           assert_values_equal_rel(double(Z(i, j)), double(refZ[i][j]), 2.e-2);
         }
-      }
-
-      if (counter == 1) {
-        const OrientationDistribution orientation_distribution(
-            2 * Tmat->get_nmax());
-        const TMatrix *T_ensemble =
-            TMatrixCalculator::apply_orientation_distribution(
-                *Tmat, orientation_distribution);
-        delete T_ensemble;
       }
 
       delete Tmat;
@@ -101,7 +116,7 @@ int main(int argc, char **argv) {
   if (do_ensemble_test) {
     ctm_warning("Calculating initial T matrix...");
     const TMatrix *Tmatrix_single = TMatrixCalculator::calculate_TMatrix(
-        0.1, 0.5, 10., 2. * M_PI, 200, 1.e-4, 2,
+        0.1, 0.5, 1.e-5, 2.e-6 * M_PI, 200, 1.e-4, 2,
         std::complex<float_type>(1.5, 0.02), 500);
     ctm_warning("Done.");
 
@@ -229,7 +244,7 @@ int main(int argc, char **argv) {
   /// astrophysically relevant T-matrix
   if (do_astro_test) {
     const TMatrix *Tmatrix = TMatrixCalculator::calculate_TMatrix(
-        1., 0.5, 0.2, 100., 200, 1.e-4, 2, std::complex<float_type>(4., 0.1),
+        1., 0.5, 2.e-7, 1.e-4, 200, 1.e-4, 2, std::complex<float_type>(4., 0.1),
         500);
     std::vector<float_type> xphi(100), wphi(100);
 

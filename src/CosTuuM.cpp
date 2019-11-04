@@ -63,8 +63,7 @@ int main(int argc, char **argv) {
   /// dust particle
   // size of the particle (in same units as the wavelength)
   const float_type axi = params.get_physical_value<QUANTITY_LENGTH>(
-                             "DustParticle:size", "10. micron") *
-                         1.e6;
+      "DustParticle:size", "10. micron");
   // ratio between the equal surface area sphere radius and equal volume sphere
   // radius (is recomputed if not equal to 1)
   float_type ratio_of_radii = 1.;
@@ -81,10 +80,8 @@ int main(int argc, char **argv) {
 
   /// radiation
   // wavelength of incoming radiation (in same units as the particle size)
-  const float_type wavelength =
-      params.get_physical_value<QUANTITY_LENGTH>(
-          "Radiation:incoming wavelength", "6.283185307 micron") *
-      1.e6;
+  const float_type wavelength = params.get_physical_value<QUANTITY_LENGTH>(
+      "Radiation:incoming wavelength", "6.283185307 micron");
 
   /// calculation
   // tolerance for the calculation
