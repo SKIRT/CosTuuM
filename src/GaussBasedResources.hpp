@@ -27,7 +27,7 @@ using namespace std;
  * @brief Precomputed factors that only depend on the number of Gauss-Legendre
  * quadrature points, @f$n_{GL}@f$.
  */
-class GaussBasedResources : public Resource, public Task {
+class GaussBasedResources : public Resource, public Task, public Computable {
 private:
   /*! @brief Number of Gauss-Legendre quadrature points, @f$n_{GL}@f$. */
   const uint_fast32_t _ngauss;
@@ -100,13 +100,23 @@ public:
         2 * _ngauss, _costheta, _weights);
     for (uint_fast32_t ig = 0; ig < _ngauss; ++ig) {
       const float_type this_sintheta2inv =
-          1. / (1. - _costheta[ig] * _costheta[ig]);
+          1. / ((1. - _costheta[ig]) * (1. + _costheta[ig]));
       _sintheta2inv[ig] = this_sintheta2inv;
       _sintheta2inv[2 * _ngauss - ig - 1] = this_sintheta2inv;
       const float_type this_sinthetainv = sqrt(this_sintheta2inv);
       _sinthetainv[ig] = this_sinthetainv;
       _sinthetainv[2 * _ngauss - ig - 1] = this_sinthetainv;
+
+      ctm_assert_not_nan(_costheta[ig]);
+      ctm_assert_not_nan(_costheta[2 * _ngauss - ig - 1]);
+      ctm_assert_not_nan(_weights[ig]);
+      ctm_assert_not_nan(_weights[2 * _ngauss - ig - 1]);
+      ctm_assert_not_nan(_sintheta2inv[ig]);
+      ctm_assert_not_nan(_sintheta2inv[2 * _ngauss - ig - 1]);
+      ctm_assert_not_nan(_sinthetainv[ig]);
+      ctm_assert_not_nan(_sinthetainv[2 * _ngauss - ig - 1]);
     }
+    make_available();
   }
 
   /**
@@ -119,7 +129,7 @@ public:
   inline float_type get_costheta(const uint_fast32_t ig) const {
     ctm_assert(ig < _costheta.size());
     // check that the resource was actually computed
-    ctm_assert(_costheta[0] != 0);
+    check_use();
     return _costheta[ig];
   }
 
@@ -129,6 +139,8 @@ public:
    * @return Reference to the @f$\cos(\theta{})@f$ array.
    */
   inline const std::vector<float_type> &get_costhetas() const {
+    // check that the resource was actually computed
+    check_use();
     return _costheta;
   }
 
@@ -142,7 +154,7 @@ public:
   inline float_type get_sinthetainv(const uint_fast32_t ig) const {
     ctm_assert(ig < _sinthetainv.size());
     // check that the resource was actually computed
-    ctm_assert(_costheta[0] != 0);
+    check_use();
     return _sinthetainv[ig];
   }
 
@@ -157,7 +169,7 @@ public:
   inline float_type get_sintheta2inv(const uint_fast32_t ig) const {
     ctm_assert(ig < _sintheta2inv.size());
     // check that the resource was actually computed
-    ctm_assert(_costheta[0] != 0);
+    check_use();
     return _sintheta2inv[ig];
   }
 
@@ -171,7 +183,7 @@ public:
   inline float_type get_weight(const uint_fast32_t ig) const {
     ctm_assert(ig < _weights.size());
     // check that the resource was actually computed
-    ctm_assert(_costheta[0] != 0);
+    check_use();
     return _weights[ig];
   }
 };

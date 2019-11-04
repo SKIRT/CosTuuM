@@ -182,6 +182,20 @@ public:
       return _T[m1](i1 * _nmax + n1 - m1 - 1, i2 * _nmax + n2 - m2 - 1);
     }
   }
+
+  /**
+   * @brief Get the scattering coefficient for the T-matrix.
+   *
+   * @return Scattering coefficient.
+   */
+  inline float_type get_scattering_coefficient() const { return _Qscattering; }
+
+  /**
+   * @brief Get the extinction coefficient for the T-matrix.
+   *
+   * @return Extinction coefficient.
+   */
+  inline float_type get_extinction_coefficient() const { return _Qextinction; }
 };
 
 /**

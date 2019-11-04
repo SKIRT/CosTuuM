@@ -29,7 +29,7 @@ using namespace std;
  * precomputed, particle specific geometric factors, and a specific choice of
  * particle refractive index and interaction wavelength.
  */
-class InteractionResource : public Resource, public Task {
+class InteractionResource : public Resource, public Task, public Computable {
 private:
   /*! @brief Maximum order of the spherical basis functions, @f$n_{max}@f$. */
   const uint_fast32_t _nmax;
@@ -167,12 +167,19 @@ public:
    * @brief Compute the factors.
    */
   virtual void execute() {
+
     for (uint_fast32_t ig = 0; ig < 2 * _ngauss; ++ig) {
       _kr[ig] = _k * _geometry.get_r(ig);
       _krmr[ig] = _kmr * _geometry.get_r(ig);
       _krinv[ig] = float_type(1.) / _kr[ig];
       _krmrinv[ig] = float_type(1.) / _krmr[ig];
     }
+
+    ctm_assert_no_nans(_kr, 2 * _ngauss);
+    ctm_assert_no_nans(_krmr, 2 * _ngauss);
+    ctm_assert_no_nans(_krinv, 2 * _ngauss);
+    ctm_assert_no_nans(_krmrinv, 2 * _ngauss);
+
     for (uint_fast32_t ig = 0; ig < 2 * _ngauss; ++ig) {
       SpecialFunctions::spherical_j_jdj_array(_nmax, _kr[ig], _jkr.get_row(ig),
                                               _djkr.get_row(ig));
@@ -180,7 +187,22 @@ public:
                                               _dykr.get_row(ig));
       SpecialFunctions::spherical_j_jdj_array(
           _nmax, _krmr[ig], _jkrmr.get_row(ig), _djkrmr.get_row(ig));
+
+      ctm_assert_message_no_nans(_jkr.get_row(ig), _nmax, "_nmax: %" PRIuFAST32,
+                                 _nmax);
+      ctm_assert_message_no_nans(_djkr.get_row(ig), _nmax,
+                                 "_nmax: %" PRIuFAST32, _nmax);
+      ctm_assert_message_no_nans(_ykr.get_row(ig), _nmax, "_nmax: %" PRIuFAST32,
+                                 _nmax);
+      ctm_assert_message_no_nans(_dykr.get_row(ig), _nmax,
+                                 "_nmax: %" PRIuFAST32, _nmax);
+      ctm_assert_message_no_nans(_jkrmr.get_row(ig), _nmax,
+                                 "_nmax: %" PRIuFAST32, _nmax);
+      ctm_assert_message_no_nans(_djkrmr.get_row(ig), _nmax,
+                                 "_nmax: %" PRIuFAST32, _nmax);
     }
+
+    make_available();
   }
 
   /**
@@ -188,21 +210,33 @@ public:
    *
    * @return Wavenumber.
    */
-  inline float_type get_k() const { return _k; }
+  inline float_type get_k() const {
+    // check that the resource was actually computed
+    check_use();
+    return _k;
+  }
 
   /**
    * @brief Get the wavenumber squared.
    *
    * @return Wavenumber squared.
    */
-  inline float_type get_k2() const { return _k2; }
+  inline float_type get_k2() const {
+    // check that the resource was actually computed
+    check_use();
+    return _k2;
+  }
 
   /**
    * @brief Get the wavenumber squared times the refractive index.
    *
    * @return Wavenumber squared times the refractive index.
    */
-  inline std::complex<float_type> get_k2mr() const { return _k2mr; }
+  inline std::complex<float_type> get_k2mr() const {
+    // check that the resource was actually computed
+    check_use();
+    return _k2mr;
+  }
 
   /**
    * @brief Get the wavenumber multiplied with the radius for the given Gauss-
@@ -213,6 +247,8 @@ public:
    */
   inline float_type get_kr(const uint_fast32_t ig) const {
     ctm_assert(ig < 2 * _ngauss);
+    // check that the resource was actually computed
+    check_use();
     return _kr[ig];
   }
 
@@ -225,6 +261,8 @@ public:
    */
   inline float_type get_krinv(const uint_fast32_t ig) const {
     ctm_assert(ig < 2 * _ngauss);
+    // check that the resource was actually computed
+    check_use();
     return _krinv[ig];
   }
 
@@ -237,6 +275,8 @@ public:
    */
   inline std::complex<float_type> get_krmr(const uint_fast32_t ig) const {
     ctm_assert(ig < 2 * _ngauss);
+    // check that the resource was actually computed
+    check_use();
     return _krmr[ig];
   }
 
@@ -249,6 +289,8 @@ public:
    */
   inline std::complex<float_type> get_krmrinv(const uint_fast32_t ig) const {
     ctm_assert(ig < 2 * _ngauss);
+    // check that the resource was actually computed
+    check_use();
     return _krmrinv[ig];
   }
 
@@ -264,6 +306,8 @@ public:
                             const uint_fast32_t n) const {
     ctm_assert(ig < 2 * _ngauss);
     ctm_assert(n - 1 < _nmax);
+    // check that the resource was actually computed
+    check_use();
     return _jkr(ig, n - 1);
   }
 
@@ -279,6 +323,8 @@ public:
                             const uint_fast32_t n) const {
     ctm_assert(ig < 2 * _ngauss);
     ctm_assert(n - 1 < _nmax);
+    // check that the resource was actually computed
+    check_use();
     return _ykr(ig, n - 1);
   }
 
@@ -294,6 +340,8 @@ public:
                              const uint_fast32_t n) const {
     ctm_assert(ig < 2 * _ngauss);
     ctm_assert(n - 1 < _nmax);
+    // check that the resource was actually computed
+    check_use();
     return _djkr(ig, n - 1);
   }
 
@@ -309,6 +357,8 @@ public:
                              const uint_fast32_t n) const {
     ctm_assert(ig < 2 * _ngauss);
     ctm_assert(n - 1 < _nmax);
+    // check that the resource was actually computed
+    check_use();
     return _dykr(ig, n - 1);
   }
 
@@ -324,6 +374,8 @@ public:
                                             const uint_fast32_t n) const {
     ctm_assert(ig < 2 * _ngauss);
     ctm_assert(n - 1 < _nmax);
+    // check that the resource was actually computed
+    check_use();
     return _jkrmr(ig, n - 1);
   }
 
@@ -339,6 +391,8 @@ public:
                                              const uint_fast32_t n) const {
     ctm_assert(ig < 2 * _ngauss);
     ctm_assert(n - 1 < _nmax);
+    // check that the resource was actually computed
+    check_use();
     return _djkrmr(ig, n - 1);
   }
 };

@@ -113,6 +113,34 @@ public:
 };
 
 /**
+ * @brief Abstract class for computable resources that keeps track of their
+ * status.
+ */
+class Computable {
+private:
+  /*! @brief Flag that is set when the resource has been successfully
+   *  computed. */
+  bool _was_computed;
+
+public:
+  /**
+   * @brief Empty constructor.
+   */
+  inline Computable() : _was_computed(false) {}
+
+  /**
+   * @brief The resource was successfully computed and should now be available
+   * for use.
+   */
+  inline void make_available() { _was_computed = true; }
+
+  /**
+   * @brief Check if the resource can be safely used.
+   */
+  inline void check_use() const { ctm_assert(_was_computed); }
+};
+
+/**
  * @brief Class wrapper around the QuickSched library.
  */
 class QuickSched {

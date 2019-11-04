@@ -26,7 +26,7 @@ using namespace std;
  * @brief Precomputed factors that only depend on the maximum order,
  * @f$n_{max}@f$.
  */
-class NBasedResources : public Resource, public Task {
+class NBasedResources : public Resource, public Task, public Computable {
 private:
   /*! @brief Precomputed factors @f$\sqrt{\frac{2n+1}{n(n+1)}}@f$ (array of size
    *  @f$n_{max}@f$). */
@@ -83,12 +83,16 @@ public:
       const float_type nn((ni + 2.) * (ni + 1.));
       const float_type d = sqrt((2. * (ni + 1.) + 1.) / nn);
       _dd[ni] = d;
+      ctm_assert_not_nan(_dd[ni]);
       for (uint_fast32_t nj = 0; nj < ni + 1; ++nj) {
         const float_type ddd = 0.5 * d * _dd[nj];
         _ann(ni, nj) = ddd;
         _ann(nj, ni) = ddd;
+        ctm_assert_not_nan(_ann(ni, nj));
+        ctm_assert_not_nan(_ann(nj, ni));
       }
     }
+    make_available();
   }
 
   /**
@@ -101,7 +105,7 @@ public:
   inline float_type get_dd(const uint_fast32_t n) const {
     ctm_assert(n - 1 < _dd.size());
     // check that the resource was actually computed
-    ctm_assert(_dd[0] != 0);
+    check_use();
     return _dd[n - 1];
   }
 
@@ -119,7 +123,7 @@ public:
     ctm_assert(n1 - 1 < _dd.size());
     ctm_assert(n2 - 1 < _dd.size());
     // check that the resource was actually computed
-    ctm_assert(_dd[0] != 0);
+    check_use();
     return _ann(n1 - 1, n2 - 1);
   }
 };

@@ -25,7 +25,7 @@ using namespace std;
  * @brief Precomputed Wigner D functions that depend on a specific value of
  * @f$n_{max}@f$ and @f$n_{GL}@f$.
  */
-class WignerDResources : public Resource, public Task {
+class WignerDResources : public Resource, public Task, public Computable {
 private:
   /*! @brief @f$m@f$ value for which the factors are computed. */
   const uint_fast32_t _m;
@@ -111,8 +111,14 @@ public:
         _wigner_d(i2 - 1, n) = sign * dv1[n];
         _dwigner_d(i1 - 1, n) = dv2[n];
         _dwigner_d(i2 - 1, n) = -sign * dv2[n];
+
+        ctm_assert_not_nan(_wigner_d(i1 - 1, n));
+        ctm_assert_not_nan(_wigner_d(i2 - 1, n));
+        ctm_assert_not_nan(_dwigner_d(i1 - 1, n));
+        ctm_assert_not_nan(_dwigner_d(i2 - 1, n));
       }
     }
+    make_available();
   }
 
   /**
@@ -125,6 +131,8 @@ public:
    */
   inline float_type get_wigner_d(const uint_fast32_t ig,
                                  const uint_fast32_t n) const {
+    // check that the resource was actually computed
+    check_use();
     return _wigner_d(ig, n - 1);
   }
 
@@ -138,6 +146,8 @@ public:
    */
   inline float_type get_dwigner_d(const uint_fast32_t ig,
                                   const uint_fast32_t n) const {
+    // check that the resource was actually computed
+    check_use();
     return _dwigner_d(ig, n - 1);
   }
 };

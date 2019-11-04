@@ -25,7 +25,9 @@ using namespace std;
  * @brief Precomputed factors that depend on precomputed Gauss-Legendre factors,
  * and a specific choice of particle geometry.
  */
-class ParticleGeometryResource : public Resource, public Task {
+class ParticleGeometryResource : public Resource,
+                                 public Task,
+                                 public Computable {
 private:
   /*! @brief Equal volume sphere radius, @f$R_V@f$. */
   const float_type _R_V;
@@ -103,11 +105,18 @@ public:
    * @brief Compute the factors.
    */
   virtual void execute() {
+
     SpecialFunctions::get_r_dr_spheroid(_quadrature_points.get_costhetas(),
                                         _R_V, _axis_ratio, _r2, _dr_over_r);
     for (uint_fast32_t ig = 0; ig < _r2.size(); ++ig) {
       _r[ig] = sqrt(_r2[ig]);
     }
+
+    ctm_assert_no_nans(_r2, _r2.size());
+    ctm_assert_no_nans(_r, _r.size());
+    ctm_assert_no_nans(_dr_over_r, _dr_over_r.size());
+
+    make_available();
   }
 
   /**
@@ -116,7 +125,11 @@ public:
    * @param ig Index of the Gauss-Legendre quadrature point.
    * @return Corresponding radius, @f$r@f$.
    */
-  inline float_type get_r(const uint_fast32_t ig) const { return _r[ig]; }
+  inline float_type get_r(const uint_fast32_t ig) const {
+    // check that the resource was actually computed
+    check_use();
+    return _r[ig];
+  }
 
   /**
    * @brief Get the radius squared for the given quadrature point.
@@ -124,7 +137,11 @@ public:
    * @param ig Index of the Gauss-Legendre quadrature point.
    * @return Corresponding radius squared, @f$r^2@f$.
    */
-  inline float_type get_r2(const uint_fast32_t ig) const { return _r2[ig]; }
+  inline float_type get_r2(const uint_fast32_t ig) const {
+    // check that the resource was actually computed
+    check_use();
+    return _r2[ig];
+  }
 
   /**
    * @brief Get the radial derivative for the given quadrature point.
@@ -134,6 +151,8 @@ public:
    * \frac{d}{d\theta{}} r(\theta{})@f$.
    */
   inline float_type get_dr_over_r(const uint_fast32_t ig) const {
+    // check that the resource was actually computed
+    check_use();
     return _dr_over_r[ig];
   }
 };
