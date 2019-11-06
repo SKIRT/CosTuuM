@@ -38,7 +38,7 @@ using namespace std;
 int main(int argc, char **argv) {
 
   const bool do_serial_test = true;
-  const bool do_quicksched_test = false;
+  const bool do_quicksched_test = true;
 
   std::ifstream ifile("test_tmatrixcalculator.txt");
   std::string line;
@@ -158,7 +158,7 @@ int main(int argc, char **argv) {
 
   /// QuickSched version
   if (do_quicksched_test) {
-    QuickSched quicksched(4);
+    QuickSched quicksched(4, true, "quicksched.log");
 
     NBasedResources nfactors(maximum_order);
     quicksched.register_resource(nfactors);
@@ -239,11 +239,13 @@ int main(int argc, char **argv) {
 
     quicksched.execute_tasks(4);
 
+    ctm_warning("nmax: %" PRIuFAST32, Tmatrix.get_nmax());
+    ctm_warning("ngauss: %" PRIuFAST32, Tmatrix.get_ngauss());
     ctm_warning("Qsca: %g", double(Tmatrix.get_scattering_coefficient()));
     ctm_warning("Qext: %g", double(Tmatrix.get_extinction_coefficient()));
 
     std::ofstream taskfile("test_tmatrix_tasks.txt");
-    taskfile << "# thread\tstart\tend\ttype\n";
+    taskfile << "# thread\tstart\tend\ttype\ttask id\n";
     quicksched.print_task(nfactors, taskfile);
     for (uint_fast32_t i = 0; i < maximum_order - minimum_order; ++i) {
       quicksched.print_task(*quadrature_points[i], taskfile);

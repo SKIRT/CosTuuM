@@ -12,6 +12,7 @@
 #include "quicksched.h"
 
 #include <cinttypes>
+#include <fstream>
 #include <map>
 #include <ostream>
 #include <typeinfo>
@@ -60,7 +61,7 @@ public:
                     std::ostream &stream) const {
     const struct task &task_data = scheduler.tasks[_task_id];
     stream << task_data.qid << "\t" << task_data.tic << "\t" << task_data.toc
-           << "\t" << task_data.type << "\n";
+           << "\t" << task_data.type << "\t" << _task_id << "\n";
   }
 };
 
@@ -95,6 +96,8 @@ private:
   qsched_res_t _resource_id;
 
 public:
+  virtual ~Resource() {}
+
   /**
    * @brief Set the QuickSched resource ID of the resource.
    *
@@ -136,9 +139,20 @@ public:
 
   /**
    * @brief Check if the resource can be safely used.
+   *
+   * @param message Message to display if the resource is used inappropriately.
    */
-  inline void check_use() const { ctm_assert(_was_computed); }
+  inline void check_use_string(const std::string message) const {
+    ctm_assert_message(_was_computed, "%s", message.c_str());
+  }
 };
+
+/**
+ * @brief Macro wrapper around Computable::check_use_string that displays the
+ * file and function name where check_use is called.
+ */
+#define check_use()                                                            \
+  check_use_string(std::string(__FILE__) + "::" + std::string(__FUNCTION__))
 
 /**
  * @brief Class wrapper around the QuickSched library.
@@ -156,6 +170,12 @@ private:
 
   /*! @brief Task type dictionary. */
   std::map<std::string, int_fast32_t> _type_dict;
+
+  /*! @brief Write a log file? */
+  const bool _write_log;
+
+  /*! @brief Log file (if present). */
+  std::ofstream _output_file;
 
 public:
   /**
@@ -175,11 +195,20 @@ public:
    *
    * @param number_of_threads Number of threads to use during parallel
    * execution.
+   * @param write_log Write a log file?
+   * @param log_name Name of the log file.
    */
-  inline QuickSched(const int_fast32_t number_of_threads)
-      : _number_of_threads(number_of_threads), _task_type(0) {
+  inline QuickSched(const int_fast32_t number_of_threads,
+                    const bool write_log = false,
+                    const std::string log_name = "")
+      : _number_of_threads(number_of_threads), _task_type(0),
+        _write_log(write_log) {
     bzero(&_s, sizeof(struct qsched));
     qsched_init(&_s, number_of_threads, qsched_flag_none);
+
+    if (_write_log) {
+      _output_file.open(log_name);
+    }
   }
 
   /**
@@ -195,6 +224,11 @@ public:
    * @param number_of_threads Number of threads to use.
    */
   inline void execute_tasks(int_fast32_t number_of_threads = -1) {
+
+    if (_write_log) {
+      _output_file.flush();
+    }
+
     if (number_of_threads <= 0) {
       number_of_threads = _number_of_threads;
     }
@@ -210,6 +244,11 @@ public:
     const qsched_res_t rid =
         qsched_addres(&_s, qsched_owner_none, qsched_res_none);
     resource.set_id(rid);
+
+    if (_write_log) {
+      _output_file << "resource\t" << rid << "\t" << typeid(resource).name()
+                   << "\n";
+    }
   }
 
   /**
@@ -233,6 +272,10 @@ public:
     const qsched_task_t tid = qsched_addtask(&_s, task_type, task_flag_none,
                                              &wrapper, sizeof(WrappedTask), 1);
     task.set_id(tid);
+
+    if (_write_log) {
+      _output_file << "task\t" << tid << "\t" << task_type_name << "\n";
+    }
   }
 
   /**
@@ -250,6 +293,16 @@ public:
     } else {
       qsched_adduse(&_s, task.get_id(), resource.get_id());
     }
+
+    if (_write_log) {
+      if (write_access) {
+        _output_file << "writelink\t" << task.get_id() << "\t"
+                     << resource.get_id() << "\n";
+      } else {
+        _output_file << "readlink\t" << task.get_id() << "\t"
+                     << resource.get_id() << "\n";
+      }
+    }
   }
 
   /**
@@ -261,6 +314,11 @@ public:
    */
   inline void link_tasks(const Task &first_task, const Task &second_task) {
     qsched_addunlock(&_s, first_task.get_id(), second_task.get_id());
+
+    if (_write_log) {
+      _output_file << "tasklink\t" << first_task.get_id() << "\t"
+                   << second_task.get_id() << "\n";
+    }
   }
 
   /**

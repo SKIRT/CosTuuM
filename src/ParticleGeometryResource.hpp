@@ -48,7 +48,7 @@ private:
   std::vector<float_type> _dr_over_r;
 
   /*! @brief Precomputed Gauss-Legendre quadrature points (read only). */
-  const GaussBasedResources _quadrature_points;
+  const GaussBasedResources &_quadrature_points;
 
 public:
   /**

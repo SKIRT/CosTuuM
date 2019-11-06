@@ -43,7 +43,7 @@ private:
   Matrix<float_type> _dwigner_d;
 
   /*! @brief Gauss-Legendre quadrature points. */
-  GaussBasedResources &_quadrature_points;
+  const GaussBasedResources &_quadrature_points;
 
 public:
   /**
@@ -57,7 +57,7 @@ public:
    */
   inline WignerDResources(const uint_fast32_t m, const uint_fast32_t nmax,
                           const uint_fast32_t ngauss,
-                          GaussBasedResources &quadrature_points)
+                          const GaussBasedResources &quadrature_points)
       : _m(m), _nmax(nmax), _ngauss(ngauss), _wigner_d(2 * ngauss, nmax),
         _dwigner_d(2 * ngauss, nmax), _quadrature_points(quadrature_points) {}
 

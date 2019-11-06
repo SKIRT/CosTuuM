@@ -395,11 +395,6 @@ public:
    */
   virtual void execute() {
 
-    ctm_warning("Qs: %g, dQs: %g, Qe: %g, dQe: %g",
-                double(_Tmatrix._Qscattering), double(_Tmatrix._dQscattering),
-                double(_Tmatrix._Qextinction), double(_Tmatrix._dQextinction));
-    ctm_warning("nmax: %" PRIuFAST32 ", ngauss: %" PRIuFAST32, _nmax, _ngauss);
-
     // check if we need to do something
     if (_Tmatrix._dQscattering > 0.) {
       if (_Tmatrix._dQscattering <= _tolerance &&
