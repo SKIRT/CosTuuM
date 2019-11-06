@@ -196,6 +196,20 @@ public:
    * @return Extinction coefficient.
    */
   inline float_type get_extinction_coefficient() const { return _Qextinction; }
+
+  /**
+   * @brief Get the order of the T-matrix.
+   *
+   * @return Maximum order, @f$n_{max}@f$.
+   */
+  inline uint_fast32_t get_nmax() const { return _nmax; }
+
+  /**
+   * @brief Get the number of Gauss-Legendre quadrature points for the T-matrix.
+   *
+   * @return Number of Gauss-Legendre quadrature points, @f$n_{GL}@f$.
+   */
+  inline uint_fast32_t get_ngauss() const { return _ngauss; }
 };
 
 /**
@@ -381,6 +395,11 @@ public:
    */
   virtual void execute() {
 
+    ctm_warning("Qs: %g, dQs: %g, Qe: %g, dQe: %g",
+                double(_Tmatrix._Qscattering), double(_Tmatrix._dQscattering),
+                double(_Tmatrix._Qextinction), double(_Tmatrix._dQextinction));
+    ctm_warning("nmax: %" PRIuFAST32 ", ngauss: %" PRIuFAST32, _nmax, _ngauss);
+
     // check if we need to do something
     if (_Tmatrix._dQscattering > 0.) {
       if (_Tmatrix._dQscattering <= _tolerance &&
@@ -512,11 +531,15 @@ public:
     }
 
     // func_TT
-    _aux._Q.plu_inverse();
-
     const uint_fast32_t nmax2 = 2 * _nmax;
+    _aux._Q.plu_inverse(nmax2);
+
     for (uint_fast32_t i = 0; i < _nmax; ++i) {
       for (uint_fast32_t j = 0; j < _nmax; ++j) {
+        _Tmatrix._T[0](i, j) = 0.;
+        _Tmatrix._T[0](_nmax + i, j) = 0.;
+        _Tmatrix._T[0](i, _nmax + j) = 0.;
+        _Tmatrix._T[0](_nmax + i, _nmax + j) = 0.;
         for (uint_fast32_t k = 0; k < nmax2; ++k) {
           _Tmatrix._T[0](i, j) -= _aux._RgQ(i, k) * _aux._Q(k, j);
           _Tmatrix._T[0](_nmax + i, j) -=
@@ -540,10 +563,12 @@ public:
     _Tmatrix._Qextinction = 0.;
     for (uint_fast32_t n = 1; n < _nmax + 1; ++n) {
       const float_type dn1 = 2. * n + 1.;
-      _Tmatrix._Qscattering += dn1 * (norm(_Tmatrix(0, n, 0, 0, n, 0)) +
-                                      norm(_Tmatrix(1, n, 0, 1, n, 0)));
-      _Tmatrix._Qextinction += dn1 * (_Tmatrix(0, n, 0, 0, n, 0).real() +
-                                      _Tmatrix(1, n, 0, 1, n, 0).real());
+      _Tmatrix._Qscattering +=
+          dn1 * (norm(_Tmatrix._T[0](n - 1, n - 1)) +
+                 norm(_Tmatrix._T[0](_nmax + n - 1, _nmax + n - 1)));
+      _Tmatrix._Qextinction +=
+          dn1 * (_Tmatrix._T[0](n - 1, n - 1).real() +
+                 _Tmatrix._T[0](_nmax + n - 1, _nmax + n - 1).real());
     }
 
     if (_Tmatrix._dQscattering == -2.) {
@@ -641,7 +666,7 @@ public:
   }
 
   /**
-   * @brief Compute the @f$m=0@f$ elements of the T-matrix.
+   * @brief Compute the @f$m>0@f$ elements of the T-matrix.
    */
   virtual void execute() {
 
@@ -846,10 +871,14 @@ public:
       }
     }
 
-    _aux._Q.plu_inverse();
+    _aux._Q.plu_inverse(nm2);
 
     for (uint_fast32_t i = 0; i < nm; ++i) {
       for (uint_fast32_t j = 0; j < nm; ++j) {
+        _Tmatrix._T[_m](i, j) = 0.;
+        _Tmatrix._T[_m](nm + i, j) = 0.;
+        _Tmatrix._T[_m](i, nm + j) = 0.;
+        _Tmatrix._T[_m](nm + i, nm + j) = 0.;
         for (uint_fast32_t k = 0; k < nm2; ++k) {
           _Tmatrix._T[_m](i, j) -= _aux._RgQ(i, k) * _aux._Q(k, j);
           _Tmatrix._T[_m](nm + i, j) -= _aux._RgQ(nm + i, k) * _aux._Q(k, j);

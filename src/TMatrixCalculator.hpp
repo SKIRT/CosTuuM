@@ -107,6 +107,8 @@ public:
       old_qsca = qsca;
 
       // some (temporary) diagnostic output
+      ctm_warning("nmax: %" PRIuFAST32, nmax);
+      ctm_warning("qsca: %g, qext: %g", double(old_qsca), double(old_qext));
       ctm_warning("dsca: %g, dext: %g", double(dsca), double(dext));
 
       // increase the order
@@ -120,6 +122,7 @@ public:
       // correct for overshoot in last iteration
       --nmax;
       ctm_warning("Converged for nmax = %" PRIuFAST32, nmax);
+      ctm_warning("qsca: %g, qext: %g", double(old_qsca), double(old_qext));
     }
 
     // now start increasing the number of quadrature points
@@ -164,6 +167,13 @@ public:
       --ngauss;
       ctm_warning("Converged for ngauss = %" PRIuFAST32, ngauss);
     }
+
+    old_qsca = active_Tmatrix->get_scattering_coefficient();
+    old_qext = active_Tmatrix->get_extinction_coefficient();
+    // output the factors
+    ctm_warning("qsca: %g", double(old_qsca));
+    ctm_warning("qext: %g", double(old_qext));
+    ctm_warning("walb: %g", double(-old_qsca / old_qext));
 
     // ok: we found the right order and number of quadrature points
     // we now need to compute the additional elements for m=/=0

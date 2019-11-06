@@ -172,7 +172,7 @@ public:
       _kr[ig] = _k * _geometry.get_r(ig);
       _krmr[ig] = _kmr * _geometry.get_r(ig);
       _krinv[ig] = float_type(1.) / _kr[ig];
-      _krmrinv[ig] = float_type(1.) / _krmr[ig];
+      _krmrinv[ig] = std::complex<float_type>(1.) / _krmr[ig];
     }
 
     ctm_assert_no_nans(_kr, 2 * _ngauss);

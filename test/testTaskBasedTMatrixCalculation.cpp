@@ -6,6 +6,7 @@
  * @author Bert Vandenbroucke (bert.vandenbroucke@ugent.be)
  */
 
+#include "Configuration.hpp"
 #include "Error.hpp"
 #include "GaussBasedResources.hpp"
 #include "InteractionResource.hpp"
@@ -13,12 +14,19 @@
 #include "ParticleGeometryResource.hpp"
 #include "QuickSchedWrapper.hpp"
 #include "TMatrixResource.hpp"
+#include "UnitConverter.hpp"
 #include "Utilities.hpp"
 #include "WignerDResources.hpp"
 
 #include <cinttypes>
 #include <fstream>
 #include <vector>
+
+#if defined(HAVE_MULTIPRECISION) && defined(HAVE_QUAD_PRECISION)
+using namespace boost::multiprecision;
+#else
+using namespace std;
+#endif
 
 /**
  * @brief Unit test for the task based T-matrix calculation.
@@ -32,19 +40,47 @@ int main(int argc, char **argv) {
   const bool do_serial_test = true;
   const bool do_quicksched_test = false;
 
-  const float_type ratio_of_radii = 1.;
-  const float_type axis_ratio = 0.5;
-  const float_type particle_radius = 0.2;
-  const float_type wavelength = 100.;
-  const float_type tolerance = 1.e-4;
-  const std::complex<float_type> refractive_index(4., 0.1);
-  const uint_fast32_t maximum_order = 100;
-  const uint_fast32_t minimum_order = 20;
-  const uint_fast32_t ndgs = 2;
-  const uint_fast32_t auxsize = 100;
+  std::ifstream ifile("test_tmatrixcalculator.txt");
+  std::string line;
+  // skip the first comment line
+  getline(ifile, line);
+  // now read the first data line
+  getline(ifile, line);
+  std::istringstream linestream(line);
+  float_type axi, rat, lam, mrr, mri, eps, ddelt, alpha, beta, thet0, thet,
+      phi0, phi, refqsca, refqext, refwalb, refZ[4][4];
+  uint_fast32_t ndgs;
+  linestream >> axi >> rat >> lam >> mrr >> mri >> eps >> ddelt >> ndgs >>
+      alpha >> beta >> thet0 >> thet >> phi0 >> phi >> refqsca >> refqext >>
+      refwalb >> refZ[0][0] >> refZ[0][1] >> refZ[0][2] >> refZ[0][3] >>
+      refZ[1][0] >> refZ[1][1] >> refZ[1][2] >> refZ[1][3] >> refZ[2][0] >>
+      refZ[2][1] >> refZ[2][2] >> refZ[2][3] >> refZ[3][0] >> refZ[3][1] >>
+      refZ[3][2] >> refZ[3][3];
 
+  const float_type particle_radius =
+      UnitConverter::to_SI<QUANTITY_LENGTH>(double(axi), "micron");
+  const float_type wavelength =
+      UnitConverter::to_SI<QUANTITY_LENGTH>(double(lam), "micron");
+  const float_type axis_ratio = eps;
+  float_type ratio_of_radii;
+  if (abs(rat - 1.) > 1.e-8) {
+    ratio_of_radii =
+        SpecialFunctions::get_equal_volume_to_equal_surface_area_sphere_ratio(
+            axis_ratio);
+  } else {
+    ratio_of_radii = rat;
+  }
   // R_V is the equivalent sphere radius
   const float_type R_V = ratio_of_radii * particle_radius;
+  const float_type xev = 2. * M_PI * R_V / wavelength;
+  const float_type tolerance = ddelt * 0.1;
+  const std::complex<float_type> refractive_index(mrr, mri);
+  const uint_fast32_t maximum_order = 100;
+  const uint_fast32_t minimum_order = static_cast<uint_fast32_t>(
+      std::max(float_type(4.), xev + 4.05 * cbrt(xev)));
+  const uint_fast32_t auxsize = 100;
+
+  ctm_warning("Minimum order: %" PRIuFAST32, minimum_order);
 
   /// Serial version
   if (do_serial_test) {
@@ -101,8 +137,23 @@ int main(int argc, char **argv) {
       m0tasks[i]->execute();
     }
 
-    ctm_warning("Qsca: %g", double(Tmatrix.get_scattering_coefficient()));
-    ctm_warning("Qext: %g", double(Tmatrix.get_extinction_coefficient()));
+    ctm_warning("nmax: %" PRIuFAST32, Tmatrix.get_nmax());
+    ctm_warning("ngauss: %" PRIuFAST32, Tmatrix.get_ngauss());
+    ctm_warning("Qsca: %g (%g)", double(Tmatrix.get_scattering_coefficient()),
+                double(refqsca));
+    ctm_warning("Qext: %g (%g)", double(Tmatrix.get_extinction_coefficient()),
+                double(refqext));
+
+    for (uint_fast32_t i = 0; i < auxsize; ++i) {
+      delete auxspace[i];
+    }
+    for (uint_fast32_t i = 0; i < maximum_order - minimum_order; ++i) {
+      delete quadrature_points[i];
+      delete wignerdm0[i];
+      delete geometries[i];
+      delete interactions[i];
+      delete m0tasks[i];
+    }
   }
 
   /// QuickSched version

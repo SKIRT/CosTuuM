@@ -106,16 +106,13 @@ public:
       const float_type this_sinthetainv = sqrt(this_sintheta2inv);
       _sinthetainv[ig] = this_sinthetainv;
       _sinthetainv[2 * _ngauss - ig - 1] = this_sinthetainv;
-
-      ctm_assert_not_nan(_costheta[ig]);
-      ctm_assert_not_nan(_costheta[2 * _ngauss - ig - 1]);
-      ctm_assert_not_nan(_weights[ig]);
-      ctm_assert_not_nan(_weights[2 * _ngauss - ig - 1]);
-      ctm_assert_not_nan(_sintheta2inv[ig]);
-      ctm_assert_not_nan(_sintheta2inv[2 * _ngauss - ig - 1]);
-      ctm_assert_not_nan(_sinthetainv[ig]);
-      ctm_assert_not_nan(_sinthetainv[2 * _ngauss - ig - 1]);
     }
+
+    ctm_assert_no_nans(_costheta, 2 * _ngauss);
+    ctm_assert_no_nans(_weights, 2 * _ngauss);
+    ctm_assert_no_nans(_sintheta2inv, 2 * _ngauss);
+    ctm_assert_no_nans(_sinthetainv, 2 * _ngauss);
+
     make_available();
   }
 

@@ -25,7 +25,7 @@ using namespace std;
  */
 int main(int argc, char **argv) {
 
-  Matrix<std::complex<float_type>> A(3, 3);
+  Matrix<std::complex<float_type>> A(4, 4);
   A(0, 0) = 1.;
   A(0, 0).imag(1.);
   A(0, 1) = 2.;
@@ -44,6 +44,15 @@ int main(int argc, char **argv) {
   A(2, 1).imag(1.);
   A(2, 2).imag(-2.);
 
+  // add some additional elements to the part of the matrix we don't care about
+  A(3, 0) = 42.;
+  A(3, 1) = 42.;
+  A(3, 2) = 48.;
+  A(3, 3) = 44.;
+  A(0, 3) = 41.;
+  A(1, 3) = 48.;
+  A(2, 3) = 43.;
+
   for (uint_fast32_t i = 0; i < 3; ++i) {
     for (uint_fast32_t j = 0; j < 3; ++j) {
       std::cout << A(i, j) << " ";
@@ -51,7 +60,7 @@ int main(int argc, char **argv) {
     std::cout << std::endl;
   }
 
-  A.plu_inverse();
+  A.plu_inverse(3);
 
   A.binary_dump("test_matrix.dump");
 

@@ -100,15 +100,7 @@ public:
       const DATA_TYPE twoip1(2. * i + 1.);
       const DATA_TYPE ip1(i + 1.);
       y[i] = twoip1 * zinv * y[i - 1] - y[i - 2];
-      ctm_assert_message(
-          !std::isinf(double(y[i])),
-          "i: %" PRIuFAST32 ", twoip1: %g, zinv: %g, y[i-1]: %g, y[i-2]: %g", i,
-          double(twoip1), double(zinv), double(y[i - 1]), double(y[i - 2]));
       dy[i] = y[i - 1] - ip1 * zinv * y[i];
-      ctm_assert_message(
-          dy[i] == dy[i],
-          "i: %" PRIuFAST32 ", y[i-1]: %g, ip1: %g, zinv: %g, y[i]: %g", i,
-          double(y[i - 1]), double(ip1), double(zinv), double(y[i]));
     }
 
     ctm_assert_no_nans(y, nmax);

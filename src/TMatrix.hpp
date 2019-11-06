@@ -716,7 +716,7 @@ public:
     }
 
     // func_TT
-    Q.plu_inverse();
+    Q.plu_inverse(nmax2);
 
     for (uint_fast32_t i = 0; i < nmax; ++i) {
       for (uint_fast32_t j = 0; j < nmax; ++j) {
@@ -957,7 +957,7 @@ public:
         }
       }
 
-      Q.plu_inverse();
+      Q.plu_inverse(nm2);
 
       for (uint_fast32_t i = 0; i < nm; ++i) {
         for (uint_fast32_t j = 0; j < nm; ++j) {
