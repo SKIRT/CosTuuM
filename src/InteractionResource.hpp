@@ -11,6 +11,7 @@
 #define INTERACTIONRESOURCE_HPP
 
 #include "Configuration.hpp"
+#include "ConvergedSizeResources.hpp"
 #include "GaussBasedResources.hpp"
 #include "Matrix.hpp"
 #include "ParticleGeometryResource.hpp"
@@ -91,6 +92,10 @@ private:
   /*! @brief Geometrical factors for this particle (read only). */
   const ParticleGeometryResource &_geometry;
 
+  /*! @brief Optional pointer to a resource holding the actual number of
+   *  quadrature points. */
+  const ConvergedSizeResources *_converged_size;
+
 public:
   /**
    * @brief Constructor.
@@ -100,19 +105,22 @@ public:
    * @param nmax Maximum order of spherical basis, @f$n_{max}@f$.
    * @param ngauss Number of Gauss-Legendre quadrature points, @f$n_{GL}@f$.
    * @param geometry Geometrical factors for this particle (read only).
+   * @param converged_size Optional pointer to a resource holding the actual
+   * size of this resource.
    */
-  inline InteractionResource(const float_type wavelength,
-                             const std::complex<float_type> refractive_index,
-                             const uint_fast32_t nmax,
-                             const uint_fast32_t ngauss,
-                             const ParticleGeometryResource &geometry)
+  inline InteractionResource(
+      const float_type wavelength,
+      const std::complex<float_type> refractive_index, const uint_fast32_t nmax,
+      const uint_fast32_t ngauss, const ParticleGeometryResource &geometry,
+      const ConvergedSizeResources *converged_size = nullptr)
       : _nmax(nmax), _ngauss(ngauss), _k(2. * M_PI / wavelength), _k2(_k * _k),
         _kmr(refractive_index * _k), _k2mr(refractive_index * _k2),
         _kr(2 * ngauss, float_type(0.)), _krinv(2 * ngauss, float_type(0.)),
         _krmr(2 * ngauss, float_type(0.)), _krmrinv(2 * ngauss, float_type(0.)),
         _jkr(2 * ngauss, nmax), _ykr(2 * ngauss, nmax), _djkr(2 * ngauss, nmax),
         _dykr(2 * ngauss, nmax), _jkrmr(2 * ngauss, nmax),
-        _djkrmr(2 * ngauss, nmax), _geometry(geometry) {}
+        _djkrmr(2 * ngauss, nmax), _geometry(geometry),
+        _converged_size(converged_size) {}
 
   virtual ~InteractionResource() {}
 
@@ -161,6 +169,9 @@ public:
 
     // read access
     quicksched.link_task_and_resource(*this, _geometry, false);
+    if (_converged_size != nullptr) {
+      quicksched.link_task_and_resource(*this, *_converged_size, false);
+    }
   }
 
   /**
@@ -168,38 +179,43 @@ public:
    */
   virtual void execute() {
 
-    for (uint_fast32_t ig = 0; ig < 2 * _ngauss; ++ig) {
+    const uint_fast32_t ngauss =
+        (_converged_size == nullptr) ? _ngauss : _converged_size->get_ngauss();
+    const uint_fast32_t nmax =
+        (_converged_size == nullptr) ? _nmax : _converged_size->get_nmax();
+
+    for (uint_fast32_t ig = 0; ig < 2 * ngauss; ++ig) {
       _kr[ig] = _k * _geometry.get_r(ig);
       _krmr[ig] = _kmr * _geometry.get_r(ig);
       _krinv[ig] = float_type(1.) / _kr[ig];
       _krmrinv[ig] = std::complex<float_type>(1.) / _krmr[ig];
     }
 
-    ctm_assert_no_nans(_kr, 2 * _ngauss);
-    ctm_assert_no_nans(_krmr, 2 * _ngauss);
-    ctm_assert_no_nans(_krinv, 2 * _ngauss);
-    ctm_assert_no_nans(_krmrinv, 2 * _ngauss);
+    ctm_assert_no_nans(_kr, 2 * ngauss);
+    ctm_assert_no_nans(_krmr, 2 * ngauss);
+    ctm_assert_no_nans(_krinv, 2 * ngauss);
+    ctm_assert_no_nans(_krmrinv, 2 * ngauss);
 
-    for (uint_fast32_t ig = 0; ig < 2 * _ngauss; ++ig) {
-      SpecialFunctions::spherical_j_jdj_array(_nmax, _kr[ig], _jkr.get_row(ig),
+    for (uint_fast32_t ig = 0; ig < 2 * ngauss; ++ig) {
+      SpecialFunctions::spherical_j_jdj_array(nmax, _kr[ig], _jkr.get_row(ig),
                                               _djkr.get_row(ig));
-      SpecialFunctions::spherical_y_ydy_array(_nmax, _kr[ig], _ykr.get_row(ig),
+      SpecialFunctions::spherical_y_ydy_array(nmax, _kr[ig], _ykr.get_row(ig),
                                               _dykr.get_row(ig));
       SpecialFunctions::spherical_j_jdj_array(
-          _nmax, _krmr[ig], _jkrmr.get_row(ig), _djkrmr.get_row(ig));
+          nmax, _krmr[ig], _jkrmr.get_row(ig), _djkrmr.get_row(ig));
 
-      ctm_assert_message_no_nans(_jkr.get_row(ig), _nmax, "_nmax: %" PRIuFAST32,
-                                 _nmax);
-      ctm_assert_message_no_nans(_djkr.get_row(ig), _nmax,
-                                 "_nmax: %" PRIuFAST32, _nmax);
-      ctm_assert_message_no_nans(_ykr.get_row(ig), _nmax, "_nmax: %" PRIuFAST32,
-                                 _nmax);
-      ctm_assert_message_no_nans(_dykr.get_row(ig), _nmax,
-                                 "_nmax: %" PRIuFAST32, _nmax);
-      ctm_assert_message_no_nans(_jkrmr.get_row(ig), _nmax,
-                                 "_nmax: %" PRIuFAST32, _nmax);
-      ctm_assert_message_no_nans(_djkrmr.get_row(ig), _nmax,
-                                 "_nmax: %" PRIuFAST32, _nmax);
+      ctm_assert_message_no_nans(_jkr.get_row(ig), nmax, "_nmax: %" PRIuFAST32,
+                                 nmax);
+      ctm_assert_message_no_nans(_djkr.get_row(ig), nmax, "_nmax: %" PRIuFAST32,
+                                 nmax);
+      ctm_assert_message_no_nans(_ykr.get_row(ig), nmax, "_nmax: %" PRIuFAST32,
+                                 nmax);
+      ctm_assert_message_no_nans(_dykr.get_row(ig), nmax, "_nmax: %" PRIuFAST32,
+                                 nmax);
+      ctm_assert_message_no_nans(_jkrmr.get_row(ig), nmax,
+                                 "_nmax: %" PRIuFAST32, nmax);
+      ctm_assert_message_no_nans(_djkrmr.get_row(ig), nmax,
+                                 "_nmax: %" PRIuFAST32, nmax);
     }
 
     make_available();

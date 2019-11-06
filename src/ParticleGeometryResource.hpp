@@ -10,6 +10,7 @@
 #define PARTICLEGEOMETRYRESOURCE_HPP
 
 #include "Configuration.hpp"
+#include "ConvergedSizeResources.hpp"
 #include "GaussBasedResources.hpp"
 #include "QuickSchedWrapper.hpp"
 #include "SpecialFunctions.hpp"
@@ -50,6 +51,10 @@ private:
   /*! @brief Precomputed Gauss-Legendre quadrature points (read only). */
   const GaussBasedResources &_quadrature_points;
 
+  /*! @brief Optional pointer to a resource holding the actual number of
+   *  quadrature points. */
+  const ConvergedSizeResources *_converged_size;
+
 public:
   /**
    * @brief Constructor.
@@ -59,14 +64,17 @@ public:
    * @param ngauss Number of Gauss-Legendre quadrature points, @f$n_{GL}@f$.
    * @param quadrature_points Gauss-Legendre quadrature points (to be computed
    * before this task is executed!).
+   * @param converged_size Optional pointer to a resource holding the actual
+   * size of this resource.
    */
-  inline ParticleGeometryResource(const float_type R_V,
-                                  const float_type axis_ratio,
-                                  const uint_fast32_t ngauss,
-                                  const GaussBasedResources &quadrature_points)
+  inline ParticleGeometryResource(
+      const float_type R_V, const float_type axis_ratio,
+      const uint_fast32_t ngauss, const GaussBasedResources &quadrature_points,
+      const ConvergedSizeResources *converged_size = nullptr)
       : _R_V(R_V), _axis_ratio(axis_ratio), _r(2 * ngauss, 0.),
         _r2(2 * ngauss, 0.), _dr_over_r(2 * ngauss, 0.),
-        _quadrature_points(quadrature_points) {}
+        _quadrature_points(quadrature_points), _converged_size(converged_size) {
+  }
 
   virtual ~ParticleGeometryResource() {}
 
@@ -99,6 +107,9 @@ public:
 
     // read access
     quicksched.link_task_and_resource(*this, _quadrature_points, false);
+    if (_converged_size != nullptr) {
+      quicksched.link_task_and_resource(*this, *_converged_size, false);
+    }
   }
 
   /**
@@ -106,8 +117,12 @@ public:
    */
   virtual void execute() {
 
-    SpecialFunctions::get_r_dr_spheroid(_quadrature_points.get_costhetas(),
-                                        _R_V, _axis_ratio, _r2, _dr_over_r);
+    const uint_fast32_t size = (_converged_size == nullptr)
+                                   ? _r2.size()
+                                   : 2 * _converged_size->get_ngauss();
+    SpecialFunctions::get_r_dr_spheroid(&_quadrature_points.get_costhetas()[0],
+                                        size, _R_V, _axis_ratio, &_r2[0],
+                                        &_dr_over_r[0]);
     for (uint_fast32_t ig = 0; ig < _r2.size(); ++ig) {
       _r[ig] = sqrt(_r2[ig]);
     }

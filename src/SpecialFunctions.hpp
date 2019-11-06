@@ -805,6 +805,7 @@ public:
    * @param costheta Cosine of the azimuthal angles, @f$\cos(\theta{})@f$. We
    * assume that values are given in order from low to high, and are symmetric
    * w.r.t. @f$0@f$.
+   * @param size Size of the input and output arrays.
    * @param R_V Equal volume sphere radius, @f$R_V@f$.
    * @param axis_ratio Ratio of horizontal to vertical axis,
    * @f$d = \frac{a}{b}@f$.
@@ -818,24 +819,24 @@ public:
    */
   template <typename DATA_TYPE>
   static inline void
-  get_r_dr_spheroid(const std::vector<DATA_TYPE> &costheta, const DATA_TYPE R_V,
-                    const DATA_TYPE axis_ratio, std::vector<DATA_TYPE> &r2,
-                    std::vector<DATA_TYPE> &dr_over_r) {
+  get_r_dr_spheroid(const DATA_TYPE *costheta, const uint_fast32_t size,
+                    const DATA_TYPE R_V, const DATA_TYPE axis_ratio,
+                    DATA_TYPE *r2, DATA_TYPE *dr_over_r) {
 
     // compute the horizontal axis length
     const DATA_TYPE a = R_V * cbrt(axis_ratio);
     const DATA_TYPE a2 = a * a;
     const DATA_TYPE axis_ratio2 = axis_ratio * axis_ratio;
     const DATA_TYPE axis_ratio2m1 = axis_ratio2 - 1.;
-    for (uint_fast32_t i = 0; i < costheta.size() / 2; ++i) {
+    for (uint_fast32_t i = 0; i < size / 2; ++i) {
       const DATA_TYPE costheta2 = costheta[i] * costheta[i];
       const DATA_TYPE sintheta2 = 1. - costheta2;
       const DATA_TYPE sintheta = sqrt(sintheta2);
       const DATA_TYPE r2_over_a2 = 1. / (sintheta2 + axis_ratio2 * costheta2);
       r2[i] = a2 * r2_over_a2;
-      r2[costheta.size() - i - 1] = r2[i];
+      r2[size - i - 1] = r2[i];
       dr_over_r[i] = r2_over_a2 * costheta[i] * sintheta * axis_ratio2m1;
-      dr_over_r[costheta.size() - i - 1] = -dr_over_r[i];
+      dr_over_r[size - i - 1] = -dr_over_r[i];
     }
   }
 

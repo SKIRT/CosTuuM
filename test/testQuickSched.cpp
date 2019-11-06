@@ -178,7 +178,7 @@ int main(int argc, char **argv) {
     size += maxgauss * gaussresourcesize;
 
     const size_t wignerm0resourcesize =
-        WignerDResources::get_memory_size(maximum_order, maxgauss);
+        WignerDm0Resources::get_memory_size(maximum_order, maxgauss);
     ctm_warning("WignerDResources: %s",
                 Utilities::human_readable_bytes(wignerm0resourcesize).c_str());
     size += maxgauss * wignerm0resourcesize;
@@ -211,6 +211,9 @@ int main(int argc, char **argv) {
     quicksched.register_task(nfactors);
     nfactors.link_resources(quicksched);
 
+    ConvergedSizeResources converged_size;
+    quicksched.register_resource(converged_size);
+
     std::vector<TMatrixAuxiliarySpace *> auxspace(auxsize, nullptr);
     for (uint_fast32_t i = 0; i < auxsize; ++i) {
       auxspace[i] = new TMatrixAuxiliarySpace(maximum_order);
@@ -218,7 +221,7 @@ int main(int argc, char **argv) {
     }
 
     std::vector<GaussBasedResources *> gaussfactors(maxgauss, nullptr);
-    std::vector<WignerDResources *> wignerm0factors(maxgauss, nullptr);
+    std::vector<WignerDm0Resources *> wignerm0factors(maxgauss, nullptr);
     std::vector<ParticleGeometryResource *> geometryfactors(maxgauss, nullptr);
     std::vector<InteractionResource *> interactionfactors(maxgauss, nullptr);
     std::vector<TMatrixResource *> tmatrices(maxgauss, nullptr);
@@ -230,7 +233,7 @@ int main(int argc, char **argv) {
       gaussfactors[ig]->link_resources(quicksched);
 
       wignerm0factors[ig] =
-          new WignerDResources(0, maximum_order, ig + 20, *gaussfactors[ig]);
+          new WignerDm0Resources(maximum_order, ig + 20, *gaussfactors[ig]);
       quicksched.register_resource(*wignerm0factors[ig]);
       quicksched.register_task(*wignerm0factors[ig]);
       wignerm0factors[ig]->link_resources(quicksched);
@@ -254,11 +257,11 @@ int main(int argc, char **argv) {
       tmatrices[ig] = new TMatrixResource(maximum_order);
       quicksched.register_resource(tmatrices[ig]->get_m_resource(0));
 
-      tmatrixm0tasks[ig] =
-          new TMatrixM0Task(1.e-4, 50, ig + 20, nfactors, *gaussfactors[ig],
-                            *geometryfactors[ig], *interactionfactors[ig],
-                            *wignerm0factors[ig], *auxspace[ig % auxsize],
-                            *tmatrices[ig], tmatrices[ig]->get_m_resource(0));
+      tmatrixm0tasks[ig] = new TMatrixM0Task(
+          1.e-4, 50, ig + 20, nfactors, *gaussfactors[ig], *geometryfactors[ig],
+          *interactionfactors[ig], *wignerm0factors[ig],
+          *auxspace[ig % auxsize], *tmatrices[ig], converged_size,
+          tmatrices[ig]->get_m_resource(0));
       quicksched.register_task(*tmatrixm0tasks[ig]);
       tmatrixm0tasks[ig]->link_resources(quicksched);
       quicksched.link_tasks(nfactors, *tmatrixm0tasks[ig]);

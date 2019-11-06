@@ -9,6 +9,7 @@
 #define TMATRIXRESOURCE_HPP
 
 #include "Configuration.hpp"
+#include "ConvergedSizeResources.hpp"
 #include "GaussBasedResources.hpp"
 #include "InteractionResource.hpp"
 #include "Matrix.hpp"
@@ -322,13 +323,17 @@ private:
   const InteractionResource &_interaction;
 
   /*! @brief Precomputed @f$m=0@f$ Wigner D functions (read only). */
-  const WignerDResources &_wigner;
+  const WignerDm0Resources &_wigner;
 
   /*! @brief Auxiliary space used to store intermediate calculations. */
   TMatrixAuxiliarySpace &_aux;
 
   /*! @brief TMatrix space containing the result. */
   TMatrixResource &_Tmatrix;
+
+  /*! @brief Resource containing the converged order and number of quadrature
+   *  points. */
+  ConvergedSizeResources &_converged_size;
 
   /*! @brief Resource that guarantees unique access to the @f$m=0@f$ T-matrix
    *  elements. */
@@ -353,6 +358,8 @@ public:
    * @param wigner Precomputed @f$m=0@f$ Wigner D functions (read only).
    * @param aux Auxiliary space used to store intermediate calculations.
    * @param Tmatrix TMatrix space containing the result.
+   * @param converged_size Resource containing the converged order and number of
+   * quadrature points.
    * @param m_resource Resource that guarantees unique access to the @f$m=0@f$
    * values of the T-matrix.
    */
@@ -362,13 +369,15 @@ public:
                        const GaussBasedResources &quadrature_points,
                        const ParticleGeometryResource &geometry,
                        const InteractionResource &interaction,
-                       const WignerDResources &wigner,
+                       const WignerDm0Resources &wigner,
                        TMatrixAuxiliarySpace &aux, TMatrixResource &Tmatrix,
+                       ConvergedSizeResources &converged_size,
                        const Resource &m_resource)
       : _tolerance(tolerance), _nmax(nmax), _ngauss(ngauss),
         _nfactors(nfactors), _quadrature_points(quadrature_points),
         _geometry(geometry), _interaction(interaction), _wigner(wigner),
-        _aux(aux), _Tmatrix(Tmatrix), _m_resource(m_resource) {}
+        _aux(aux), _Tmatrix(Tmatrix), _converged_size(converged_size),
+        _m_resource(m_resource) {}
 
   virtual ~TMatrixM0Task() {}
 
@@ -381,6 +390,7 @@ public:
     // write access
     quicksched.link_task_and_resource(*this, _aux, true);
     quicksched.link_task_and_resource(*this, _m_resource, true);
+    quicksched.link_task_and_resource(*this, _converged_size, true);
 
     // read access
     quicksched.link_task_and_resource(*this, _nfactors, false);
@@ -551,6 +561,9 @@ public:
     _Tmatrix._nmax = _nmax;
     _Tmatrix._ngauss = _ngauss;
 
+    _converged_size._nmax = _nmax;
+    _converged_size._ngauss = _ngauss;
+
     // update Q coefficients
     const float_type old_Qscattering = _Tmatrix._Qscattering;
     const float_type old_Qextinction = _Tmatrix._Qextinction;
@@ -599,7 +612,7 @@ private:
   const InteractionResource &_interaction;
 
   /*! @brief Precomputed @f$m=0@f$ Wigner D functions (read only). */
-  const WignerDResources &_wigner;
+  const WignerDm0Resources &_wigner;
 
   /*! @brief Auxiliary space used to store intermediate calculations. */
   TMatrixAuxiliarySpace &_aux;
@@ -633,7 +646,7 @@ public:
                          const GaussBasedResources &quadrature_points,
                          const ParticleGeometryResource &geometry,
                          const InteractionResource &interaction,
-                         const WignerDResources &wigner,
+                         const WignerDm0Resources &wigner,
                          TMatrixAuxiliarySpace &aux, TMatrixResource &Tmatrix,
                          const Resource &m_resource)
       : _m(m), _nfactors(nfactors), _quadrature_points(quadrature_points),

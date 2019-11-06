@@ -10,6 +10,7 @@
 #define GAUSSBASEDRESOURCES_HPP
 
 #include "Configuration.hpp"
+#include "ConvergedSizeResources.hpp"
 #include "Error.hpp"
 #include "QuickSchedWrapper.hpp"
 #include "SpecialFunctions.hpp"
@@ -48,17 +49,25 @@ private:
    *  size @f$2n_{GL}@f$). */
   std::vector<float_type> _weights;
 
+  /*! @brief Optional pointer to a resource holding the actual size of this
+   *  resource. */
+  const ConvergedSizeResources *_converged_size;
+
 public:
   /**
    * @brief Constructor.
    *
    * @param ngauss Number of Gauss-Legendre quadrature points, @f$n_{GL}@f$.
+   * @param converged_size Optional pointer to a resource holding the actual
+   * size of this resource.
    */
-  inline GaussBasedResources(const uint_fast32_t ngauss)
+  inline GaussBasedResources(
+      const uint_fast32_t ngauss,
+      const ConvergedSizeResources *converged_size = nullptr)
       : _ngauss(ngauss), _costheta(2 * ngauss, float_type(0.)),
         _sinthetainv(2 * ngauss, float_type(0.)),
         _sintheta2inv(2 * ngauss, float_type(0.)),
-        _weights(2 * ngauss, float_type(0.)) {}
+        _weights(2 * ngauss, float_type(0.)), _converged_size(converged_size) {}
 
   virtual ~GaussBasedResources() {}
 
@@ -90,28 +99,37 @@ public:
   inline void link_resources(QuickSched &quicksched) {
     // write access
     quicksched.link_task_and_resource(*this, *this, true);
+
+    // read only
+    if (_converged_size != nullptr) {
+      quicksched.link_task_and_resource(*this, *_converged_size, false);
+    }
   }
 
   /**
    * @brief Compute the factors.
    */
   virtual void execute() {
+
+    const uint_fast32_t ngauss =
+        (_converged_size == nullptr) ? _ngauss : _converged_size->get_ngauss();
+
     SpecialFunctions::get_gauss_legendre_points_and_weights(
-        2 * _ngauss, _costheta, _weights);
-    for (uint_fast32_t ig = 0; ig < _ngauss; ++ig) {
+        2 * ngauss, _costheta, _weights);
+    for (uint_fast32_t ig = 0; ig < ngauss; ++ig) {
       const float_type this_sintheta2inv =
           1. / ((1. - _costheta[ig]) * (1. + _costheta[ig]));
       _sintheta2inv[ig] = this_sintheta2inv;
-      _sintheta2inv[2 * _ngauss - ig - 1] = this_sintheta2inv;
+      _sintheta2inv[2 * ngauss - ig - 1] = this_sintheta2inv;
       const float_type this_sinthetainv = sqrt(this_sintheta2inv);
       _sinthetainv[ig] = this_sinthetainv;
-      _sinthetainv[2 * _ngauss - ig - 1] = this_sinthetainv;
+      _sinthetainv[2 * ngauss - ig - 1] = this_sinthetainv;
     }
 
-    ctm_assert_no_nans(_costheta, 2 * _ngauss);
-    ctm_assert_no_nans(_weights, 2 * _ngauss);
-    ctm_assert_no_nans(_sintheta2inv, 2 * _ngauss);
-    ctm_assert_no_nans(_sinthetainv, 2 * _ngauss);
+    ctm_assert_no_nans(_costheta, 2 * ngauss);
+    ctm_assert_no_nans(_weights, 2 * ngauss);
+    ctm_assert_no_nans(_sintheta2inv, 2 * ngauss);
+    ctm_assert_no_nans(_sinthetainv, 2 * ngauss);
 
     make_available();
   }

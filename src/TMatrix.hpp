@@ -555,8 +555,8 @@ public:
       _sinthetainv[ig] = this_sinthetainv;
       _sinthetainv[2 * ngauss - ig - 1] = this_sinthetainv;
     }
-    SpecialFunctions::get_r_dr_spheroid(_costheta, R_V, axis_ratio, _r2,
-                                        _dr_over_r);
+    SpecialFunctions::get_r_dr_spheroid(&_costheta[0], _costheta.size(), R_V,
+                                        axis_ratio, &_r2[0], &_dr_over_r[0]);
     const std::complex<float_type> mrinv = float_type(1.) / refractive_index;
     for (uint_fast32_t i = 0; i < 2 * ngauss; ++i) {
       const float_type r = sqrt(_r2[i]);

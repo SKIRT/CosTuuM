@@ -7,6 +7,7 @@
  */
 
 #include "Configuration.hpp"
+#include "ConvergedSizeResources.hpp"
 #include "Error.hpp"
 #include "GaussBasedResources.hpp"
 #include "InteractionResource.hpp"
@@ -38,7 +39,7 @@ using namespace std;
 int main(int argc, char **argv) {
 
   const bool do_serial_test = true;
-  const bool do_quicksched_test = true;
+  const bool do_quicksched_test = false;
 
   std::ifstream ifile("test_tmatrixcalculator.txt");
   std::string line;
@@ -87,6 +88,8 @@ int main(int argc, char **argv) {
     NBasedResources nfactors(maximum_order);
     nfactors.execute();
 
+    ConvergedSizeResources converged_size;
+
     std::vector<TMatrixAuxiliarySpace *> auxspace(auxsize, nullptr);
     for (uint_fast32_t i = 0; i < auxsize; ++i) {
       auxspace[i] = new TMatrixAuxiliarySpace(maximum_order);
@@ -100,12 +103,11 @@ int main(int argc, char **argv) {
       quadrature_points[i]->execute();
     }
 
-    std::vector<WignerDResources *> wignerdm0(maximum_order - minimum_order,
-                                              nullptr);
+    std::vector<WignerDm0Resources *> wignerdm0(maximum_order - minimum_order,
+                                                nullptr);
     for (uint_fast32_t i = 0; i < maximum_order - minimum_order; ++i) {
-      wignerdm0[i] =
-          new WignerDResources(0, minimum_order + i, ndgs * (minimum_order + i),
-                               *quadrature_points[i]);
+      wignerdm0[i] = new WignerDm0Resources(
+          minimum_order + i, ndgs * (minimum_order + i), *quadrature_points[i]);
       wignerdm0[i]->execute();
     }
 
@@ -133,7 +135,8 @@ int main(int argc, char **argv) {
       m0tasks[i] = new TMatrixM0Task(
           tolerance, minimum_order + i, ndgs * (minimum_order + i), nfactors,
           *quadrature_points[i], *geometries[i], *interactions[i],
-          *wignerdm0[i], *auxspace[0], Tmatrix, Tmatrix.get_m_resource(0));
+          *wignerdm0[i], *auxspace[0], Tmatrix, converged_size,
+          Tmatrix.get_m_resource(0));
       m0tasks[i]->execute();
     }
 
@@ -143,6 +146,14 @@ int main(int argc, char **argv) {
                 double(refqsca));
     ctm_warning("Qext: %g (%g)", double(Tmatrix.get_extinction_coefficient()),
                 double(refqext));
+
+    std::vector<WignerDmn0Resources *> more_wigner(maximum_order, nullptr);
+    for (uint_fast32_t i = 0; i < maximum_order; ++i) {
+      more_wigner[i] =
+          new WignerDmn0Resources(1 + i, maximum_order, ndgs * maximum_order,
+                                  *quadrature_points.back(), converged_size);
+      more_wigner[i]->execute();
+    }
 
     for (uint_fast32_t i = 0; i < auxsize; ++i) {
       delete auxspace[i];
@@ -154,6 +165,9 @@ int main(int argc, char **argv) {
       delete interactions[i];
       delete m0tasks[i];
     }
+    for (uint_fast32_t i = 0; i < maximum_order; ++i) {
+      delete more_wigner[i];
+    }
   }
 
   /// QuickSched version
@@ -164,6 +178,9 @@ int main(int argc, char **argv) {
     quicksched.register_resource(nfactors);
     quicksched.register_task(nfactors);
     nfactors.link_resources(quicksched);
+
+    ConvergedSizeResources converged_size;
+    quicksched.register_resource(converged_size);
 
     std::vector<TMatrixAuxiliarySpace *> auxspace(auxsize, nullptr);
     for (uint_fast32_t i = 0; i < auxsize; ++i) {
@@ -185,12 +202,11 @@ int main(int argc, char **argv) {
       quicksched.register_task(*quadrature_points[i]);
     }
 
-    std::vector<WignerDResources *> wignerdm0(maximum_order - minimum_order,
-                                              nullptr);
+    std::vector<WignerDm0Resources *> wignerdm0(maximum_order - minimum_order,
+                                                nullptr);
     for (uint_fast32_t i = 0; i < maximum_order - minimum_order; ++i) {
-      wignerdm0[i] =
-          new WignerDResources(0, minimum_order + i, ndgs * (minimum_order + i),
-                               *quadrature_points[i]);
+      wignerdm0[i] = new WignerDm0Resources(
+          minimum_order + i, ndgs * (minimum_order + i), *quadrature_points[i]);
       quicksched.register_resource(*wignerdm0[i]);
       quicksched.register_task(*wignerdm0[i]);
       wignerdm0[i]->link_resources(quicksched);
@@ -226,7 +242,8 @@ int main(int argc, char **argv) {
       m0tasks[i] = new TMatrixM0Task(
           tolerance, minimum_order + i, ndgs * (minimum_order + i), nfactors,
           *quadrature_points[i], *geometries[i], *interactions[i],
-          *wignerdm0[i], *auxspace[0], Tmatrix, Tmatrix.get_m_resource(0));
+          *wignerdm0[i], *auxspace[0], Tmatrix, converged_size,
+          Tmatrix.get_m_resource(0));
       quicksched.register_task(*m0tasks[i]);
       m0tasks[i]->link_resources(quicksched);
       quicksched.link_tasks(nfactors, *m0tasks[i]);
