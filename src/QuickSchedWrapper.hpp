@@ -37,6 +37,17 @@ public:
   virtual void execute() = 0;
 
   /**
+   * @brief Get the computational cost of the task.
+   *
+   * By default, this is set to 1. Increase to a higher value for tasks that
+   * need to be executed preferentially, increasing their likelihood of being
+   * scheduled early and boosting the load-balancing efficiency.
+   *
+   * @return Computational cost of the task.
+   */
+  virtual int_fast32_t get_cost() const { return 1; }
+
+  /**
    * @brief Set the QuickSched task ID of the task.
    *
    * @param task_id QuickSched task ID.

@@ -208,7 +208,7 @@ public:
    *
    * This function returns
    * @f[
-   *    d^n_{0m}(x) = (-1)^{-m} \sqrt{\frac{(n-m)!}{(n+m)!}} P^m_n(\cos(x)),
+   *    d^n_{0m}(x) = (-1)^{m} \sqrt{\frac{(n-m)!}{(n+m)!}} P^m_n(\cos(x)),
    * @f]
    * where @f$n \in{} [1, n_{max}]@f$, @f$m \in{} [-n, n]@f$ and
    * @f$P^m_n(x)@f$ is the associated Legendre polynomial of degree @f$n@f$ and
@@ -266,6 +266,8 @@ public:
   static inline void
   wigner_dn_0m(const DATA_TYPE cosx, const uint_fast32_t nmax,
                const uint_fast32_t m, DATA_TYPE *y, DATA_TYPE *dy) {
+
+    ctm_assert(m <= nmax);
 
     const DATA_TYPE zero(0.);
     const DATA_TYPE one(1.);

@@ -119,6 +119,15 @@ public:
   }
 
   /**
+   * @brief Get the computational cost of this task.
+   *
+   * @return Computational cost.
+   */
+  virtual int_fast32_t get_cost() const {
+    return 38 * _ngauss + 298 * _ngauss + 12046;
+  }
+
+  /**
    * @brief Get the Wigner D function for the given Gauss-Legendre quadrature
    * point.
    *
@@ -171,9 +180,6 @@ private:
   /*! @brief Derivatives of the Wigner D functions. */
   Matrix<float_type> _dwigner_d;
 
-  /*! @brief Gauss-Legendre quadrature points. */
-  const GaussBasedResources &_quadrature_points;
-
   /*! @brief Actual order and number of quadrature points. */
   const ConvergedSizeResources &_converged_size;
 
@@ -185,17 +191,13 @@ public:
    * @param nmax Maximum order, @f$n_{max}@f$.
    * @param ngauss Maximum number of Gauss-Legendre quadrature points,
    * @f$n_{GL}@f$.
-   * @param quadrature_points Gauss-Legendre quadrature points (to be computed
-   * before this task is executed!).
    * @param converged_size Actual order and number of quadrature points.
    */
   inline WignerDmn0Resources(const uint_fast32_t m, const uint_fast32_t nmax,
                              const uint_fast32_t ngauss,
-                             const GaussBasedResources &quadrature_points,
                              const ConvergedSizeResources &converged_size)
       : _m(m), _nmax(nmax), _ngauss(ngauss), _wigner_d(2 * ngauss, nmax),
-        _dwigner_d(2 * ngauss, nmax), _quadrature_points(quadrature_points),
-        _converged_size(converged_size) {}
+        _dwigner_d(2 * ngauss, nmax), _converged_size(converged_size) {}
 
   virtual ~WignerDmn0Resources() {}
 
@@ -227,7 +229,6 @@ public:
     quicksched.link_task_and_resource(*this, *this, true);
 
     // read access
-    quicksched.link_task_and_resource(*this, _quadrature_points, false);
     quicksched.link_task_and_resource(*this, _converged_size, false);
   }
 
@@ -237,7 +238,15 @@ public:
   virtual void execute() {
 
     const uint_fast32_t nmax = _converged_size.get_nmax();
+    // skip tasks that are not required (we spawn tasks for all n, but only
+    // tasks for m <= nmax are actually needed)
+    if (_m > nmax) {
+      return;
+    }
+
     const uint_fast32_t ngauss = _converged_size.get_ngauss();
+    const GaussBasedResources &quadrature_points =
+        *_converged_size.get_quadrature_points();
 
     ctm_assert(nmax <= _nmax);
     ctm_assert(ngauss <= _ngauss);
@@ -246,7 +255,7 @@ public:
       const uint_fast32_t i1 = ngauss + ig;
       const uint_fast32_t i2 = ngauss - ig + 1;
       std::vector<float_type> dv1(nmax), dv2(nmax);
-      SpecialFunctions::wigner_dn_0m(_quadrature_points.get_costheta(i1 - 1),
+      SpecialFunctions::wigner_dn_0m(quadrature_points.get_costheta(i1 - 1),
                                      nmax, _m, &dv1[0], &dv2[0]);
       int_fast8_t sign = 1;
       for (uint_fast32_t n = 0; n < nmax; ++n) {
@@ -263,6 +272,16 @@ public:
       }
     }
     make_available();
+  }
+
+  /**
+   * @brief Get the computational cost of this task.
+   *
+   * @return Computational cost.
+   */
+  virtual int_fast32_t get_cost() const {
+    return static_cast<int_fast32_t>(
+        std::round(155166. + 167149. * std::exp(-0.175 * _m)));
   }
 
   /**

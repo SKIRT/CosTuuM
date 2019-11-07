@@ -39,7 +39,7 @@ using namespace std;
 int main(int argc, char **argv) {
 
   const bool do_serial_test = true;
-  const bool do_quicksched_test = false;
+  const bool do_quicksched_test = true;
 
   std::ifstream ifile("test_tmatrixcalculator.txt");
   std::string line;
@@ -149,11 +149,26 @@ int main(int argc, char **argv) {
 
     std::vector<WignerDmn0Resources *> more_wigner(maximum_order, nullptr);
     for (uint_fast32_t i = 0; i < maximum_order; ++i) {
-      more_wigner[i] =
-          new WignerDmn0Resources(1 + i, maximum_order, ndgs * maximum_order,
-                                  *quadrature_points.back(), converged_size);
+      more_wigner[i] = new WignerDmn0Resources(
+          1 + i, maximum_order, ndgs * maximum_order, converged_size);
       more_wigner[i]->execute();
     }
+
+    std::vector<TMatrixMAllTask *> malltask(maximum_order, nullptr);
+    for (uint_fast32_t i = 0; i < maximum_order; ++i) {
+      malltask[i] = new TMatrixMAllTask(1 + i, nfactors, *more_wigner[i],
+                                        converged_size, *auxspace[i % auxsize],
+                                        Tmatrix, Tmatrix.get_m_resource(1 + i));
+      malltask[i]->execute();
+    }
+
+    TMatrixQTask qtask(Tmatrix, Tmatrix.get_m_resource(0));
+    qtask.execute();
+
+    ctm_warning("Qsca: %g (%g)", double(Tmatrix.get_scattering_coefficient()),
+                double(refqsca));
+    ctm_warning("Qext: %g (%g)", double(Tmatrix.get_extinction_coefficient()),
+                double(refqext));
 
     for (uint_fast32_t i = 0; i < auxsize; ++i) {
       delete auxspace[i];
@@ -167,6 +182,7 @@ int main(int argc, char **argv) {
     }
     for (uint_fast32_t i = 0; i < maximum_order; ++i) {
       delete more_wigner[i];
+      delete malltask[i];
     }
   }
 
@@ -254,6 +270,32 @@ int main(int argc, char **argv) {
       }
     }
 
+    std::vector<WignerDmn0Resources *> more_wigner(maximum_order, nullptr);
+    for (uint_fast32_t i = 0; i < maximum_order; ++i) {
+      more_wigner[i] = new WignerDmn0Resources(
+          1 + i, maximum_order, ndgs * maximum_order, converged_size);
+      quicksched.register_resource(*more_wigner[i]);
+      quicksched.register_task(*more_wigner[i]);
+      more_wigner[i]->link_resources(quicksched);
+      quicksched.link_tasks(*m0tasks.back(), *more_wigner[i]);
+    }
+
+    TMatrixQTask qtask(Tmatrix, Tmatrix.get_m_resource(0));
+    quicksched.register_task(qtask);
+    qtask.link_resources(quicksched);
+
+    std::vector<TMatrixMAllTask *> malltask(maximum_order, nullptr);
+    for (uint_fast32_t i = 0; i < maximum_order; ++i) {
+      malltask[i] = new TMatrixMAllTask(1 + i, nfactors, *more_wigner[i],
+                                        converged_size, *auxspace[i % auxsize],
+                                        Tmatrix, Tmatrix.get_m_resource(1 + i));
+      quicksched.register_task(*malltask[i]);
+      malltask[i]->link_resources(quicksched);
+      quicksched.link_tasks(*more_wigner[i], *malltask[i]);
+
+      quicksched.link_tasks(*malltask[i], qtask);
+    }
+
     quicksched.execute_tasks(4);
 
     ctm_warning("nmax: %" PRIuFAST32, Tmatrix.get_nmax());
@@ -271,6 +313,11 @@ int main(int argc, char **argv) {
       quicksched.print_task(*interactions[i], taskfile);
       quicksched.print_task(*m0tasks[i], taskfile);
     }
+    for (uint_fast32_t i = 0; i < maximum_order; ++i) {
+      quicksched.print_task(*more_wigner[i], taskfile);
+      quicksched.print_task(*malltask[i], taskfile);
+    }
+    quicksched.print_task(qtask, taskfile);
     std::ofstream typefile("test_tmatrix_types.txt");
     typefile << "# type\tlabel\n";
     quicksched.print_type_dict(typefile);
@@ -285,6 +332,10 @@ int main(int argc, char **argv) {
       delete geometries[i];
       delete interactions[i];
       delete m0tasks[i];
+    }
+    for (uint_fast32_t i = 0; i < maximum_order; ++i) {
+      delete more_wigner[i];
+      delete malltask[i];
     }
   }
 

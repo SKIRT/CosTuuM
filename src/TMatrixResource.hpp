@@ -47,6 +47,9 @@ class TMatrixResource {
   /*! @brief Grant access to @f$m>0@f$ computation task. */
   friend class TMatrixMAllTask;
 
+  /*! @brief Grant access to the scattering and extinction computation task. */
+  friend class TMatrixQTask;
+
 private:
   /*! @brief Actual size of the matrix stored in this resource. */
   uint_fast32_t _nmax;
@@ -563,6 +566,9 @@ public:
 
     _converged_size._nmax = _nmax;
     _converged_size._ngauss = _ngauss;
+    _converged_size._quadrature_points = &_quadrature_points;
+    _converged_size._geometry = &_geometry;
+    _converged_size._interaction = &_interaction;
 
     // update Q coefficients
     const float_type old_Qscattering = _Tmatrix._Qscattering;
@@ -589,6 +595,15 @@ public:
                                     _Tmatrix._Qextinction);
     }
   }
+
+  /**
+   * @brief Get the computational cost of this task.
+   *
+   * @return Computational cost.
+   */
+  virtual int_fast32_t get_cost() const {
+    return 93468 * _ngauss * _ngauss - 4358242 * _ngauss + 66752438;
+  }
 };
 
 /**
@@ -602,17 +617,11 @@ private:
   /*! @brief Precomputed @f$n@f$ factors (read only). */
   const NBasedResources &_nfactors;
 
-  /*! @brief Precomputed Gauss-Legendre quadrature points (read only). */
-  const GaussBasedResources &_quadrature_points;
+  /*! @brief Precomputed @f$m>0@f$ Wigner D functions (read only). */
+  const WignerDmn0Resources &_wigner;
 
-  /*! @brief Precomputed geometry specific quadrature points (read only). */
-  const ParticleGeometryResource &_geometry;
-
-  /*! @brief Precomputed interaction specific quadrature points (read only). */
-  const InteractionResource &_interaction;
-
-  /*! @brief Precomputed @f$m=0@f$ Wigner D functions (read only). */
-  const WignerDm0Resources &_wigner;
+  /*! @brief Converged T-matrix variables. */
+  const ConvergedSizeResources &_converged_size;
 
   /*! @brief Auxiliary space used to store intermediate calculations. */
   TMatrixAuxiliarySpace &_aux;
@@ -620,7 +629,7 @@ private:
   /*! @brief TMatrix space containing the result. */
   TMatrixResource &_Tmatrix;
 
-  /*! @brief Resource that guarantees unique access to the @f$m=0@f$ T-matrix
+  /*! @brief Resource that guarantees unique access to the @f$m>0@f$ T-matrix
    *  elements. */
   const Resource &_m_resource;
 
@@ -630,28 +639,21 @@ public:
    *
    * @param m @f$m@f$ value.
    * @param nfactors Precomputed @f$n@f$ factors (read only).
-   * @param quadrature_points Precomputed Gauss-Legendre quadrature points (read
-   * only).
-   * @param geometry Precomputed geometry specific quadrature points (read
-   * only).
-   * @param interaction Precomputed interaction specific quadrature points (read
-   * only).
-   * @param wigner Precomputed @f$m=0@f$ Wigner D functions (read only).
+   * @param wigner Precomputed @f$m>0@f$ Wigner D functions (read only).
+   * @param converged_size Converged T-matrix variables (read only).
    * @param aux Auxiliary space used to store intermediate calculations.
    * @param Tmatrix TMatrix space containing the result.
    * @param m_resource Resource that guarantees unique access to the @f$m=0@f$
    * values of the T-matrix.
    */
   inline TMatrixMAllTask(const uint_fast32_t m, const NBasedResources &nfactors,
-                         const GaussBasedResources &quadrature_points,
-                         const ParticleGeometryResource &geometry,
-                         const InteractionResource &interaction,
-                         const WignerDm0Resources &wigner,
+                         const WignerDmn0Resources &wigner,
+                         const ConvergedSizeResources &converged_size,
                          TMatrixAuxiliarySpace &aux, TMatrixResource &Tmatrix,
                          const Resource &m_resource)
-      : _m(m), _nfactors(nfactors), _quadrature_points(quadrature_points),
-        _geometry(geometry), _interaction(interaction), _wigner(wigner),
-        _aux(aux), _Tmatrix(Tmatrix), _m_resource(m_resource) {}
+      : _m(m), _nfactors(nfactors), _wigner(wigner),
+        _converged_size(converged_size), _aux(aux), _Tmatrix(Tmatrix),
+        _m_resource(m_resource) {}
 
   virtual ~TMatrixMAllTask() {}
 
@@ -667,10 +669,8 @@ public:
 
     // read access
     quicksched.link_task_and_resource(*this, _nfactors, false);
-    quicksched.link_task_and_resource(*this, _quadrature_points, false);
-    quicksched.link_task_and_resource(*this, _geometry, false);
-    quicksched.link_task_and_resource(*this, _interaction, false);
     quicksched.link_task_and_resource(*this, _wigner, false);
+    quicksched.link_task_and_resource(*this, _converged_size, false);
   }
 
   /**
@@ -681,25 +681,31 @@ public:
     // since we don't know how many elements the T matrix will have before
     // we create the tasks, we might have tasks for elements of the T matrix
     // that we don't need. We make sure they don't waste computing time.
-    if (_m > _Tmatrix._nmax) {
+    const uint_fast32_t nmax = _converged_size.get_nmax();
+    if (_m > nmax) {
       return;
     }
+    const uint_fast32_t ngauss = _converged_size.get_ngauss();
+    const GaussBasedResources &quadrature_points =
+        *_converged_size.get_quadrature_points();
+    const ParticleGeometryResource &geometry = *_converged_size.get_geometry();
+    const InteractionResource &interaction = *_converged_size.get_interaction();
 
     const float_type m2 = _m * _m;
-    const uint_fast32_t nm = _Tmatrix._nmax + 1 - _m;
+    const uint_fast32_t nm = nmax + 1 - _m;
     const uint_fast32_t nm2 = 2 * nm;
 
-    for (uint_fast32_t n1 = _m; n1 < _Tmatrix._nmax + 1; ++n1) {
+    for (uint_fast32_t n1 = _m; n1 < nmax + 1; ++n1) {
       // n1 * (n1 + 1)
       const float_type n1n1p1 = n1 * (n1 + 1.);
-      for (uint_fast32_t n2 = _m; n2 < _Tmatrix._nmax + 1; ++n2) {
+      for (uint_fast32_t n2 = _m; n2 < nmax + 1; ++n2) {
         // n2 * (n2 + 1)
         const float_type n2n2p1 = n2 * (n2 + 1.);
 
         std::complex<float_type> this_J11, this_J12, this_J21, this_J22,
             this_RgJ11, this_RgJ12, this_RgJ21, this_RgJ22;
         const int_fast8_t sign = ((n1 + n2) % 2 == 0) ? 1 : -1;
-        for (uint_fast32_t ig = 0; ig < _Tmatrix._ngauss; ++ig) {
+        for (uint_fast32_t ig = 0; ig < ngauss; ++ig) {
           const float_type wigner_n1 = _wigner.get_wigner_d(ig, n1);
           const float_type dwigner_n1 = _wigner.get_dwigner_d(ig, n1);
           const float_type wigner_n2 = _wigner.get_wigner_d(ig, n2);
@@ -709,17 +715,17 @@ public:
           const float_type wn1dwn2 = wigner_n1 * dwigner_n2;
           const float_type dwn1wn2 = dwigner_n1 * wigner_n2;
 
-          const float_type jkrn1 = _interaction.get_jkr(ig, n1);
-          const float_type ykrn1 = _interaction.get_ykr(ig, n1);
+          const float_type jkrn1 = interaction.get_jkr(ig, n1);
+          const float_type ykrn1 = interaction.get_ykr(ig, n1);
           // spherical Hankel function of the first kind
           const std::complex<float_type> hkrn1(jkrn1, ykrn1);
-          const float_type djkrn1 = _interaction.get_djkr(ig, n1);
-          const float_type dykrn1 = _interaction.get_dykr(ig, n1);
+          const float_type djkrn1 = interaction.get_djkr(ig, n1);
+          const float_type dykrn1 = interaction.get_dykr(ig, n1);
           const std::complex<float_type> dhkrn1(djkrn1, dykrn1);
           const std::complex<float_type> jkrmrn2 =
-              _interaction.get_jkrmr(ig, n2);
+              interaction.get_jkrmr(ig, n2);
           const std::complex<float_type> djkrmrn2 =
-              _interaction.get_djkrmr(ig, n2);
+              interaction.get_djkrmr(ig, n2);
 
           const std::complex<float_type> c1 = jkrmrn2 * jkrn1;
           const std::complex<float_type> b1 = jkrmrn2 * hkrn1;
@@ -727,20 +733,19 @@ public:
           const std::complex<float_type> c2 = jkrmrn2 * djkrn1;
           const std::complex<float_type> b2 = jkrmrn2 * dhkrn1;
 
-          const float_type krinvi = _interaction.get_krinv(ig);
+          const float_type krinvi = interaction.get_krinv(ig);
 
           const std::complex<float_type> c4 = djkrmrn2 * jkrn1;
           const std::complex<float_type> b4 = djkrmrn2 * hkrn1;
 
-          const std::complex<float_type> krmrinvi =
-              _interaction.get_krmrinv(ig);
+          const std::complex<float_type> krmrinvi = interaction.get_krmrinv(ig);
 
-          const float_type dr_over_ri = _geometry.get_dr_over_r(ig);
+          const float_type dr_over_ri = geometry.get_dr_over_r(ig);
 
           if (sign < 0) {
-            const float_type dsi = _quadrature_points.get_sinthetainv(ig) * _m *
-                                   _quadrature_points.get_weight(ig) *
-                                   _geometry.get_r2(ig);
+            const float_type dsi = quadrature_points.get_sinthetainv(ig) * _m *
+                                   quadrature_points.get_weight(ig) *
+                                   geometry.get_r2(ig);
 
             const std::complex<float_type> c6 = djkrmrn2 * djkrn1;
             const std::complex<float_type> b6 = djkrmrn2 * dhkrn1;
@@ -778,9 +783,8 @@ public:
             this_RgJ22 += e1 * c6 + e2 * c7 + e3 * c8;
           } else {
             const float_type wr2i =
-                _quadrature_points.get_weight(ig) * _geometry.get_r2(ig);
-            const float_type dssi =
-                _quadrature_points.get_sintheta2inv(ig) * m2;
+                quadrature_points.get_weight(ig) * geometry.get_r2(ig);
+            const float_type dssi = quadrature_points.get_sintheta2inv(ig) * m2;
 
             const std::complex<float_type> c3 = krinvi * c1;
             const std::complex<float_type> b3 = krinvi * b1;
@@ -830,10 +834,10 @@ public:
         _aux._RgJ22(n1 - 1, n2 - 1) = this_RgJ22 * an12;
       }
     }
-    for (uint_fast32_t n1 = _m; n1 < _Tmatrix._nmax + 1; ++n1) {
+    for (uint_fast32_t n1 = _m; n1 < nmax + 1; ++n1) {
       const uint_fast32_t k1 = n1 + 1 - _m;
       const uint_fast32_t kk1 = k1 + nm;
-      for (uint_fast32_t n2 = _m; n2 < _Tmatrix._nmax + 1; ++n2) {
+      for (uint_fast32_t n2 = _m; n2 < nmax + 1; ++n2) {
         const uint_fast32_t k2 = n2 + 1 - _m;
         const uint_fast32_t kk2 = k2 + nm;
 
@@ -857,25 +861,25 @@ public:
         const std::complex<float_type> this_RgJ22 =
             -_aux._RgJ22(n1 - 1, n2 - 1);
 
-        _aux._Q(k1 - 1, k2 - 1) = _interaction.get_k2mr() * this_J21 +
-                                  _interaction.get_k2() * this_J12;
-        _aux._RgQ(k1 - 1, k2 - 1) = _interaction.get_k2mr() * this_RgJ21 +
-                                    _interaction.get_k2() * this_RgJ12;
+        _aux._Q(k1 - 1, k2 - 1) =
+            interaction.get_k2mr() * this_J21 + interaction.get_k2() * this_J12;
+        _aux._RgQ(k1 - 1, k2 - 1) = interaction.get_k2mr() * this_RgJ21 +
+                                    interaction.get_k2() * this_RgJ12;
 
-        _aux._Q(k1 - 1, kk2 - 1) = _interaction.get_k2mr() * this_J11 +
-                                   _interaction.get_k2() * this_J22;
-        _aux._RgQ(k1 - 1, kk2 - 1) = _interaction.get_k2mr() * this_RgJ11 +
-                                     _interaction.get_k2() * this_RgJ22;
+        _aux._Q(k1 - 1, kk2 - 1) =
+            interaction.get_k2mr() * this_J11 + interaction.get_k2() * this_J22;
+        _aux._RgQ(k1 - 1, kk2 - 1) = interaction.get_k2mr() * this_RgJ11 +
+                                     interaction.get_k2() * this_RgJ22;
 
-        _aux._Q(kk1 - 1, k2 - 1) = _interaction.get_k2mr() * this_J22 +
-                                   _interaction.get_k2() * this_J11;
-        _aux._RgQ(kk1 - 1, k2 - 1) = _interaction.get_k2mr() * this_RgJ22 +
-                                     _interaction.get_k2() * this_RgJ11;
+        _aux._Q(kk1 - 1, k2 - 1) =
+            interaction.get_k2mr() * this_J22 + interaction.get_k2() * this_J11;
+        _aux._RgQ(kk1 - 1, k2 - 1) = interaction.get_k2mr() * this_RgJ22 +
+                                     interaction.get_k2() * this_RgJ11;
 
-        _aux._Q(kk1 - 1, kk2 - 1) = _interaction.get_k2mr() * this_J12 +
-                                    _interaction.get_k2() * this_J21;
-        _aux._RgQ(kk1 - 1, kk2 - 1) = _interaction.get_k2mr() * this_RgJ12 +
-                                      _interaction.get_k2() * this_RgJ21;
+        _aux._Q(kk1 - 1, kk2 - 1) =
+            interaction.get_k2mr() * this_J12 + interaction.get_k2() * this_J21;
+        _aux._RgQ(kk1 - 1, kk2 - 1) = interaction.get_k2mr() * this_RgJ12 +
+                                      interaction.get_k2() * this_RgJ21;
       }
     }
 
@@ -894,6 +898,99 @@ public:
           _Tmatrix._T[_m](nm + i, nm + j) -=
               _aux._RgQ(nm + i, k) * _aux._Q(k, nm + j);
         }
+      }
+    }
+  }
+
+  /**
+   * @brief Get the computational cost of this task.
+   *
+   * @return Computational cost.
+   */
+  virtual int_fast32_t get_cost() const {
+    return static_cast<int_fast32_t>(std::round(2.5e8 * std::exp(-0.117 * _m)));
+  }
+};
+
+/**
+ * @brief Task that computes the scattering and extinction coefficients for a
+ * complete T-matrix.
+ */
+class TMatrixQTask : public Task {
+private:
+  /*! @brief TMatrix space containing the result. */
+  TMatrixResource &_Tmatrix;
+
+  /*! @brief Resource that guarantees unique access to the @f$m>0@f$ T-matrix
+   *  elements. */
+  const Resource &_m_resource;
+
+public:
+  /**
+   * @brief Constructor.
+   *
+   * @param Tmatrix TMatrix resource containing the full T-matrix.
+   * @param m_resource Resource that guards the coefficients in the T-matrix.
+   */
+  inline TMatrixQTask(TMatrixResource &Tmatrix, const Resource &m_resource)
+      : _Tmatrix(Tmatrix), _m_resource(m_resource) {}
+
+  virtual ~TMatrixQTask() {}
+
+  /**
+   * @brief Link the resources for this task.
+   *
+   * @param quicksched QuickSched library.
+   */
+  inline void link_resources(QuickSched &quicksched) {
+    // write access
+    quicksched.link_task_and_resource(*this, _m_resource, true);
+  }
+
+  /**
+   * @brief Compute the scattering and extinction coefficients.
+   */
+  virtual void execute() {
+
+    _Tmatrix._Qscattering = 0.;
+    for (uint_fast32_t n1 = 1; n1 < _Tmatrix._nmax + 1; ++n1) {
+      for (uint_fast32_t n2 = 1; n2 < _Tmatrix._nmax + 1; ++n2) {
+        for (uint_fast32_t m1 = 0; m1 < n1 + 1; ++m1) {
+          for (uint_fast32_t m2 = 0; m2 < n2 + 1; ++m2) {
+            if (m1 == m2) {
+              float_type factor;
+              if (m1 > 0) {
+                factor = 2.;
+              } else {
+                factor = 1.;
+              }
+              _Tmatrix._Qscattering +=
+                  factor * std::norm(_Tmatrix(0, n1, m1, 0, n2, m2));
+              _Tmatrix._Qscattering +=
+                  factor * std::norm(_Tmatrix(0, n1, m1, 1, n2, m2));
+              _Tmatrix._Qscattering +=
+                  factor * std::norm(_Tmatrix(1, n1, m1, 0, n2, m2));
+              _Tmatrix._Qscattering +=
+                  factor * std::norm(_Tmatrix(1, n1, m1, 1, n2, m2));
+            }
+          }
+        }
+      }
+    }
+
+    _Tmatrix._Qextinction = 0.;
+    for (uint_fast32_t n1 = 1; n1 < _Tmatrix._nmax + 1; ++n1) {
+      for (uint_fast32_t m1 = 0; m1 < n1 + 1; ++m1) {
+        float_type factor;
+        if (m1 > 0) {
+          factor = 2.;
+        } else {
+          factor = 1.;
+        }
+        _Tmatrix._Qextinction += factor * _Tmatrix(0, n1, m1, 0, n1, m1).real();
+        _Tmatrix._Qextinction += factor * _Tmatrix(0, n1, m1, 1, n1, m1).real();
+        _Tmatrix._Qextinction += factor * _Tmatrix(1, n1, m1, 0, n1, m1).real();
+        _Tmatrix._Qextinction += factor * _Tmatrix(1, n1, m1, 1, n1, m1).real();
       }
     }
   }
