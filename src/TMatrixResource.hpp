@@ -58,6 +58,9 @@ private:
    *  T-matrix. */
   uint_fast32_t _ngauss;
 
+  /*! @brief Wavenumber for which this T-matrix was computed. */
+  float_type _wavenumber;
+
   /*! @brief T-matrix itself. Is in fact a @f$n_{max}+1@f$ element vector for
    *  which every element is a @f$2n_{max}\times{}2n_{max}@f$ matrix. */
   std::vector<Matrix<std::complex<float_type>>> _T;
@@ -96,8 +99,9 @@ public:
    * from this resource, used to initialise the internal storage space.
    */
   inline TMatrixResource(const uint_fast32_t maximum_order)
-      : _nmax(0), _ngauss(0), _m_resources(maximum_order + 1), _Qscattering(0.),
-        _Qextinction(0.), _dQscattering(-2.), _dQextinction(-2.) {
+      : _nmax(0), _ngauss(0), _wavenumber(0), _m_resources(maximum_order + 1),
+        _Qscattering(0.), _Qextinction(0.), _dQscattering(-2.),
+        _dQextinction(-2.) {
     _T.reserve(maximum_order + 1);
     for (uint_fast32_t m = 0; m < maximum_order + 1; ++m) {
       const uint_fast32_t nm = maximum_order + 1 - m;
@@ -214,6 +218,13 @@ public:
    * @return Number of Gauss-Legendre quadrature points, @f$n_{GL}@f$.
    */
   inline uint_fast32_t get_ngauss() const { return _ngauss; }
+
+  /**
+   * @brief Get the wavenumber for which this T-matrix was computed.
+   *
+   * @return Wavenumber.
+   */
+  inline float_type get_wavenumber() const { return _wavenumber; }
 };
 
 /**
@@ -563,6 +574,7 @@ public:
     // set the order and number of quadrature poitns of the T-matrix
     _Tmatrix._nmax = _nmax;
     _Tmatrix._ngauss = _ngauss;
+    _Tmatrix._wavenumber = _interaction.get_k();
 
     _converged_size._nmax = _nmax;
     _converged_size._ngauss = _ngauss;

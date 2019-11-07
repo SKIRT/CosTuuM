@@ -9,6 +9,7 @@
 #include "Configuration.hpp"
 #include "ConvergedSizeResources.hpp"
 #include "Error.hpp"
+#include "ExtinctionMatrixResource.hpp"
 #include "GaussBasedResources.hpp"
 #include "InteractionResource.hpp"
 #include "NBasedResources.hpp"
@@ -283,6 +284,10 @@ int main(int argc, char **argv) {
     TMatrixQTask qtask(Tmatrix, Tmatrix.get_m_resource(0));
     quicksched.register_task(qtask);
     qtask.link_resources(quicksched);
+    ExtinctionMatrixResource Kmatrix(0.3 * M_PI, 0., Tmatrix);
+    quicksched.register_resource(Kmatrix);
+    quicksched.register_task(Kmatrix);
+    Kmatrix.link_resources(quicksched);
 
     std::vector<TMatrixMAllTask *> malltask(maximum_order, nullptr);
     for (uint_fast32_t i = 0; i < maximum_order; ++i) {
@@ -294,6 +299,7 @@ int main(int argc, char **argv) {
       quicksched.link_tasks(*more_wigner[i], *malltask[i]);
 
       quicksched.link_tasks(*malltask[i], qtask);
+      quicksched.link_tasks(*malltask[i], Kmatrix);
     }
 
     quicksched.execute_tasks(4);
@@ -302,6 +308,19 @@ int main(int argc, char **argv) {
     ctm_warning("ngauss: %" PRIuFAST32, Tmatrix.get_ngauss());
     ctm_warning("Qsca: %g", double(Tmatrix.get_scattering_coefficient()));
     ctm_warning("Qext: %g", double(Tmatrix.get_extinction_coefficient()));
+
+    ctm_warning("K[0,:]: %g %g %g %g", double(Kmatrix(0, 0)),
+                double(Kmatrix(0, 1)), double(Kmatrix(0, 2)),
+                double(Kmatrix(0, 3)));
+    ctm_warning("K[1,:]: %g %g %g %g", double(Kmatrix(1, 0)),
+                double(Kmatrix(1, 1)), double(Kmatrix(1, 2)),
+                double(Kmatrix(1, 3)));
+    ctm_warning("K[2,:]: %g %g %g %g", double(Kmatrix(2, 0)),
+                double(Kmatrix(2, 1)), double(Kmatrix(2, 2)),
+                double(Kmatrix(2, 3)));
+    ctm_warning("K[3,:]: %g %g %g %g", double(Kmatrix(3, 0)),
+                double(Kmatrix(3, 1)), double(Kmatrix(3, 2)),
+                double(Kmatrix(3, 3)));
 
     std::ofstream taskfile("test_tmatrix_tasks.txt");
     taskfile << "# thread\tstart\tend\ttype\ttask id\n";
@@ -318,6 +337,7 @@ int main(int argc, char **argv) {
       quicksched.print_task(*malltask[i], taskfile);
     }
     quicksched.print_task(qtask, taskfile);
+    quicksched.print_task(Kmatrix, taskfile);
     std::ofstream typefile("test_tmatrix_types.txt");
     typefile << "# type\tlabel\n";
     quicksched.print_type_dict(typefile);
