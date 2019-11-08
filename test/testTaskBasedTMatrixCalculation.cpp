@@ -15,6 +15,7 @@
 #include "NBasedResources.hpp"
 #include "ParticleGeometryResource.hpp"
 #include "QuickSchedWrapper.hpp"
+#include "ScatteringMatrixResource.hpp"
 #include "TMatrixResource.hpp"
 #include "UnitConverter.hpp"
 #include "Utilities.hpp"
@@ -59,10 +60,24 @@ int main(int argc, char **argv) {
       refZ[2][1] >> refZ[2][2] >> refZ[2][3] >> refZ[3][0] >> refZ[3][1] >>
       refZ[3][2] >> refZ[3][3];
 
-  const float_type particle_radius =
-      UnitConverter::to_SI<QUANTITY_LENGTH>(double(axi), "micron");
-  const float_type wavelength =
-      UnitConverter::to_SI<QUANTITY_LENGTH>(double(lam), "micron");
+  axi = UnitConverter::to_SI<QUANTITY_LENGTH>(double(axi), "micron");
+  lam = UnitConverter::to_SI<QUANTITY_LENGTH>(double(lam), "micron");
+  alpha = UnitConverter::to_SI<QUANTITY_ANGLE>(double(alpha), "degrees");
+  beta = UnitConverter::to_SI<QUANTITY_ANGLE>(double(beta), "degrees");
+  thet0 = UnitConverter::to_SI<QUANTITY_ANGLE>(double(thet0), "degrees");
+  thet = UnitConverter::to_SI<QUANTITY_ANGLE>(double(thet), "degrees");
+  phi0 = UnitConverter::to_SI<QUANTITY_ANGLE>(double(phi0), "degrees");
+  phi = UnitConverter::to_SI<QUANTITY_ANGLE>(double(phi), "degrees");
+  // convert the reference results to SI units
+  for (uint_fast8_t i = 0; i < 4; ++i) {
+    for (uint_fast8_t j = 0; j < 4; ++j) {
+      refZ[i][j] = UnitConverter::to_SI<QUANTITY_SURFACE_AREA>(
+          double(refZ[i][j]), "micron^2");
+    }
+  }
+
+  const float_type particle_radius = axi;
+  const float_type wavelength = lam;
   const float_type axis_ratio = eps;
   float_type ratio_of_radii;
   if (abs(rat - 1.) > 1.e-8) {
@@ -170,6 +185,31 @@ int main(int argc, char **argv) {
                 double(refqsca));
     ctm_warning("Qext: %g (%g)", double(Tmatrix.get_extinction_coefficient()),
                 double(refqext));
+
+    ScatteringMatrixResource Zmatrix(alpha, beta, thet0, phi0, thet, phi,
+                                     Tmatrix);
+    Zmatrix.execute();
+
+    ctm_warning("Z[0,:]: %g %g %g %g", double(Zmatrix(0, 0)),
+                double(Zmatrix(0, 1)), double(Zmatrix(0, 2)),
+                double(Zmatrix(0, 3)));
+    ctm_warning("Zref[0,:]: %g %g %g %g", double(refZ[0][0]),
+                double(refZ[0][1]), double(refZ[0][2]), double(refZ[0][3]));
+    ctm_warning("Z[1,:]: %g %g %g %g", double(Zmatrix(1, 0)),
+                double(Zmatrix(1, 1)), double(Zmatrix(1, 2)),
+                double(Zmatrix(1, 3)));
+    ctm_warning("Zref[1,:]: %g %g %g %g", double(refZ[1][0]),
+                double(refZ[1][1]), double(refZ[1][2]), double(refZ[1][3]));
+    ctm_warning("Z[2,:]: %g %g %g %g", double(Zmatrix(2, 0)),
+                double(Zmatrix(2, 1)), double(Zmatrix(2, 2)),
+                double(Zmatrix(2, 3)));
+    ctm_warning("Zref[2,:]: %g %g %g %g", double(refZ[2][0]),
+                double(refZ[2][1]), double(refZ[2][2]), double(refZ[2][3]));
+    ctm_warning("Z[3,:]: %g %g %g %g", double(Zmatrix(3, 0)),
+                double(Zmatrix(3, 1)), double(Zmatrix(3, 2)),
+                double(Zmatrix(3, 3)));
+    ctm_warning("Zref[3,:]: %g %g %g %g", double(refZ[3][0]),
+                double(refZ[3][1]), double(refZ[3][2]), double(refZ[3][3]));
 
     for (uint_fast32_t i = 0; i < auxsize; ++i) {
       delete auxspace[i];
@@ -288,6 +328,11 @@ int main(int argc, char **argv) {
     quicksched.register_resource(Kmatrix);
     quicksched.register_task(Kmatrix);
     Kmatrix.link_resources(quicksched);
+    ScatteringMatrixResource Zmatrix(0., 0., 0.2 * M_PI, 0.3 * M_PI, 0.8 * M_PI,
+                                     1.2 * M_PI, Tmatrix);
+    quicksched.register_resource(Zmatrix);
+    quicksched.register_task(Zmatrix);
+    Zmatrix.link_resources(quicksched);
 
     std::vector<TMatrixMAllTask *> malltask(maximum_order, nullptr);
     for (uint_fast32_t i = 0; i < maximum_order; ++i) {
@@ -322,6 +367,19 @@ int main(int argc, char **argv) {
                 double(Kmatrix(3, 1)), double(Kmatrix(3, 2)),
                 double(Kmatrix(3, 3)));
 
+    ctm_warning("Z[0,:]: %g %g %g %g", double(Zmatrix(0, 0)),
+                double(Zmatrix(0, 1)), double(Zmatrix(0, 2)),
+                double(Zmatrix(0, 3)));
+    ctm_warning("Z[1,:]: %g %g %g %g", double(Zmatrix(1, 0)),
+                double(Zmatrix(1, 1)), double(Zmatrix(1, 2)),
+                double(Zmatrix(1, 3)));
+    ctm_warning("Z[2,:]: %g %g %g %g", double(Zmatrix(2, 0)),
+                double(Zmatrix(2, 1)), double(Zmatrix(2, 2)),
+                double(Zmatrix(2, 3)));
+    ctm_warning("Z[3,:]: %g %g %g %g", double(Zmatrix(3, 0)),
+                double(Zmatrix(3, 1)), double(Zmatrix(3, 2)),
+                double(Zmatrix(3, 3)));
+
     std::ofstream taskfile("test_tmatrix_tasks.txt");
     taskfile << "# thread\tstart\tend\ttype\ttask id\n";
     quicksched.print_task(nfactors, taskfile);
@@ -338,6 +396,7 @@ int main(int argc, char **argv) {
     }
     quicksched.print_task(qtask, taskfile);
     quicksched.print_task(Kmatrix, taskfile);
+    quicksched.print_task(Zmatrix, taskfile);
     std::ofstream typefile("test_tmatrix_types.txt");
     typefile << "# type\tlabel\n";
     quicksched.print_type_dict(typefile);
