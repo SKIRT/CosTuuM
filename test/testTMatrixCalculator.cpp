@@ -7,6 +7,7 @@
  */
 
 #include "Assert.hpp"
+#include "Configuration.hpp"
 #include "OrientationDistribution.hpp"
 #include "ShapeDistribution.hpp"
 #include "TMatrixCalculator.hpp"

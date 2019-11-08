@@ -6,6 +6,7 @@
  * @author Bert Vandenbroucke (bert.vandenbroucke@ugent.be)
  */
 
+#include "Assert.hpp"
 #include "Configuration.hpp"
 #include "ConvergedSizeResources.hpp"
 #include "Error.hpp"
@@ -181,10 +182,15 @@ int main(int argc, char **argv) {
     TMatrixQTask qtask(Tmatrix, Tmatrix.get_m_resource(0));
     qtask.execute();
 
-    ctm_warning("Qsca: %g (%g)", double(Tmatrix.get_scattering_coefficient()),
-                double(refqsca));
-    ctm_warning("Qext: %g (%g)", double(Tmatrix.get_extinction_coefficient()),
-                double(refqext));
+    const float_type qext = Tmatrix.get_extinction_coefficient();
+    const float_type qsca = Tmatrix.get_scattering_coefficient();
+    const float_type walb = -qsca / qext;
+    ctm_warning("Qsca: %g (%g)", double(qsca), double(refqsca));
+    ctm_warning("Qext: %g (%g)", double(qext), double(refqext));
+
+    assert_values_equal_rel(double(qext), double(refqext), 1.e-5);
+    assert_values_equal_rel(double(qsca), double(refqsca), 1.e-5);
+    assert_values_equal_rel(double(walb), double(refwalb), 1.e-5);
 
     ScatteringMatrixResource Zmatrix(alpha, beta, thet0, phi0, thet, phi,
                                      Tmatrix);
@@ -210,6 +216,14 @@ int main(int argc, char **argv) {
                 double(Zmatrix(3, 3)));
     ctm_warning("Zref[3,:]: %g %g %g %g", double(refZ[3][0]),
                 double(refZ[3][1]), double(refZ[3][2]), double(refZ[3][3]));
+
+    // compare the result with the reference
+    for (uint_fast8_t i = 0; i < 4; ++i) {
+      for (uint_fast8_t j = 0; j < 4; ++j) {
+        assert_values_equal_rel(double(Zmatrix(i, j)), double(refZ[i][j]),
+                                2.e-2);
+      }
+    }
 
     for (uint_fast32_t i = 0; i < auxsize; ++i) {
       delete auxspace[i];

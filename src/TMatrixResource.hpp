@@ -225,6 +225,14 @@ public:
    * @return Wavenumber.
    */
   inline float_type get_wavenumber() const { return _wavenumber; }
+
+  /**
+   * @brief Reset the relative differences to force an update of the T-matrix.
+   */
+  inline void reset_relative_differences() {
+    _dQextinction = -1.;
+    _dQscattering = -1.;
+  }
 };
 
 /**
@@ -305,6 +313,22 @@ public:
     // RgQ
     size += 8 * maximum_order * maximum_order * sizeof(float_type);
     return size;
+  }
+
+  /**
+   * @brief Clear the entire contents of the matrices.
+   */
+  inline void reset() {
+    _J11.reset();
+    _J12.reset();
+    _J21.reset();
+    _J22.reset();
+    _RgJ11.reset();
+    _RgJ12.reset();
+    _RgJ21.reset();
+    _RgJ22.reset();
+    _Q.reset();
+    _RgQ.reset();
   }
 };
 
@@ -427,6 +451,8 @@ public:
         return;
       }
     }
+
+    _aux.reset();
 
     for (uint_fast32_t n1 = 1; n1 < _nmax + 1; ++n1) {
       // n1 * (n1 + 1)
@@ -606,6 +632,9 @@ public:
       _Tmatrix._dQextinction = fabs((old_Qextinction - _Tmatrix._Qextinction) /
                                     _Tmatrix._Qextinction);
     }
+
+    ctm_warning("dsca: %g, dext: %g", double(_Tmatrix._dQscattering),
+                double(_Tmatrix._dQextinction));
   }
 
   /**
@@ -697,6 +726,9 @@ public:
     if (_m > nmax) {
       return;
     }
+
+    _aux.reset();
+
     const uint_fast32_t ngauss = _converged_size.get_ngauss();
     const GaussBasedResources &quadrature_points =
         *_converged_size.get_quadrature_points();

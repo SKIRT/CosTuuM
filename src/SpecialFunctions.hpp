@@ -968,8 +968,8 @@ public:
 
       // Cplus = sqrt((n - m) * (n + m + 1))
       const DATA_TYPE Cplusn2m2 =
-          sqrt((n2 - N + m1temp + 1) * (n2 + N - m1temp));
-      const DATA_TYPE Cplusn1m1m1 = sqrt((n1 - m1temp) * (n1 + m1temp + 1));
+          sqrt((n2 - N + m1temp + 1.) * (n2 + N - m1temp));
+      const DATA_TYPE Cplusn1m1m1 = sqrt((n1 - m1temp) * (n1 + m1temp + 1.));
       const DATA_TYPE Cn1m1p1 = C[N * nsize + m1temp + 1 + n1];
       const DATA_TYPE Cnext = -Cplusn2m2 * Cn1m1p1 / Cplusn1m1m1;
 
@@ -998,7 +998,7 @@ public:
     for (int_fast32_t Mtemp = N - 1; Mtemp >= 0; --Mtemp) {
 
       // precompute the inverse ladder coefficient, since it does not change
-      const DATA_TYPE Cmin_inverse = 1. / sqrt((N + Mtemp + 1) * (N - Mtemp));
+      const DATA_TYPE Cmin_inverse = 1. / sqrt((N + Mtemp + 1.) * (N - Mtemp));
 
       // the conditions for a valid element with M = Mtemp are
       // m1temp >= -n1, m1temp <= n1
@@ -1014,14 +1014,14 @@ public:
         DATA_TYPE term1 = 0.;
         if (m1temp + 1 <= n1) {
           // Cmin = sqrt((n + m) * (n - m + 1))
-          const DATA_TYPE Cminn1m1p1 = sqrt((n1 + m1temp + 1) * (n1 - m1temp));
+          const DATA_TYPE Cminn1m1p1 = sqrt((n1 + m1temp + 1.) * (n1 - m1temp));
           const DATA_TYPE Cn1m1p1 = C[(Mtemp + 1) * nsize + m1temp + 1 + n1];
           term1 = Cminn1m1p1 * Cn1m1p1;
         }
         DATA_TYPE term2 = 0.;
         if (m2temp + 1 <= n2) {
           // Cmin = sqrt((n + m) * (n - m + 1))
-          const DATA_TYPE Cminn2m2p1 = sqrt((n2 + m2temp + 1) * (n2 - m2temp));
+          const DATA_TYPE Cminn2m2p1 = sqrt((n2 + m2temp + 1.) * (n2 - m2temp));
           const DATA_TYPE Cn2m2p2 = C[(Mtemp + 1) * nsize + m1temp + n1];
           term2 = Cminn2m2p1 * Cn2m2p2;
         }
@@ -1113,8 +1113,8 @@ public:
 
       // Cplus = sqrt((n - m) * (n + m + 1))
       const DATA_TYPE Cplusn2m2 =
-          sqrt((n2 - N + m1temp + 1) * (n2 + N - m1temp));
-      const DATA_TYPE Cplusn1m1m1 = sqrt((n1 - m1temp) * (n1 + m1temp + 1));
+          sqrt((n2 - N + m1temp + 1.) * (n2 + N - m1temp));
+      const DATA_TYPE Cplusn1m1m1 = sqrt((n1 - m1temp) * (n1 + m1temp + 1.));
       const DATA_TYPE Cn1m1p1 = C[N * nsize + m1temp + 1 + n1];
       const DATA_TYPE Cnext = -Cplusn2m2 * Cn1m1p1 / Cplusn1m1m1;
 
@@ -1143,7 +1143,7 @@ public:
     for (int_fast32_t Mtemp = N - 1; Mtemp >= 0; --Mtemp) {
 
       // precompute the inverse ladder coefficient, since it does not change
-      const DATA_TYPE Cmin_inverse = 1. / sqrt((N + Mtemp + 1) * (N - Mtemp));
+      const DATA_TYPE Cmin_inverse = 1. / sqrt((N + Mtemp + 1.) * (N - Mtemp));
 
       // the conditions for a valid element with M = Mtemp are
       // m1temp >= -n1, m1temp <= n1
@@ -1159,14 +1159,14 @@ public:
         DATA_TYPE term1 = 0.;
         if (m1temp + 1 <= n1) {
           // Cmin = sqrt((n + m) * (n - m + 1))
-          const DATA_TYPE Cminn1m1p1 = sqrt((n1 + m1temp + 1) * (n1 - m1temp));
+          const DATA_TYPE Cminn1m1p1 = sqrt((n1 + m1temp + 1.) * (n1 - m1temp));
           const DATA_TYPE Cn1m1p1 = C[(Mtemp + 1) * nsize + m1temp + 1 + n1];
           term1 = Cminn1m1p1 * Cn1m1p1;
         }
         DATA_TYPE term2 = 0.;
         if (m2temp + 1 <= n2) {
           // Cmin = sqrt((n + m) * (n - m + 1))
-          const DATA_TYPE Cminn2m2p1 = sqrt((n2 + m2temp + 1) * (n2 - m2temp));
+          const DATA_TYPE Cminn2m2p1 = sqrt((n2 + m2temp + 1.) * (n2 - m2temp));
           const DATA_TYPE Cn2m2p2 = C[(Mtemp + 1) * nsize + m1temp + n1];
           term2 = Cminn2m2p1 * Cn2m2p2;
         }

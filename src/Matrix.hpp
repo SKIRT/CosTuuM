@@ -49,6 +49,15 @@ public:
   }
 
   /**
+   * @brief Clear the contents of the matrix.
+   */
+  inline void reset() {
+    for (uint_fast32_t i = 0; i < _array.size(); ++i) {
+      _array[i] = 0.;
+    }
+  }
+
+  /**
    * @brief Access operator.
    *
    * This function performs the bookkeeping required to figure out where in the
