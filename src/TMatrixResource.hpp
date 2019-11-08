@@ -277,6 +277,12 @@ private:
   /*! @brief Regular Q matrix. */
   Matrix<std::complex<float_type>> _RgQ;
 
+  /*! @brief Pivot array for Q matrix inversion. */
+  std::vector<uint_fast32_t> _pivot_array;
+
+  /*! @brief Work array for Q matrix inversion. */
+  std::vector<std::complex<float_type>> _work;
+
 public:
   /**
    * @brief Constructor.
@@ -292,7 +298,8 @@ public:
         _RgJ21(maximum_order, maximum_order),
         _RgJ22(maximum_order, maximum_order),
         _Q(2 * maximum_order, 2 * maximum_order),
-        _RgQ(2 * maximum_order, 2 * maximum_order) {}
+        _RgQ(2 * maximum_order, 2 * maximum_order),
+        _pivot_array(2 * maximum_order), _work(2 * maximum_order) {}
 
   /**
    * @brief Get the size in memory of a hypothetical TMatrixAuxiliarySpace
@@ -577,7 +584,8 @@ public:
 
     // func_TT
     const uint_fast32_t nmax2 = 2 * _nmax;
-    _aux._Q.plu_inverse(nmax2);
+    _aux._Q.plu_inverse(nmax2, &_aux._pivot_array[0], _aux._pivot_array.size(),
+                        &_aux._work[0], _aux._work.size());
 
     for (uint_fast32_t i = 0; i < _nmax; ++i) {
       for (uint_fast32_t j = 0; j < _nmax; ++j) {
@@ -632,9 +640,6 @@ public:
       _Tmatrix._dQextinction = fabs((old_Qextinction - _Tmatrix._Qextinction) /
                                     _Tmatrix._Qextinction);
     }
-
-    ctm_warning("dsca: %g, dext: %g", double(_Tmatrix._dQscattering),
-                double(_Tmatrix._dQextinction));
   }
 
   /**
@@ -927,7 +932,8 @@ public:
       }
     }
 
-    _aux._Q.plu_inverse(nm2);
+    _aux._Q.plu_inverse(nm2, &_aux._pivot_array[0], _aux._pivot_array.size(),
+                        &_aux._work[0], _aux._work.size());
 
     for (uint_fast32_t i = 0; i < nm; ++i) {
       for (uint_fast32_t j = 0; j < nm; ++j) {

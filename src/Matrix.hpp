@@ -219,18 +219,25 @@ public:
    * @param number_of_columns Number of columns (and rows) in the current
    * matrix. This does not need to match the actual number of rows and columns
    * in the data array, to allow for the inversion of smaller matrices.
+   * @param pivot_array Preallocated array to store pivot values in.
+   * @param pivot_array_size Size of the pivot array.
+   * @param work Preallocated array to store temporary columns in.
+   * @param work_size Size of the work array.
    */
-  inline void plu_inverse(const uint_fast32_t number_of_columns) {
+  inline void plu_inverse(const uint_fast32_t number_of_columns,
+                          uint_fast32_t *pivot_array,
+                          const uint_fast32_t pivot_array_size, DATA_TYPE *work,
+                          const uint_fast32_t work_size) {
 
     ctm_assert(number_of_columns <= _number_of_columns);
     ctm_assert(number_of_columns <= _number_of_rows);
+    ctm_assert(pivot_array_size >= number_of_columns);
+    ctm_assert(work_size >= number_of_columns);
 
     // required so that the compiler finds the correct division operator for
     // std::complex<boost::multiprecision::cpp_bin_float_quad> DATA_TYPEs
     const DATA_TYPE one(1.);
 
-    // allocate the pivot array
-    std::vector<uint_fast32_t> pivot_array(number_of_columns, 0);
     // alias the object using the label A (to be consistent with the notation
     // in the function documentation)
     Matrix &A = *this;
@@ -297,7 +304,6 @@ public:
 
     // step 3: solve inv(A)*L = inv(U)
     // we need a temporary array to store the new columns while we update them
-    std::vector<DATA_TYPE> work(number_of_columns);
     // note that we need to iterate backwards for this algorithm
     for (uint_fast32_t jp1 = number_of_columns; jp1 > 0; --jp1) {
       // unsigned counters overflow when you decrement them below 0, so we
@@ -341,6 +347,21 @@ public:
         }
       }
     }
+  }
+
+  /**
+   * @brief PLU inversion function that uses its own pivot and work arrays.
+   *
+   * @param number_of_columns Number of columns (and rows) in the current
+   * matrix. This does not need to match the actual number of rows and columns
+   * in the data array, to allow for the inversion of smaller matrices.
+   */
+  inline void plu_inverse(const uint_fast32_t number_of_columns) {
+
+    std::vector<uint_fast32_t> pivot_array(number_of_columns);
+    std::vector<DATA_TYPE> work(number_of_columns);
+    plu_inverse(number_of_columns, &pivot_array[0], number_of_columns, &work[0],
+                number_of_columns);
   }
 };
 

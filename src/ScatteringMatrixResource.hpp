@@ -53,6 +53,48 @@ private:
   /*! @brief Scattering matrix. */
   Matrix<float_type> _Z;
 
+  /*! @brief Temporary B matrix. */
+  Matrix<float_type> _B;
+
+  /*! @brief Temporary AL_in matrix. */
+  Matrix<float_type> _AL_in;
+
+  /*! @brief Temporary AP_in matrix. */
+  Matrix<float_type> _AP_in;
+
+  /*! @brief Temporary AL_out matrix. */
+  Matrix<float_type> _AL_out;
+
+  /*! @brief Temporary AP_out matrix. */
+  Matrix<float_type> _AP_out;
+
+  /*! @brief Temporary C matrix. */
+  Matrix<float_type> _C;
+
+  /*! @brief Temporary R_in matrix. */
+  Matrix<float_type> _R_in;
+
+  /*! @brief Temporary R_out matrix. */
+  Matrix<float_type> _R_out;
+
+  /*! @brief Prefactor matrix. */
+  Matrix<std::complex<float_type>> _c;
+
+  /*! @brief Temporary S matrix. */
+  Matrix<std::complex<float_type>> _S;
+
+  /*! @brief Temporary Wigner D arrays. */
+  std::vector<float_type> _pi_in;
+
+  /*! @brief Temporary Wigner D arrays. */
+  std::vector<float_type> _tau_in;
+
+  /*! @brief Temporary Wigner D arrays. */
+  std::vector<float_type> _pi_out;
+
+  /*! @brief Temporary Wigner D arrays. */
+  std::vector<float_type> _tau_out;
+
 public:
   /**
    * @brief Constructor.
@@ -64,13 +106,18 @@ public:
    * @param theta_out Output zenith angle (in radians).
    * @param phi_out Output azimuth angle (in radians).
    * @param Tmatrix T-matrix to use.
+   * @param nmax Maximum order of the T-matrix.
    */
   ScatteringMatrixResource(const float_type alpha, const float_type beta,
                            const float_type theta_in, const float_type phi_in,
                            const float_type theta_out, const float_type phi_out,
-                           const TMatrixResource &Tmatrix)
+                           const TMatrixResource &Tmatrix,
+                           const uint_fast32_t nmax)
       : _alpha(alpha), _beta(beta), _theta_in(theta_in), _phi_in(phi_in),
-        _theta_out(theta_out), _phi_out(phi_out), _Tmatrix(Tmatrix), _Z(4, 4) {}
+        _theta_out(theta_out), _phi_out(phi_out), _Tmatrix(Tmatrix), _Z(4, 4),
+        _B(3, 3), _AL_in(3, 2), _AP_in(2, 3), _AL_out(3, 2), _AP_out(2, 3),
+        _C(3, 2), _R_in(2, 2), _R_out(2, 2), _c(nmax, nmax), _S(2, 2),
+        _pi_in(nmax), _tau_in(nmax), _pi_out(nmax), _tau_out(nmax) {}
 
   virtual ~ScatteringMatrixResource() {}
 
@@ -148,63 +195,56 @@ public:
       sintheta_p_out_inv = 9000.;
     }
 
-    Matrix<float_type> B(3, 3);
-    B(0, 0) = cosalpha * cosbeta;
-    B(0, 1) = sinalpha * cosbeta;
-    B(0, 2) = -sinbeta;
-    B(1, 0) = -sinalpha;
-    B(1, 1) = cosalpha;
+    _B(0, 0) = cosalpha * cosbeta;
+    _B(0, 1) = sinalpha * cosbeta;
+    _B(0, 2) = -sinbeta;
+    _B(1, 0) = -sinalpha;
+    _B(1, 1) = cosalpha;
     // B(1,2) remains 0.
-    B(2, 0) = cosalpha * sinbeta;
-    B(2, 1) = sinalpha * sinbeta;
-    B(2, 2) = cosbeta;
+    _B(2, 0) = cosalpha * sinbeta;
+    _B(2, 1) = sinalpha * sinbeta;
+    _B(2, 2) = cosbeta;
 
-    Matrix<float_type> AL_in(3, 2);
-    AL_in(0, 0) = costheta_l_in * cosphi_l_in;
-    AL_in(0, 1) = -sinphi_l_in;
-    AL_in(1, 0) = costheta_l_in * sinphi_l_in;
-    AL_in(1, 1) = cosphi_l_in;
-    AL_in(2, 0) = -sintheta_l_in;
+    _AL_in(0, 0) = costheta_l_in * cosphi_l_in;
+    _AL_in(0, 1) = -sinphi_l_in;
+    _AL_in(1, 0) = costheta_l_in * sinphi_l_in;
+    _AL_in(1, 1) = cosphi_l_in;
+    _AL_in(2, 0) = -sintheta_l_in;
     // AL_in(2,1) remains 0.
 
-    Matrix<float_type> AP_in(2, 3);
-    AP_in(0, 0) = costheta_p_in * cosphi_p_in;
-    AP_in(0, 1) = costheta_p_in * sinphi_p_in;
-    AP_in(0, 2) = -sintheta_p_in;
-    AP_in(1, 0) = -sinphi_p_in;
-    AP_in(1, 1) = cosphi_p_in;
+    _AP_in(0, 0) = costheta_p_in * cosphi_p_in;
+    _AP_in(0, 1) = costheta_p_in * sinphi_p_in;
+    _AP_in(0, 2) = -sintheta_p_in;
+    _AP_in(1, 0) = -sinphi_p_in;
+    _AP_in(1, 1) = cosphi_p_in;
     // AP_in(1,2) remains 0.
 
-    Matrix<float_type> AL_out(3, 2);
-    AL_out(0, 0) = costheta_l_out * cosphi_l_out;
-    AL_out(0, 1) = -sinphi_l_out;
-    AL_out(1, 0) = costheta_l_out * sinphi_l_out;
-    AL_out(1, 1) = cosphi_l_out;
-    AL_out(2, 0) = -sintheta_l_out;
+    _AL_out(0, 0) = costheta_l_out * cosphi_l_out;
+    _AL_out(0, 1) = -sinphi_l_out;
+    _AL_out(1, 0) = costheta_l_out * sinphi_l_out;
+    _AL_out(1, 1) = cosphi_l_out;
+    _AL_out(2, 0) = -sintheta_l_out;
     // AL_out(2,1) remains 0.
 
-    Matrix<float_type> AP_out(2, 3);
-    AP_out(0, 0) = costheta_p_out * cosphi_p_out;
-    AP_out(0, 1) = costheta_p_out * sinphi_p_out;
-    AP_out(0, 2) = -sintheta_p_out;
-    AP_out(1, 0) = -sinphi_p_out;
-    AP_out(1, 1) = cosphi_p_out;
+    _AP_out(0, 0) = costheta_p_out * cosphi_p_out;
+    _AP_out(0, 1) = costheta_p_out * sinphi_p_out;
+    _AP_out(0, 2) = -sintheta_p_out;
+    _AP_out(1, 0) = -sinphi_p_out;
+    _AP_out(1, 1) = cosphi_p_out;
     // AP_out(1,2) remains 0.
 
     // C is a temporary matrix that contains B x AL_in
-    Matrix<float_type> C(3, 2);
     for (uint_fast8_t i = 0; i < 3; ++i) {
       for (uint_fast8_t j = 0; j < 2; ++j) {
         for (uint_fast8_t k = 0; k < 3; ++k) {
-          C(i, j) += B(i, k) * AL_in(k, j);
+          _C(i, j) += _B(i, k) * _AL_in(k, j);
         }
       }
     }
-    Matrix<float_type> R_in(2, 2);
     for (uint_fast8_t i = 0; i < 2; ++i) {
       for (uint_fast8_t j = 0; j < 2; ++j) {
         for (uint_fast8_t k = 0; k < 3; ++k) {
-          R_in(i, j) += AP_in(i, k) * C(k, j);
+          _R_in(i, j) += _AP_in(i, k) * _C(k, j);
         }
       }
     }
@@ -212,42 +252,39 @@ public:
     // now C will contain B x AL_out
     for (uint_fast8_t i = 0; i < 3; ++i) {
       for (uint_fast8_t j = 0; j < 2; ++j) {
-        C(i, j) = 0.;
+        _C(i, j) = 0.;
         for (uint_fast8_t k = 0; k < 3; ++k) {
-          C(i, j) += B(i, k) * AL_out(k, j);
+          _C(i, j) += _B(i, k) * _AL_out(k, j);
         }
       }
     }
-    Matrix<float_type> R_out(2, 2);
     for (uint_fast8_t i = 0; i < 2; ++i) {
       for (uint_fast8_t j = 0; j < 2; ++j) {
         for (uint_fast8_t k = 0; k < 3; ++k) {
-          R_out(i, j) += AP_out(i, k) * C(k, j);
+          _R_out(i, j) += _AP_out(i, k) * _C(k, j);
         }
       }
     }
 
     // manually invert the 2x2 matrix R_out
     const float_type d =
-        1. / (R_out(0, 0) * R_out(1, 1) - R_out(0, 1) * R_out(1, 0));
-    const float_type temp = R_out(0, 0);
-    R_out(0, 0) = R_out(1, 1) * d;
-    R_out(0, 1) = -R_out(0, 1) * d;
-    R_out(1, 0) = -R_out(1, 0) * d;
-    R_out(1, 1) = temp * d;
+        1. / (_R_out(0, 0) * _R_out(1, 1) - _R_out(0, 1) * _R_out(1, 0));
+    const float_type temp = _R_out(0, 0);
+    _R_out(0, 0) = _R_out(1, 1) * d;
+    _R_out(0, 1) = -_R_out(0, 1) * d;
+    _R_out(1, 0) = -_R_out(1, 0) * d;
+    _R_out(1, 1) = temp * d;
 
     // precompute the c factors
     const std::complex<float_type> icompl(0., 1.);
-    Matrix<std::complex<float_type>> c(_Tmatrix.get_nmax(),
-                                       _Tmatrix.get_nmax());
     std::complex<float_type> icomp_pow_nn = icompl;
     for (uint_fast32_t nn = 1; nn < _Tmatrix.get_nmax() + 1; ++nn) {
       std::complex<float_type> icomp_pow_m_n_m_1(-1.);
       for (uint_fast32_t n = 1; n < _Tmatrix.get_nmax() + 1; ++n) {
         // icomp_pow_nn*icomp_pow_m_n_m_1 now equals i^(nn - n - 1)
-        c(n - 1, nn - 1) = icomp_pow_m_n_m_1 * icomp_pow_nn *
-                           float_type(sqrt((2. * n + 1.) * (2. * nn + 1.) /
-                                           (n * nn * (n + 1.) * (nn + 1.))));
+        _c(n - 1, nn - 1) = icomp_pow_m_n_m_1 * icomp_pow_nn *
+                            float_type(sqrt((2. * n + 1.) * (2. * nn + 1.) /
+                                            (n * nn * (n + 1.) * (nn + 1.))));
         icomp_pow_m_n_m_1 /= icompl;
       }
       icomp_pow_nn *= icompl;
@@ -261,7 +298,6 @@ public:
     // e^{im(phi_out-phi_in)} is computed recursively, starting with the value
     // for m=0: 1
     std::complex<float_type> expimphi_p_out_m_in(1., 0.);
-    Matrix<std::complex<float_type>> S(2, 2);
     // instead of summing over n and n', we sum over m, since then we can reuse
     // the e^{im(phi_out-phi_in)}, pi and tau factors
     for (uint_fast32_t m = 0; m < _Tmatrix.get_nmax() + 1; ++m) {
@@ -270,16 +306,12 @@ public:
       const uint_fast32_t nmin = std::max(m, static_cast<uint_fast32_t>(1));
 
       // precompute the pi and tau functions for this value of m
-      std::vector<float_type> pi_in(_Tmatrix.get_nmax()),
-          tau_in(_Tmatrix.get_nmax());
       SpecialFunctions::wigner_dn_0m_sinx(
           costheta_p_in, sintheta_p_in, sintheta_p_in_inv, _Tmatrix.get_nmax(),
-          m, &pi_in[0], &tau_in[0]);
-      std::vector<float_type> pi_out(_Tmatrix.get_nmax()),
-          tau_out(_Tmatrix.get_nmax());
+          m, &_pi_in[0], &_tau_in[0]);
       SpecialFunctions::wigner_dn_0m_sinx(
           costheta_p_out, sintheta_p_out, sintheta_p_out_inv,
-          _Tmatrix.get_nmax(), m, &pi_out[0], &tau_out[0]);
+          _Tmatrix.get_nmax(), m, &_pi_out[0], &_tau_out[0]);
 
       // we get the real and imaginary part of e^{im\phi{}} and multiply with
       // 2 to account for both m and -m
@@ -292,17 +324,17 @@ public:
       for (uint_fast32_t nn = nmin; nn < _Tmatrix.get_nmax() + 1; ++nn) {
 
         // get the specific pi and tau for this n'
-        const float_type pi_nn = m * pi_in[nn - 1];
-        const float_type tau_nn = tau_in[nn - 1];
+        const float_type pi_nn = m * _pi_in[nn - 1];
+        const float_type tau_nn = _tau_in[nn - 1];
 
         for (uint_fast32_t n = nmin; n < _Tmatrix.get_nmax() + 1; ++n) {
 
           // get the specific pi and tau for this n
-          const float_type pi_n = m * pi_out[n - 1];
-          const float_type tau_n = tau_out[n - 1];
+          const float_type pi_n = m * _pi_out[n - 1];
+          const float_type tau_n = _tau_out[n - 1];
 
           // get the c factor for these values of n and n'
-          const std::complex<float_type> c_nnn = c(n - 1, nn - 1);
+          const std::complex<float_type> c_nnn = _c(n - 1, nn - 1);
 
           // get the T11 and T22 elements for this m, n and n' (we need these
           // in all cases)
@@ -312,8 +344,8 @@ public:
           // simplify the expression for S
           if (m == 0) {
             const std::complex<float_type> factor = c_nnn * tau_n * tau_nn;
-            S(0, 0) += factor * T22nmnnm;
-            S(1, 1) += factor * T11nmnnm;
+            _S(0, 0) += factor * T22nmnnm;
+            _S(1, 1) += factor * T11nmnnm;
           } else {
             // in the general case m=/=0, we also need the T12 and T21 elements
             // for this m, n and n'
@@ -333,74 +365,80 @@ public:
             const float_type tau_pi = tau_n * pi_nn;
             const float_type tau_tau = tau_n * tau_nn;
 
-            S(0, 0) += real_factor * (T11nmnnm * pi_pi + T21nmnnm * tau_pi +
-                                      T12nmnnm * pi_tau + T22nmnnm * tau_tau);
-            S(0, 1) += imag_factor * (T11nmnnm * pi_tau + T21nmnnm * tau_tau +
-                                      T12nmnnm * pi_pi + T22nmnnm * tau_pi);
-            S(1, 0) -= imag_factor * (T11nmnnm * tau_pi + T21nmnnm * pi_pi +
-                                      T12nmnnm * tau_tau + T22nmnnm * pi_tau);
-            S(1, 1) += real_factor * (T11nmnnm * tau_tau + T21nmnnm * pi_tau +
-                                      T12nmnnm * tau_pi + T22nmnnm * pi_pi);
+            _S(0, 0) += real_factor * (T11nmnnm * pi_pi + T21nmnnm * tau_pi +
+                                       T12nmnnm * pi_tau + T22nmnnm * tau_tau);
+            _S(0, 1) += imag_factor * (T11nmnnm * pi_tau + T21nmnnm * tau_tau +
+                                       T12nmnnm * pi_pi + T22nmnnm * tau_pi);
+            _S(1, 0) -= imag_factor * (T11nmnnm * tau_pi + T21nmnnm * pi_pi +
+                                       T12nmnnm * tau_tau + T22nmnnm * pi_tau);
+            _S(1, 1) += real_factor * (T11nmnnm * tau_tau + T21nmnnm * pi_tau +
+                                       T12nmnnm * tau_pi + T22nmnnm * pi_pi);
           }
         }
       }
     }
     // now divide all expressions by the wavenumber
     const float_type kinv = 1. / _Tmatrix.get_wavenumber();
-    S(0, 0) *= kinv;
-    S(0, 1) *= kinv;
-    S(1, 0) *= kinv;
-    S(1, 1) *= kinv;
+    _S(0, 0) *= kinv;
+    _S(0, 1) *= kinv;
+    _S(1, 0) *= kinv;
+    _S(1, 1) *= kinv;
 
     // perform the double 2x2 matrix product to convert S^P to S^L
     const std::complex<float_type> cS11 =
-        S(0, 0) * R_in(0, 0) + S(0, 1) * R_in(1, 0);
+        _S(0, 0) * _R_in(0, 0) + _S(0, 1) * _R_in(1, 0);
     const std::complex<float_type> cS12 =
-        S(0, 0) * R_in(0, 1) + S(0, 1) * R_in(1, 1);
+        _S(0, 0) * _R_in(0, 1) + _S(0, 1) * _R_in(1, 1);
     const std::complex<float_type> cS21 =
-        S(1, 0) * R_in(0, 0) + S(1, 1) * R_in(1, 0);
+        _S(1, 0) * _R_in(0, 0) + _S(1, 1) * _R_in(1, 0);
     const std::complex<float_type> cS22 =
-        S(1, 0) * R_in(0, 1) + S(1, 1) * R_in(1, 1);
+        _S(1, 0) * _R_in(0, 1) + _S(1, 1) * _R_in(1, 1);
 
-    S(0, 0) = R_out(0, 0) * cS11 + R_out(0, 1) * cS21;
-    S(0, 1) = R_out(0, 0) * cS12 + R_out(0, 1) * cS22;
-    S(1, 0) = R_out(1, 0) * cS11 + R_out(1, 1) * cS21;
-    S(1, 1) = R_out(1, 0) * cS12 + R_out(1, 1) * cS22;
+    _S(0, 0) = _R_out(0, 0) * cS11 + _R_out(0, 1) * cS21;
+    _S(0, 1) = _R_out(0, 0) * cS12 + _R_out(0, 1) * cS22;
+    _S(1, 0) = _R_out(1, 0) * cS11 + _R_out(1, 1) * cS21;
+    _S(1, 1) = _R_out(1, 0) * cS12 + _R_out(1, 1) * cS22;
 
     const float_type half(0.5);
-    _Z(0, 0) = (half * (S(0, 0) * conj(S(0, 0)) + S(0, 1) * conj(S(0, 1)) +
-                        S(1, 0) * conj(S(1, 0)) + S(1, 1) * conj(S(1, 1))))
+    _Z(0, 0) = (half * (_S(0, 0) * conj(_S(0, 0)) + _S(0, 1) * conj(_S(0, 1)) +
+                        _S(1, 0) * conj(_S(1, 0)) + _S(1, 1) * conj(_S(1, 1))))
                    .real();
-    _Z(0, 1) = (half * (S(0, 0) * conj(S(0, 0)) - S(0, 1) * conj(S(0, 1)) +
-                        S(1, 0) * conj(S(1, 0)) - S(1, 1) * conj(S(1, 1))))
+    _Z(0, 1) = (half * (_S(0, 0) * conj(_S(0, 0)) - _S(0, 1) * conj(_S(0, 1)) +
+                        _S(1, 0) * conj(_S(1, 0)) - _S(1, 1) * conj(_S(1, 1))))
                    .real();
-    _Z(0, 2) = (-S(0, 0) * conj(S(0, 1)) - S(1, 1) * conj(S(1, 0))).real();
+    _Z(0, 2) = (-_S(0, 0) * conj(_S(0, 1)) - _S(1, 1) * conj(_S(1, 0))).real();
     _Z(0, 3) =
-        (icompl * (S(0, 0) * conj(S(0, 1)) - S(1, 1) * conj(S(1, 0)))).real();
+        (icompl * (_S(0, 0) * conj(_S(0, 1)) - _S(1, 1) * conj(_S(1, 0))))
+            .real();
 
-    _Z(1, 0) = (half * (S(0, 0) * conj(S(0, 0)) + S(0, 1) * conj(S(0, 1)) -
-                        S(1, 0) * conj(S(1, 0)) - S(1, 1) * conj(S(1, 1))))
+    _Z(1, 0) = (half * (_S(0, 0) * conj(_S(0, 0)) + _S(0, 1) * conj(_S(0, 1)) -
+                        _S(1, 0) * conj(_S(1, 0)) - _S(1, 1) * conj(_S(1, 1))))
                    .real();
-    _Z(1, 1) = (half * (S(0, 0) * conj(S(0, 0)) - S(0, 1) * conj(S(0, 1)) -
-                        S(1, 0) * conj(S(1, 0)) + S(1, 1) * conj(S(1, 1))))
+    _Z(1, 1) = (half * (_S(0, 0) * conj(_S(0, 0)) - _S(0, 1) * conj(_S(0, 1)) -
+                        _S(1, 0) * conj(_S(1, 0)) + _S(1, 1) * conj(_S(1, 1))))
                    .real();
-    _Z(1, 2) = (-S(0, 0) * conj(S(0, 1)) + S(1, 1) * conj(S(1, 0))).real();
+    _Z(1, 2) = (-_S(0, 0) * conj(_S(0, 1)) + _S(1, 1) * conj(_S(1, 0))).real();
     _Z(1, 3) =
-        (icompl * (S(0, 0) * conj(S(0, 1)) + S(1, 1) * conj(S(1, 0)))).real();
+        (icompl * (_S(0, 0) * conj(_S(0, 1)) + _S(1, 1) * conj(_S(1, 0))))
+            .real();
 
-    _Z(2, 0) = (-S(0, 0) * conj(S(1, 0)) - S(1, 1) * conj(S(0, 1))).real();
-    _Z(2, 1) = (-S(0, 0) * conj(S(1, 0)) + S(1, 1) * conj(S(0, 1))).real();
-    _Z(2, 2) = (S(0, 0) * conj(S(1, 1)) + S(0, 1) * conj(S(1, 0))).real();
+    _Z(2, 0) = (-_S(0, 0) * conj(_S(1, 0)) - _S(1, 1) * conj(_S(0, 1))).real();
+    _Z(2, 1) = (-_S(0, 0) * conj(_S(1, 0)) + _S(1, 1) * conj(_S(0, 1))).real();
+    _Z(2, 2) = (_S(0, 0) * conj(_S(1, 1)) + _S(0, 1) * conj(_S(1, 0))).real();
     _Z(2, 3) =
-        (-icompl * (S(0, 0) * conj(S(1, 1)) + S(1, 0) * conj(S(0, 1)))).real();
+        (-icompl * (_S(0, 0) * conj(_S(1, 1)) + _S(1, 0) * conj(_S(0, 1))))
+            .real();
 
     _Z(3, 0) =
-        (icompl * (S(1, 0) * conj(S(0, 0)) + S(1, 1) * conj(S(0, 1)))).real();
+        (icompl * (_S(1, 0) * conj(_S(0, 0)) + _S(1, 1) * conj(_S(0, 1))))
+            .real();
     _Z(3, 1) =
-        (icompl * (S(1, 0) * conj(S(0, 0)) - S(1, 1) * conj(S(0, 1)))).real();
+        (icompl * (_S(1, 0) * conj(_S(0, 0)) - _S(1, 1) * conj(_S(0, 1))))
+            .real();
     _Z(3, 2) =
-        (-icompl * (S(1, 1) * conj(S(0, 0)) - S(0, 1) * conj(S(1, 0)))).real();
-    _Z(3, 3) = (S(1, 1) * conj(S(0, 0)) - S(0, 1) * conj(S(1, 0))).real();
+        (-icompl * (_S(1, 1) * conj(_S(0, 0)) - _S(0, 1) * conj(_S(1, 0))))
+            .real();
+    _Z(3, 3) = (_S(1, 1) * conj(_S(0, 0)) - _S(0, 1) * conj(_S(1, 0))).real();
 
     make_available();
   }
