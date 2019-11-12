@@ -1895,6 +1895,44 @@ public:
   }
 
   /**
+   * @brief Get the three independent elements of the extinction matrix.
+   *
+   * The extinction matrix is assumed to have the form
+   * @f[
+   *  K = \begin{pmatrix}
+   *    C_{ext} & C_{pol} & 0 & 0 \\
+   *    C_{pol} & C_{ext} & 0 & 0 \\
+   *    0 & 0 & C_{ext} & C_{cpol} \\
+   *    0 & 0 & -C_{cpol} & C_{ext}
+   *  \end{pmatrix}.
+   * @f]
+   * This function returns the values @f$[C_{ext}, C_{pol}, C_{cpol}]@f$.
+   *
+   * @param alpha_radians Azimuth angle of the scattering particle (in radians).
+   * @param beta_radians Zenith angle of the scattering particle (in radians).
+   * @param theta_in_radians Zenith angle of the incoming radiation (in
+   * radians).
+   * @param phi_in_radians Azimuth angle of the incoming radiation (in radians).
+   * @param output Independent components of the extinction matrix, @f$[C_{ext},
+   * C_{pol}, C_{cpol}]@f$ (should be an array like pointer of size at least 3).
+   */
+  inline void get_reduced_extinction_matrix(const float_type alpha_radians,
+                                            const float_type beta_radians,
+                                            const float_type theta_in_radians,
+                                            const float_type phi_in_radians,
+                                            float_type output[3]) const {
+
+    Matrix<std::complex<float_type>> S = get_forward_scattering_matrix(
+        alpha_radians, beta_radians, theta_in_radians, phi_in_radians,
+        theta_in_radians, phi_in_radians);
+
+    const float_type prefactor = 2. * M_PI / _k;
+    output[0] = prefactor * (S(0, 0) + S(1, 1)).imag();
+    output[1] = prefactor * (S(0, 0) - S(1, 1)).imag();
+    output[2] = prefactor * (S(1, 1) - S(0, 0)).real();
+  }
+
+  /**
    * @brief Get the scattering coefficient for the T-matrix.
    *
    * @return Scattering coefficient.

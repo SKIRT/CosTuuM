@@ -1,0 +1,40 @@
+# Upper right quarter from Table 1 in Mishchenko, 1991, ApJ, 367, 561
+# The scattering particle is a prolate spheroid with axis ratio d = 0.5
+# and equal-volume sphere radius r_ev = 0.2 um.
+# Listed below are the three independent components for the extinction
+# matrix
+#     (Cext Cpol 0      0    )
+# K = (Cpol Cext 0      0    )
+#     (0    0    Cext   Ccpol)
+#     (0    0    -Ccpol Cext )
+# assuming imperfect alignment (ia), i.e. the grains are aligned according to
+# p(beta) = 0.5 - 0.25*(cos^2(beta) - 1)
+# The actual components listed are
+# Qx = Cx / (pi*r_ev^2)
+# The different blocks correspond to different ingoing angles, as indicated
+
+# lambda (um)	Qext	Qpol	Qcpol
+
+# theta = 0 degrees
+0.2	2.96	0.	0.
+0.55	3.42	0.	0.
+1.	1.06	0.	0.
+5.	2.41e-2	0.	0.
+
+# theta = 30 degrees
+0.2	2.92	-4.41e-3	-8.6e-3
+0.55	3.5	-2.27e-2	-8.2e-3
+1.	1.04	-1.99e-2	1.3e-2
+5.	2.38e-2	-3.44e-4	2.69e-3
+
+# theta = 60 degrees
+0.2	2.83	-1.32e-2	-2.58e-2
+0.55	3.64	-6.81e-2	-2.46e-2
+1.	1.01	-5.97e-2	3.9e-2
+5.	2.31e-2	-1.38e-3	1.07e-2
+
+# theta = 90 degrees
+0.2	2.78	-1.77e-2	-3.44e-2
+0.55	3.71	-9.08e-2	-3.28e-2
+1.	9.89e-1	-7.97e-2	5.2e-2
+5.	2.28e-2	-1.38e-3	1.07e-2

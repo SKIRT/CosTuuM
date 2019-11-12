@@ -1,0 +1,52 @@
+# Lower left quarter from Table 1 in Mishchenko, 1991, ApJ, 367, 561
+# The scattering particle is an oblate spheroid with axis ratio d = 2.
+# and equal-volume sphere radius r_ev = 0.2 um.
+# Listed below are the three independent components for the extinction
+# matrix
+#     (Cext Cpol 0      0    )
+# K = (Cpol Cext 0      0    )
+#     (0    0    Cext   Ccpol)
+#     (0    0    -Ccpol Cext )
+# assuming perfect Davis-Greenstein alignment (PDG), i.e. the grains are
+# aligned according to
+# p(beta) = delta(cos(beta) - 1.)
+# The actual components listed are
+# Qx = Cx / (pi*r_ev^2)
+# The different blocks correspond to different ingoing angles, as indicated
+# Note that the refractive indices used correspond to the values given in
+# Draine, 1985, ApJS, 57, 587. These are slightly different from the ones
+# given on Bruce Draine's web page and are as follows:
+# lambda (um)	e_1	e_2	n_r	n_i
+# 0.2	3.7	0.205	1.92	0.0533
+# 0.55	2.95	0.101	1.72	0.0293
+# 1.	2.94	0.104	1.71	0.0303
+# 5.	2.67	0.144	1.63	0.044
+# where the last two columns where computed using
+# n_r = sqrt{0.5 * [sqrt(e_1^2 + e_2^2) + e_1]}
+# n_i = sqrt{0.5 * [sqrt(e_1^2 + e_2^2) - e_1]}
+
+# lambda (um)	Qext	Qpol	Qcpol
+
+# theta = 0 degrees
+0.2	3.	0	0.
+0.55	2.9	0.	0.
+1.	1.26	0.	0.
+5.	2.76e-2	0.	0.
+
+# theta = 30 degrees
+0.2	2.84	-3.71e-2	-3.99e-2
+0.55	2.98	1.02e-1	-1.12e-1
+1.	1.16	-1.25e-1	1.1e-1
+5.	2.6e-2	-1.59e-3	1.36e-2
+
+# theta = 60 degrees
+0.2	2.72	-3.51e-2	-1.64e-1
+0.55	3.8	-2.63e-1	-4.03e-1
+1.	1.01	-3.21e-1	3.16e-1
+5.	2.29e-2	-4.75e-3	4.06e-2
+
+# theta = 90 degrees
+0.2	2.24	-2.82e-3	-1.09e-1
+0.55	4.38	-5.65e-1	-5.09e-1
+1.	9.46e-1	-3.94e-1	4.11e-1
+5.	2.13e-2	-6.32e-3	5.41e-2
