@@ -38,7 +38,9 @@ typedef struct {
  * @param self T-matrix object that is being deallocated.
  */
 static void TmatrixObject_dealloc(TmatrixObject *self) {
+  // first free the wrapped T-matrix object
   delete self->_Tmatrix;
+  // then free the Python object
   Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
@@ -54,7 +56,9 @@ static void TmatrixObject_dealloc(TmatrixObject *self) {
  */
 static PyObject *TmatrixObject_new(PyTypeObject *type, PyObject *args,
                                    PyObject *kwargs) {
+  // allocate the Python object
   TmatrixObject *self = (TmatrixObject *)type->tp_alloc(type, 0);
+  // set the wrapped T-matrix to a sensible initial value
   self->_Tmatrix = nullptr;
   return (PyObject *)self;
 }
@@ -86,18 +90,26 @@ static PyObject *TmatrixObject_new(PyTypeObject *type, PyObject *args,
 static int TmatrixObject_init(TmatrixObject *self, PyObject *args,
                               PyObject *kwargs) {
 
+  // required arguments
   float_type particle_radius;
   float_type axis_ratio;
   float_type wavelength;
   std::complex<float_type> mr;
 
+  // optional arguments
   float_type tolerance = 1.e-4;
   uint_fast32_t maximum_order = 200;
   uint_fast32_t ndgs = 2;
   uint_fast32_t maximum_ngauss = 500;
 
+  // always fixed (for now)
   const float_type ratio_of_radii = 1.;
 
+  /// parse arguments
+  // list of keywords (in the expected order)
+  // note that we need to use strdup because the Python API expects char*,
+  // while C++ strings are const char*
+  // not doing this results in compilation warnings
   static char *kwlist[] = {strdup("particle_radius"),
                            strdup("axis_ratio"),
                            strdup("wavelength"),
@@ -108,25 +120,42 @@ static int TmatrixObject_init(TmatrixObject *self, PyObject *args,
                            strdup("maximum_ngauss"),
                            nullptr};
 
+  // allocate a temporary variable to store the complex refractive index
   Py_complex mr_temp;
+  // parse the keywords/positional arguments
+  // d is a double
+  // D is a complex double (Py_complex)
+  // I is an unsigned integer
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "dddD|dIII", kwlist,
                                    &particle_radius, &axis_ratio, &wavelength,
                                    &mr_temp, &tolerance, &maximum_order, &ndgs,
                                    &maximum_ngauss)) {
+    // PyArg_ParseTupleAndKeywords will return 0 if a required argument was
+    // missing, if an argument of the wrong type was provided or if the number
+    // of arguments does not match the expectation
+    // we use ctm_warning so that we can gracefully exit and let Python handle
+    // the exception
+    // ctm_error would call abort, which would kill the Python interpreter
     ctm_warning("Wrong arguments provided!");
+    // exit code 1 signals to Python that something was wrong
     return 1;
   }
+  // get the complex components from the Py_complex and store them in the
+  // std::complex variable
   mr.real(mr_temp.real);
   mr.imag(mr_temp.imag);
 
+  // construct the T-matrix
   self->_Tmatrix = TMatrixCalculator::calculate_TMatrix(
       ratio_of_radii, axis_ratio, particle_radius, wavelength, maximum_order,
       tolerance, ndgs, mr, maximum_ngauss);
 
+  // average it out over a trivial orientation distribution
   OrientationDistribution orientation(2 * self->_Tmatrix->get_nmax());
   self->_Tmatrix = TMatrixCalculator::apply_orientation_distribution(
       *self->_Tmatrix, orientation);
 
+  // everything went well: return 0
   return 0;
 }
 
@@ -139,6 +168,7 @@ static int TmatrixObject_init(TmatrixObject *self, PyObject *args,
  */
 static PyObject *TmatrixObject_get_nmax(TmatrixObject *self,
                                         PyObject *Py_UNUSED(ignored)) {
+  // wrap the returned value in a Python object
   return PyLong_FromUnsignedLong(self->_Tmatrix->get_nmax());
 }
 
@@ -163,34 +193,44 @@ static PyObject *TmatrixObject_get_extinction_matrix(TmatrixObject *self,
                                                      PyObject *args,
                                                      PyObject *kwargs) {
 
+  // required arguments
   float_type theta;
   float_type phi;
 
+  // optional arguments
   float_type alpha = 0.;
   float_type beta = 0.;
 
+  // list of keywords (see comment above)
   static char *kwlist[] = {strdup("theta"), strdup("phi"), strdup("alpha"),
                            strdup("beta"), nullptr};
 
+  // parse positional and keyword arguments
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "dd|dd", kwlist, &theta, &phi,
                                    &alpha, &beta)) {
+    // again, we do not call ctm_error to avoid killing the Python interpreter
     ctm_warning("Wrong arguments provided!");
+    // this time, a nullptr return will signal an error to Python
     return nullptr;
   }
 
+  // get the extinction matrix
   Matrix<float_type> K =
       self->_Tmatrix->get_extinction_matrix(alpha, beta, theta, phi);
 
+  // create an uninitialised 4x4 double NumPy array
   npy_intp dims[2] = {4, 4};
   PyArrayObject *numpy_array =
       (PyArrayObject *)PyArray_SimpleNew(2, dims, NPY_DOUBLE);
 
+  // copy the elements from the extinction matrix into the array
   for (uint_fast8_t i = 0; i < 4; ++i) {
     for (uint_fast8_t j = 0; j < 4; ++j) {
       *((float_type *)PyArray_GETPTR2(numpy_array, i, j)) = K(i, j);
     }
   }
 
+  // return the array
   return PyArray_Return(numpy_array);
 }
 
@@ -218,9 +258,18 @@ static struct PyModuleDef CTMmodule = {PyModuleDef_HEAD_INIT, "CTMmodule",
  */
 PyMODINIT_FUNC PyInit_CTMmodule() {
 
+  // we need to call this to enable NumPy array functionality
   import_array();
+
+  // create the module object
   PyObject *m = PyModule_Create(&CTMmodule);
 
+  // set the required fields in the TmatrixObjectType struct
+  // we need to do this because C++ does not support fancy C struct
+  // initialisation
+  // without this, we would need to manually set all elements in the struct
+  // this is a pain (there are many) and makes it very hard to make the code
+  // portable (addition of a single element to the struct would break it)
   TmatrixObjectType.tp_name = "CTMmodule.TMatrix";
   TmatrixObjectType.tp_basicsize = sizeof(TmatrixObject);
   TmatrixObjectType.tp_dealloc = (destructor)TmatrixObject_dealloc;
@@ -228,8 +277,13 @@ PyMODINIT_FUNC PyInit_CTMmodule() {
   TmatrixObjectType.tp_init = (initproc)TmatrixObject_init;
   TmatrixObjectType.tp_new = TmatrixObject_new;
 
+  // finalize creation of the TmatrixObjectType
   PyType_Ready(&TmatrixObjectType);
+  // add a T-matrix object to the module
+  // any call to CTMmodule.TMatrix() will use this same object
   Py_INCREF(&TmatrixObjectType);
   PyModule_AddObject(m, "TMatrix", (PyObject *)&TmatrixObjectType);
+
+  // return the module object
   return m;
 }
