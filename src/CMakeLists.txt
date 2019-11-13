@@ -49,11 +49,18 @@ target_link_libraries(CosTuuM ${LIBQUICKSCHED})
 add_dependencies(CosTuuM CompilerInfo)
 
 if(HAVE_PYTHON)
+  # Add a target for the Python module (this simply calls the Python build
+  # script; this script figures out dependencies itself)
+  # we overwrite the default build folder to make sure the library file ends up
+  # in the bin/ folder
   add_custom_target(CTMmodule ALL
                     COMMENT "Building Python module"
                     COMMAND ${PYTHON_EXECUTABLE}
                               ${PROJECT_BINARY_DIR}/setup.py build
                               --build-lib ${PROJECT_BINARY_DIR}/bin)
 
+  # add an installation script, so that 'make install' installs the Python
+  # module (it will then be available for the current user from anywhere in
+  # the system)
   install(SCRIPT ${PROJECT_BINARY_DIR}/install_python_module.cmake)
 endif(HAVE_PYTHON)

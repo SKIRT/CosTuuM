@@ -253,10 +253,11 @@ add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/src/CompilerInfo.cpp
 add_custom_target(CompilerInfo
                   DEPENDS ${PROJECT_BINARY_DIR}/src/CompilerInfo.cpp)
 
-# Prepare the Python module setup script
+# Find Python
 find_package(PythonLibs 3.0)
 find_package(PythonInterp 3.0)
 if(PYTHONLIBS_FOUND AND PYTHONINTERP_FOUND)
+  # Check if NumPy can be found
   execute_process(COMMAND ${PYTHON_EXECUTABLE} -c
                               "import numpy; print(numpy.get_include())"
                   RESULT_VARIABLE NUMPY_RESULT
@@ -264,6 +265,8 @@ if(PYTHONLIBS_FOUND AND PYTHONINTERP_FOUND)
                   ERROR_VARIABLE NUMPY_ERROR)
   if(NUMPY_RESULT STREQUAL "0")
     message(STATUS "Python and NumPy found. Building Python module.")
+    # Configure the build script for the Python module and the CMake wrapper
+    # script for the module installation
     configure_file(${PROJECT_SOURCE_DIR}/setup.py.in
                    ${PROJECT_BINARY_DIR}/setup.py @ONLY)
     configure_file(${PROJECT_SOURCE_DIR}/install_python_module.cmake.in

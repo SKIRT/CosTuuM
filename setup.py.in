@@ -1,15 +1,26 @@
+# setup script for CTMmodule
+# this file is parsed by CMake to add information about the compiler and
+# the build environment and should not be edited directly
+# (instead edit setup.py.in)
+
+# import the setuptools module for module creation
 from setuptools import setup, Extension
 import os
 import glob
 
-
+# main module creation routine
 def main():
 
+    # set the C and C++ compilers to the ones found by CMake
     os.environ["CC"] = "@CMAKE_C_COMPILER@"
     os.environ["CXX"] = "@CMAKE_CXX_COMPILER@"
 
+    # find all the header files in the source folder to create a dependency
+    # list that ensures the module is recompiled if any of the header files
+    # changes
     header_dependencies = glob.glob("@PROJECT_SOURCE_DIR@/src/*.hpp")
 
+    # create the module
     setup(
         name="CTMmodule",
         version="1.0.0",
@@ -31,5 +42,6 @@ def main():
     )
 
 
+# call the main function
 if __name__ == "__main__":
     main()
