@@ -1,0 +1,11 @@
+# Small subset of the dielectric functions and refractive indices given in
+# Draine, 1985, ApJS, 57, 587, Table 3. These are slightly different from the
+# ones given on Bruce Draine's web page.
+# The last two columns where computed using
+# n_r = sqrt{0.5 * [sqrt(e_1^2 + e_2^2) + e_1]}
+# n_i = sqrt{0.5 * [sqrt(e_1^2 + e_2^2) - e_1]}
+# lambda (um)	e_1	e_2	n_r	n_i
+0.2	3.7	0.205	1.92	0.0533
+0.55	2.95	0.101	1.72	0.0293
+1.	2.94	0.104	1.71	0.0303
+5.	2.67	0.144	1.63	0.044

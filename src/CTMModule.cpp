@@ -123,6 +123,10 @@ static int TmatrixObject_init(TmatrixObject *self, PyObject *args,
       ratio_of_radii, axis_ratio, particle_radius, wavelength, maximum_order,
       tolerance, ndgs, mr, maximum_ngauss);
 
+  OrientationDistribution orientation(2 * self->_Tmatrix->get_nmax());
+  self->_Tmatrix = TMatrixCalculator::apply_orientation_distribution(
+      *self->_Tmatrix, orientation);
+
   return 0;
 }
 

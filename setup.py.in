@@ -1,10 +1,14 @@
 from setuptools import setup, Extension
 import os
+import glob
+
 
 def main():
 
     os.environ["CC"] = "@CMAKE_C_COMPILER@"
     os.environ["CXX"] = "@CMAKE_CXX_COMPILER@"
+
+    header_dependencies = glob.glob("@PROJECT_SOURCE_DIR@/src/*.hpp")
 
     setup(
         name="CTMmodule",
@@ -20,9 +24,10 @@ def main():
                     "@PROJECT_SOURCE_DIR@/src",
                     "@PROJECT_BINARY_DIR@/src",
                 ],
+                depends=header_dependencies,
             )
         ],
-        install_requires = ["numpy"],
+        install_requires=["numpy"],
     )
 
 
