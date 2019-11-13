@@ -1,0 +1,30 @@
+from setuptools import setup, Extension
+import os
+
+def main():
+
+    os.environ["CC"] = "@CMAKE_C_COMPILER@"
+    os.environ["CXX"] = "@CMAKE_CXX_COMPILER@"
+
+    setup(
+        name="CTMmodule",
+        version="1.0.0",
+        description="T-matrix module",
+        author="Bert Vandenbroucke",
+        author_email="bert.vandenbrucke@gmail.com",
+        ext_modules=[
+            Extension(
+                "CTMmodule",
+                ["@PROJECT_SOURCE_DIR@/src/CTMModule.cpp"],
+                include_dirs=[
+                    "@PROJECT_SOURCE_DIR@/src",
+                    "@PROJECT_BINARY_DIR@/src",
+                ],
+            )
+        ],
+        install_requires = ["numpy"],
+    )
+
+
+if __name__ == "__main__":
+    main()

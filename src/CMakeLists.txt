@@ -47,3 +47,13 @@ set(CosTuuM_SOURCES
 add_executable(CosTuuM ${CosTuuM_SOURCES})
 target_link_libraries(CosTuuM ${LIBQUICKSCHED})
 add_dependencies(CosTuuM CompilerInfo)
+
+if(HAVE_PYTHON)
+  add_custom_target(CTMmodule ALL
+                    COMMENT "Building Python module"
+                    COMMAND ${PYTHON_EXECUTABLE}
+                              ${PROJECT_BINARY_DIR}/setup.py build
+                              --build-lib ${PROJECT_BINARY_DIR}/bin)
+
+  install(SCRIPT ${PROJECT_BINARY_DIR}/install_python_module.cmake)
+endif(HAVE_PYTHON)
