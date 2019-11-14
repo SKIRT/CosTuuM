@@ -7,6 +7,7 @@
  */
 
 #include "Configuration.hpp"
+#include "DavisGreensteinOrientationDistribution.hpp"
 #include "MishchenkoOrientationDistribution.hpp"
 #include "TMatrixCalculator.hpp"
 
@@ -151,11 +152,21 @@ static int TmatrixObject_init(TmatrixObject *self, PyObject *args,
       ratio_of_radii, axis_ratio, particle_radius, wavelength, maximum_order,
       tolerance, ndgs, mr, maximum_ngauss);
 
-  // average it out over a trivial orientation distribution
-  MishchenkoOrientationDistribution orientation(2 * self->_Tmatrix->get_nmax(),
-                                                axis_ratio, cos2beta);
+  // average it out over the orientation distribution
+  OrientationDistribution *orientation;
+  if (cos2beta == 0. || cos2beta == 1.) {
+    orientation = new DavisGreensteinOrientationDistribution(
+        2 * self->_Tmatrix->get_nmax(), axis_ratio);
+  } else if (cos2beta == 1. / 3.) {
+    orientation = new OrientationDistribution(2 * self->_Tmatrix->get_nmax());
+    orientation->initialise();
+  } else {
+    orientation = new MishchenkoOrientationDistribution(
+        2 * self->_Tmatrix->get_nmax(), axis_ratio, cos2beta);
+  }
   self->_Tmatrix = TMatrixCalculator::apply_orientation_distribution(
-      *self->_Tmatrix, orientation);
+      *self->_Tmatrix, *orientation);
+  delete orientation;
 
   // everything went well: return 0
   return 0;

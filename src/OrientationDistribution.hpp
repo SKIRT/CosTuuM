@@ -67,10 +67,11 @@ public:
     return _normalisation_factor * (*this)(beta, cosbeta, sinbeta);
   }
 
-private:
+protected:
   /*! @brief Coefficients. */
   std::vector<float_type> _coefficients;
 
+private:
   /**
    * @brief Auxiliary class used to wrap integrand function arguments.
    */
@@ -172,6 +173,8 @@ public:
    */
   inline OrientationDistribution(const uint_fast32_t nmax)
       : _normalisation_factor(1.), _coefficients(nmax + 1, 0.) {}
+
+  virtual ~OrientationDistribution() {}
 
   /**
    * @brief Initialise the coefficients of the distribution.
