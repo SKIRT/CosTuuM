@@ -22,14 +22,14 @@ def main():
 
     # create the module
     setup(
-        name="CTMmodule",
+        name="CosTuuM",
         version="1.0.0",
         description="T-matrix module",
         author="Bert Vandenbroucke",
         author_email="bert.vandenbrucke@gmail.com",
         ext_modules=[
             Extension(
-                "CTMmodule",
+                "CosTuuM",
                 ["@PROJECT_SOURCE_DIR@/src/CTMModule.cpp"],
                 include_dirs=[
                     "@PROJECT_SOURCE_DIR@/src",

@@ -248,15 +248,15 @@ static PyMethodDef TmatrixObject_methods[] = {
 static PyTypeObject TmatrixObjectType = {PyVarObject_HEAD_INIT(nullptr, 0)};
 
 /*! @brief Module definition for the CTM module. */
-static struct PyModuleDef CTMmodule = {PyModuleDef_HEAD_INIT, "CTMmodule",
+static struct PyModuleDef CTMmodule = {PyModuleDef_HEAD_INIT, "CosTuuM",
                                        "T-matrix module.", -1, 0};
 
 /**
- * @brief CTMmodule initialisation function.
+ * @brief CosTuuM initialisation function.
  *
  * @return Pointer to the initialised module object.
  */
-PyMODINIT_FUNC PyInit_CTMmodule() {
+PyMODINIT_FUNC PyInit_CosTuuM() {
 
   // we need to call this to enable NumPy array functionality
   import_array();
@@ -270,7 +270,7 @@ PyMODINIT_FUNC PyInit_CTMmodule() {
   // without this, we would need to manually set all elements in the struct
   // this is a pain (there are many) and makes it very hard to make the code
   // portable (addition of a single element to the struct would break it)
-  TmatrixObjectType.tp_name = "CTMmodule.TMatrix";
+  TmatrixObjectType.tp_name = "CosTuuM.TMatrix";
   TmatrixObjectType.tp_basicsize = sizeof(TmatrixObject);
   TmatrixObjectType.tp_dealloc = (destructor)TmatrixObject_dealloc;
   TmatrixObjectType.tp_methods = TmatrixObject_methods;

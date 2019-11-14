@@ -1,5 +1,5 @@
 import numpy as np
-import CTMmodule
+import CosTuuM
 import matplotlib
 
 matplotlib.use("Agg")
@@ -38,7 +38,7 @@ for row in mrdata:
         "Qcpolref": [],
     }
 for row in data:
-    Tmatrix = CTMmodule.TMatrix(
+    Tmatrix = CosTuuM.TMatrix(
         particle_radius=2.0e-7,
         axis_ratio=2.0,
         wavelength=row[1] * 1.0e-6,
