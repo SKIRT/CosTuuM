@@ -16,15 +16,36 @@ for row in mrdata:
     mrdict[row[0]] = n + 1.0j * k
 
 fname = "1991Mishchenko_oblate_ia.txt"
+axis_ratio = 2.0
+cos2beta = 3.0 / 5.0
+r_ev = 2.0e-7
+
+pbfunc = CosTuuM.MishchenkoOrientationDistribution(axis_ratio, cos2beta)
+b = np.linspace(0.0, np.pi, 100)
+pb = np.array([pbfunc.get_distribution(xb) for xb in b])
+pl.plot(b, pb)
+pl.savefig("distribution_function.png", dpi=300, bbox_inches="tight")
+pl.close()
 
 rawdata = np.loadtxt(fname)
 
-data = np.zeros((rawdata.shape[0], rawdata.shape[1] + 1))
-data[:, 1:6] = rawdata[:, :]
-data[:4, 0] = 0.0
-data[4:8, 0] = np.pi / 6.0
-data[8:12, 0] = np.pi / 3.0
-data[12:16, 0] = 0.5 * np.pi
+if len(rawdata) > 4:
+    data = np.zeros((rawdata.shape[0], rawdata.shape[1] + 1))
+    data[:, 1:6] = rawdata[:, :]
+    data[:4, 0] = 0.0
+    data[4:8, 0] = np.pi / 6.0
+    data[8:12, 0] = np.pi / 3.0
+    data[12:16, 0] = 0.5 * np.pi
+else:
+    data = np.zeros((rawdata.shape[0] * 4, rawdata.shape[1] + 1))
+    data[:4, 1:6] = rawdata[:, :]
+    data[:4, 0] = 0.0
+    data[4:8, 0] = np.pi / 6.0
+    data[4:8, 1:6] = rawdata[:, :]
+    data[8:12, 1:6] = rawdata[:, :]
+    data[8:12, 0] = np.pi / 3.0
+    data[12:16, 1:6] = rawdata[:, :]
+    data[12:16, 0] = 0.5 * np.pi
 
 rdict = {}
 for row in mrdata:
@@ -39,14 +60,15 @@ for row in mrdata:
     }
 for row in data:
     Tmatrix = CosTuuM.TMatrix(
-        particle_radius=2.0e-7,
-        axis_ratio=2.0,
+        particle_radius=r_ev,
+        axis_ratio=axis_ratio,
         wavelength=row[1] * 1.0e-6,
         refractive_index=mrdict[row[1]],
+        cos2beta=cos2beta,
     )
     K = Tmatrix.get_extinction_matrix(theta=row[0], phi=0.0)
 
-    parea = np.pi * 2.0e-7 ** 2
+    parea = np.pi * r_ev ** 2
     Qext = K[0, 0] / parea
     Qpol = K[0, 1] / parea
     Qcpol = K[2, 3] / parea
@@ -55,9 +77,9 @@ for row in data:
     rdict[row[1]]["Qext"].append(Qext)
     rdict[row[1]]["Qextref"].append(row[2])
     rdict[row[1]]["Qpol"].append(Qpol)
-    rdict[row[1]]["Qpolref"].append(row[3] / 10.0)
+    rdict[row[1]]["Qpolref"].append(row[3])
     rdict[row[1]]["Qcpol"].append(Qcpol)
-    rdict[row[1]]["Qcpolref"].append(row[4] / 10.0)
+    rdict[row[1]]["Qcpolref"].append(row[4])
 
 fig, ax = pl.subplots(3, 2, sharex=True)
 

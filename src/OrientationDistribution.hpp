@@ -47,7 +47,7 @@ public:
   virtual float_type operator()(const float_type beta, const float_type cosbeta,
                                 const float_type sinbeta) const {
 
-    return 0.5 + 0.125 * (cosbeta * cosbeta - 1.);
+    return 0.5;
   }
 
   /**
@@ -60,7 +60,7 @@ public:
    * @return Orientation distribution function for that value of
    * @f$\beta{}@f$, @f$p(\beta{})@f$.
    */
-  inline float_type operator()(const float_type beta) const {
+  float_type operator()(const float_type beta) const {
 
     const float_type cosbeta = cos(beta);
     const float_type sinbeta = sin(beta);
@@ -171,7 +171,12 @@ public:
    * @param nmax Highest order for which we store a coefficient.
    */
   inline OrientationDistribution(const uint_fast32_t nmax)
-      : _coefficients(nmax + 1, 0.) {
+      : _normalisation_factor(1.), _coefficients(nmax + 1, 0.) {}
+
+  /**
+   * @brief Initialise the coefficients of the distribution.
+   */
+  inline void initialise() {
 
     // compute the normalisation factor
     {

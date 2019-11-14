@@ -7,6 +7,7 @@
  */
 
 #include "Configuration.hpp"
+#include "MishchenkoOrientationDistribution.hpp"
 #include "TMatrixCalculator.hpp"
 
 #include <Python.h>
@@ -21,6 +22,8 @@ using namespace boost::multiprecision;
 #else
 using namespace std;
 #endif
+
+/// T-matrix object
 
 /**
  * @brief C struct wrapper around a T-matrix object.
@@ -97,6 +100,7 @@ static int TmatrixObject_init(TmatrixObject *self, PyObject *args,
   std::complex<float_type> mr;
 
   // optional arguments
+  float_type cos2beta = 1. / 3.;
   float_type tolerance = 1.e-4;
   uint_fast32_t maximum_order = 200;
   uint_fast32_t ndgs = 2;
@@ -110,15 +114,12 @@ static int TmatrixObject_init(TmatrixObject *self, PyObject *args,
   // note that we need to use strdup because the Python API expects char*,
   // while C++ strings are const char*
   // not doing this results in compilation warnings
-  static char *kwlist[] = {strdup("particle_radius"),
-                           strdup("axis_ratio"),
-                           strdup("wavelength"),
-                           strdup("refractive_index"),
-                           strdup("tolerance"),
-                           strdup("maximum_order"),
-                           strdup("gauss_legendre_factor"),
-                           strdup("maximum_ngauss"),
-                           nullptr};
+  static char *kwlist[] = {
+      strdup("particle_radius"), strdup("axis_ratio"),
+      strdup("wavelength"),      strdup("refractive_index"),
+      strdup("cos2beta"),        strdup("tolerance"),
+      strdup("maximum_order"),   strdup("gauss_legendre_factor"),
+      strdup("maximum_ngauss"),  nullptr};
 
   // allocate a temporary variable to store the complex refractive index
   Py_complex mr_temp;
@@ -126,10 +127,10 @@ static int TmatrixObject_init(TmatrixObject *self, PyObject *args,
   // d is a double
   // D is a complex double (Py_complex)
   // I is an unsigned integer
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "dddD|dIII", kwlist,
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "dddD|ddIII", kwlist,
                                    &particle_radius, &axis_ratio, &wavelength,
-                                   &mr_temp, &tolerance, &maximum_order, &ndgs,
-                                   &maximum_ngauss)) {
+                                   &mr_temp, &cos2beta, &tolerance,
+                                   &maximum_order, &ndgs, &maximum_ngauss)) {
     // PyArg_ParseTupleAndKeywords will return 0 if a required argument was
     // missing, if an argument of the wrong type was provided or if the number
     // of arguments does not match the expectation
@@ -151,7 +152,8 @@ static int TmatrixObject_init(TmatrixObject *self, PyObject *args,
       tolerance, ndgs, mr, maximum_ngauss);
 
   // average it out over a trivial orientation distribution
-  OrientationDistribution orientation(2 * self->_Tmatrix->get_nmax());
+  MishchenkoOrientationDistribution orientation(2 * self->_Tmatrix->get_nmax(),
+                                                axis_ratio, cos2beta);
   self->_Tmatrix = TMatrixCalculator::apply_orientation_distribution(
       *self->_Tmatrix, orientation);
 
@@ -239,13 +241,170 @@ static PyMethodDef TmatrixObject_methods[] = {
     {"get_nmax", (PyCFunction)TmatrixObject_get_nmax, METH_NOARGS,
      "Return the maximum order of the T-matrix."},
     {"get_extinction_matrix", (PyCFunction)TmatrixObject_get_extinction_matrix,
-     METH_VARARGS | METH_KEYWORDS, "Return the excintion matrix."},
+     METH_VARARGS | METH_KEYWORDS, "Return the extinction matrix."},
     {nullptr}};
 
 /*! @brief Python Object type for the T-matrix (is edited in the module
  *  initialisation function since C++ does not allow fancy unordered struct
  *  initialisation). */
 static PyTypeObject TmatrixObjectType = {PyVarObject_HEAD_INIT(nullptr, 0)};
+
+/// MishchenkoOrientationDistributionObject
+
+/**
+ * @brief C struct wrapper around a MishchenkoOrientationDistribution object.
+ */
+typedef struct {
+  /*! @brief Python object members. */
+  PyObject_HEAD;
+  /*! @brief T-matrix object. */
+  MishchenkoOrientationDistribution *_distribution;
+} MishchenkoOrientationDistributionObject;
+
+/**
+ * @brief Destructor for the MishchenkoOrientationDistributionObject.
+ *
+ * @param self MishchenkoOrientationDistributionObject that is being
+ * deallocated.
+ */
+static void MishchenkoOrientationDistributionObject_dealloc(
+    MishchenkoOrientationDistributionObject *self) {
+  // first free the wrapped T-matrix object
+  delete self->_distribution;
+  // then free the Python object
+  Py_TYPE(self)->tp_free((PyObject *)self);
+}
+
+/**
+ * @brief Constructor for the MishchenkoOrientationDistributionObject.
+ *
+ * Constructs an empty MishchenkoOrientationDistributionObject.
+ *
+ * @param type Type for the object.
+ * @param args Positional arguments.
+ * @param kwargs Keyword arguments.
+ * @return Pointer to the newly created object.
+ */
+static PyObject *MishchenkoOrientationDistributionObject_new(PyTypeObject *type,
+                                                             PyObject *args,
+                                                             PyObject *kwargs) {
+  // allocate the Python object
+  MishchenkoOrientationDistributionObject *self =
+      (MishchenkoOrientationDistributionObject *)type->tp_alloc(type, 0);
+  // set the wrapped T-matrix to a sensible initial value
+  self->_distribution = nullptr;
+  return (PyObject *)self;
+}
+
+/**
+ * @brief init() function for the MishchenkoOrientationDistributionObject.
+ *
+ * Required arguments are:
+ *  - cos2beta: Parameter for the object.
+ *
+ * Additional optional arguments are:
+ *  - maximum_order: Maximum order to use in the spherical basis function
+ *    expansion.
+ *
+ * @param self MishchenkoOrientationDistributionObject that is being
+ * initialised.
+ * @param args Positional arguments.
+ * @param kwargs Keyword arguments.
+ * @return 0 on success, 1 on failure.
+ */
+static int MishchenkoOrientationDistributionObject_init(
+    MishchenkoOrientationDistributionObject *self, PyObject *args,
+    PyObject *kwargs) {
+
+  // required arguments
+  float_type axis_ratio;
+  float_type cos2beta;
+
+  // optional arguments
+  uint_fast32_t maximum_order = 200;
+
+  /// parse arguments
+  // list of keywords (in the expected order)
+  // note that we need to use strdup because the Python API expects char*,
+  // while C++ strings are const char*
+  // not doing this results in compilation warnings
+  static char *kwlist[] = {strdup("axis_ratio"), strdup("cos2beta"),
+                           strdup("maximum_order"), nullptr};
+
+  // parse the keywords/positional arguments
+  // d is a double
+  // I is an unsigned integer
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "dd|I", kwlist, &axis_ratio,
+                                   &cos2beta, &maximum_order)) {
+    // PyArg_ParseTupleAndKeywords will return 0 if a required argument was
+    // missing, if an argument of the wrong type was provided or if the number
+    // of arguments does not match the expectation
+    // we use ctm_warning so that we can gracefully exit and let Python handle
+    // the exception
+    // ctm_error would call abort, which would kill the Python interpreter
+    ctm_warning("Wrong arguments provided!");
+    // exit code 1 signals to Python that something was wrong
+    return 1;
+  }
+
+  self->_distribution = new MishchenkoOrientationDistribution(
+      maximum_order, axis_ratio, cos2beta);
+
+  // everything went well: return 0
+  return 0;
+}
+
+/**
+ * @brief Compute the orientation distribution for the given angle.
+ *
+ * Required arguments are:
+ *  - beta: Zenith angle of the particle rotation axis (in radians).
+ *
+ * @param self MishchenkoOrientationDistributionObject being used.
+ * @param args Positional arguments.
+ * @param kwargs Keyword arguments.
+ * @return Value of the distribution, wrapped in a Python float object.
+ */
+static PyObject *MishchenkoOrientationDistributionObject_get_distribution(
+    MishchenkoOrientationDistributionObject *self, PyObject *args,
+    PyObject *kwargs) {
+
+  // required arguments
+  float_type beta;
+
+  // list of keywords (see comment above)
+  static char *kwlist[] = {strdup("beta"), nullptr};
+
+  // parse positional and keyword arguments
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "d", kwlist, &beta)) {
+    // again, we do not call ctm_error to avoid killing the Python interpreter
+    ctm_warning("Wrong arguments provided!");
+    // this time, a nullptr return will signal an error to Python
+    return nullptr;
+  }
+
+  const float_type value =
+      (*static_cast<OrientationDistribution *>(self->_distribution))(beta);
+
+  // return the array
+  return PyFloat_FromDouble(value);
+}
+
+/*! @brief List of MishchenkoOrientationDistributionObject methods that are
+ *  exposed to Python. */
+static PyMethodDef MishchenkoOrientationDistributionObject_methods[] = {
+    {"get_distribution",
+     (PyCFunction)MishchenkoOrientationDistributionObject_get_distribution,
+     METH_VARARGS | METH_KEYWORDS, "Return the distribution function."},
+    {nullptr}};
+
+/*! @brief Python Object type for the MishchenkoOrientationDistributionObject
+ *  (is edited in the module initialisation function since C++ does not allow
+ *  fancy unordered struct initialisation). */
+static PyTypeObject MishchenkoOrientationDistributionObjectType = {
+    PyVarObject_HEAD_INIT(nullptr, 0)};
+
+/// CosTuuM module
 
 /*! @brief Module definition for the CTM module. */
 static struct PyModuleDef CTMmodule = {PyModuleDef_HEAD_INIT, "CosTuuM",
@@ -283,6 +442,30 @@ PyMODINIT_FUNC PyInit_CosTuuM() {
   // any call to CTMmodule.TMatrix() will use this same object
   Py_INCREF(&TmatrixObjectType);
   PyModule_AddObject(m, "TMatrix", (PyObject *)&TmatrixObjectType);
+
+  // set the required fields in the MishchenkoOrientationDistributionObjectType
+  // struct
+  MishchenkoOrientationDistributionObjectType.tp_name =
+      "CosTuuM.MishchenkoOrientationDistribution";
+  MishchenkoOrientationDistributionObjectType.tp_basicsize =
+      sizeof(MishchenkoOrientationDistributionObject);
+  MishchenkoOrientationDistributionObjectType.tp_dealloc =
+      (destructor)MishchenkoOrientationDistributionObject_dealloc;
+  MishchenkoOrientationDistributionObjectType.tp_methods =
+      MishchenkoOrientationDistributionObject_methods;
+  MishchenkoOrientationDistributionObjectType.tp_init =
+      (initproc)MishchenkoOrientationDistributionObject_init;
+  MishchenkoOrientationDistributionObjectType.tp_new =
+      MishchenkoOrientationDistributionObject_new;
+
+  // finalize creation of the MishchenkoOrientationDistributionObjectType
+  PyType_Ready(&MishchenkoOrientationDistributionObjectType);
+  // add a MishchenkoOrientationDistributionObject to the module
+  // any call to CTMmodule.MishchenkoOrientationDistribution() will use this
+  // same object
+  Py_INCREF(&MishchenkoOrientationDistributionObjectType);
+  PyModule_AddObject(m, "MishchenkoOrientationDistribution",
+                     (PyObject *)&MishchenkoOrientationDistributionObjectType);
 
   // return the module object
   return m;

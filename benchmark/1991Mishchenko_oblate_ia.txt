@@ -8,7 +8,7 @@
 #     (0    0    Cext   Ccpol)
 #     (0    0    -Ccpol Cext )
 # assuming imperfect alignment (ia), i.e. the grains are aligned according to
-# p(beta) = 0.5 + 0.125*(cos^2(beta) - 1.)
+# p(beta) = 0.5 + 0.5*(cos^2(beta) - 1.)
 # The actual components listed are
 # Qx = Cx / (pi*r_ev^2)
 # The different blocks correspond to different ingoing angles, as indicated

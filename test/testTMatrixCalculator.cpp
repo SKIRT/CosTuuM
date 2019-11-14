@@ -124,8 +124,9 @@ int main(int argc, char **argv) {
     ctm_warning("Done.");
 
     ctm_warning("Averaging T matrix over orientations...");
-    const OrientationDistribution orientation_distribution(
+    OrientationDistribution orientation_distribution(
         2 * Tmatrix_single->get_nmax());
+    orientation_distribution.initialise();
     const TMatrix *Tmatrix_ensemble =
         TMatrixCalculator::apply_orientation_distribution(
             *Tmatrix_single, orientation_distribution);
