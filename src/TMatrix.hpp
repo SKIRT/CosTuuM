@@ -1993,6 +1993,35 @@ public:
     }
     return extinction_coefficient;
   }
+
+  /**
+   * @brief Get the extinction coefficient appropriately averaged over the
+   * outgoing angle @f$\theta{}@f$.
+   *
+   * @param ngauss Number of Gauss-Legendre quadrature points to use to compute
+   * the average integral.
+   * @return Average extinction coefficient.
+   */
+  inline float_type
+  get_average_extinction_coefficient(const uint_fast32_t ngauss) const {
+
+    std::vector<float_type> costheta(ngauss), weights(ngauss);
+    SpecialFunctions::get_gauss_legendre_points_and_weights<float_type>(
+        ngauss, costheta, weights);
+
+    float_type result = 0.;
+    for (uint_fast32_t igauss = 0; igauss < ngauss; ++igauss) {
+      const float_type theta = acos(costheta[igauss]);
+      Matrix<std::complex<float_type>> S =
+          get_forward_scattering_matrix(0., 0., theta, 0., theta, 0.);
+
+      result += (S(0, 0) + S(1, 1)).imag() * weights[igauss];
+    }
+
+    // we need to multiply with 2*pi/k (prefactor for extinction matrix
+    // elements) and divide by 2 (norm of the angular distribution sin(theta))
+    return M_PI * result / _k;
+  }
 };
 
 #endif // TMATRIX_HPP

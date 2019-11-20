@@ -186,6 +186,22 @@ static PyObject *TmatrixObject_get_nmax(TmatrixObject *self,
 }
 
 /**
+ * @brief Get the extinction coefficient appropriately averaged over the
+ * outgoing angle @f$\theta{}@f$.
+ *
+ * @param self T-matrix object.
+ * @param Py_UNUSED Additional arguments are not used but need to be present.
+ * @return Integer Python object containing the maximum order.
+ */
+static PyObject *
+TmatrixObject_get_average_extinction_coefficient(TmatrixObject *self,
+                                                 PyObject *Py_UNUSED(ignored)) {
+  // wrap the returned value in a Python object
+  return PyFloat_FromDouble(
+      self->_Tmatrix->get_average_extinction_coefficient(100));
+}
+
+/**
  * @brief Compute the extinction matrix using the given T-matrix object.
  *
  * Required arguments are:
@@ -323,6 +339,9 @@ static PyMethodDef TmatrixObject_methods[] = {
      "Return the maximum order of the T-matrix."},
     {"get_extinction_matrix", (PyCFunction)TmatrixObject_get_extinction_matrix,
      METH_VARARGS | METH_KEYWORDS, "Return the extinction matrix."},
+    {"get_average_extinction_coefficient",
+     (PyCFunction)TmatrixObject_get_average_extinction_coefficient, METH_NOARGS,
+     "Return the angular average of the extinction coefficient."},
     {nullptr}};
 
 /*! @brief Python Object type for the T-matrix (is edited in the module
