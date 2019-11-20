@@ -89,11 +89,12 @@ def test_case(axis_ratio_key, orientation_key):
 
         if len(rdict[row[1]]["theta"]) == 0:
             thetas = np.linspace(0.0, 0.5 * np.pi, 100)
-            for theta in thetas:
-                K = Tmatrix.get_extinction_matrix(theta=theta, phi=0.0)
-                Qext = K[0, 0] / parea
-                Qpol = K[0, 1] / parea
-                Qcpol = K[2, 3] / parea
+            Ks = Tmatrix.get_extinction_matrix(theta=thetas, phi=0.0)
+            for i in range(len(thetas)):
+                theta = thetas[i]
+                Qext = Ks[i, 0, 0] / parea
+                Qpol = Ks[i, 0, 1] / parea
+                Qcpol = Ks[i, 2, 3] / parea
                 rdict[row[1]]["theta"].append(theta)
                 rdict[row[1]]["Qext"].append(Qext)
                 rdict[row[1]]["Qpol"].append(Qpol)

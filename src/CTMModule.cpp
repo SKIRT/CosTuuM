@@ -207,8 +207,8 @@ static PyObject *TmatrixObject_get_extinction_matrix(TmatrixObject *self,
                                                      PyObject *kwargs) {
 
   // required arguments
-  float_type theta;
-  float_type phi;
+  PyArrayObject *thetas;
+  PyArrayObject *phis;
 
   // optional arguments
   float_type alpha = 0.;
@@ -219,32 +219,102 @@ static PyObject *TmatrixObject_get_extinction_matrix(TmatrixObject *self,
                            strdup("beta"), nullptr};
 
   // parse positional and keyword arguments
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "dd|dd", kwlist, &theta, &phi,
-                                   &alpha, &beta)) {
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O&O&|dd", kwlist,
+                                   PyArray_Converter, &thetas,
+                                   PyArray_Converter, &phis, &alpha, &beta)) {
     // again, we do not call ctm_error to avoid killing the Python interpreter
     ctm_warning("Wrong arguments provided!");
     // this time, a nullptr return will signal an error to Python
     return nullptr;
   }
 
-  // get the extinction matrix
-  Matrix<float_type> K =
-      self->_Tmatrix->get_extinction_matrix(alpha, beta, theta, phi);
+  // determine the size of the input arrays
+  npy_intp thetasize;
+  npy_intp phisize;
 
-  // create an uninitialised 4x4 double NumPy array
-  npy_intp dims[2] = {4, 4};
+  // get the number of dimensions for the theta array
+  const npy_intp thetadim = PyArray_NDIM(thetas);
+  // we only accept 0D (scalar) or 1D input
+  if (thetadim > 1) {
+    ctm_warning("Wrong shape for input array!");
+    return nullptr;
+  }
+  // check if we are in the 0D or 1D case
+  if (thetadim > 0) {
+    // if 1D, simply get the size from the 1 dimension
+    const npy_intp *thetadims = PyArray_DIMS(thetas);
+    thetasize = thetadims[0];
+  } else {
+    // if 0D, set the size to 1
+    thetasize = 1;
+    // reshape the array into a 1D array with 1 element, so that we can
+    // manipulate it in the same way as a 1D array
+    npy_intp newdims[1] = {1};
+    PyArray_Dims newdimsobj;
+    newdimsobj.ptr = newdims;
+    newdimsobj.len = 1;
+    thetas = reinterpret_cast<PyArrayObject *>(
+        PyArray_Newshape(thetas, &newdimsobj, NPY_ANYORDER));
+  }
+  // now repeat for the phi array
+  const npy_intp phidim = PyArray_NDIM(phis);
+  if (phidim > 1) {
+    ctm_warning("Wrong shape for input array!");
+    return nullptr;
+  }
+  if (phidim > 0) {
+    const npy_intp *phidims = PyArray_DIMS(phis);
+    phisize = phidims[0];
+  } else {
+    phisize = 1;
+    npy_intp newdims[1] = {1};
+    PyArray_Dims newdimsobj;
+    newdimsobj.ptr = newdims;
+    newdimsobj.len = 1;
+    phis = reinterpret_cast<PyArrayObject *>(
+        PyArray_Newshape(phis, &newdimsobj, NPY_ANYORDER));
+  }
+
+  // create an uninitialised double NumPy array to store the results
+  // shape: thetasize x phisize x 4 x 4
+  npy_intp dims[4] = {thetasize, phisize, 4, 4};
   PyArrayObject *numpy_array =
-      (PyArrayObject *)PyArray_SimpleNew(2, dims, NPY_DOUBLE);
+      (PyArrayObject *)PyArray_SimpleNew(4, dims, NPY_DOUBLE);
 
-  // copy the elements from the extinction matrix into the array
-  for (uint_fast8_t i = 0; i < 4; ++i) {
-    for (uint_fast8_t j = 0; j < 4; ++j) {
-      *((float_type *)PyArray_GETPTR2(numpy_array, i, j)) = K(i, j);
+  // loop over all theta elements
+  for (npy_intp itheta = 0; itheta < thetasize; ++itheta) {
+    // get the corresponding theta angle
+    const float_type theta =
+        *(reinterpret_cast<double *>(PyArray_GETPTR1(thetas, itheta)));
+    // loop over all phi elements
+    for (npy_intp iphi = 0; iphi < phisize; ++iphi) {
+      // get the corresponding phi angle
+      const float_type phi =
+          *(reinterpret_cast<double *>(PyArray_GETPTR1(phis, iphi)));
+
+      // get the extinction matrix
+      Matrix<float_type> K =
+          self->_Tmatrix->get_extinction_matrix(alpha, beta, theta, phi);
+
+      // copy the elements from the extinction matrix into the array
+      for (uint_fast8_t i = 0; i < 4; ++i) {
+        for (uint_fast8_t j = 0; j < 4; ++j) {
+          *((float_type *)PyArray_GETPTR4(numpy_array, itheta, iphi, i, j)) =
+              K(i, j);
+        }
+      }
     }
   }
 
+  // tell Python we are done with the input objects (so that memory is properly
+  // deallocated)
+  Py_DECREF(thetas);
+  Py_DECREF(phis);
+
   // return the array
-  return PyArray_Return(numpy_array);
+  // we squeeze it so that the output dimensions match the input arrays:
+  // a 1D theta and 0D phi array e.g. will have a thetasize x 4 x 4 output
+  return PyArray_Squeeze(numpy_array);
 }
 
 /*! @brief List of T-matrix object methods that are exposed to Python. */
