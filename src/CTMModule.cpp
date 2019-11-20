@@ -162,7 +162,7 @@ static int TmatrixObject_init(TmatrixObject *self, PyObject *args,
     orientation->initialise();
   } else {
     orientation = new MishchenkoOrientationDistribution(
-        2 * self->_Tmatrix->get_nmax(), axis_ratio, cos2beta);
+        2 * self->_Tmatrix->get_nmax(), cos2beta);
   }
   self->_Tmatrix = TMatrixCalculator::apply_orientation_distribution(
       *self->_Tmatrix, *orientation);
@@ -398,7 +398,6 @@ static int MishchenkoOrientationDistributionObject_init(
     PyObject *kwargs) {
 
   // required arguments
-  float_type axis_ratio;
   float_type cos2beta;
 
   // optional arguments
@@ -415,8 +414,8 @@ static int MishchenkoOrientationDistributionObject_init(
   // parse the keywords/positional arguments
   // d is a double
   // I is an unsigned integer
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "dd|I", kwlist, &axis_ratio,
-                                   &cos2beta, &maximum_order)) {
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "d|I", kwlist, &cos2beta,
+                                   &maximum_order)) {
     // PyArg_ParseTupleAndKeywords will return 0 if a required argument was
     // missing, if an argument of the wrong type was provided or if the number
     // of arguments does not match the expectation
@@ -428,8 +427,8 @@ static int MishchenkoOrientationDistributionObject_init(
     return 1;
   }
 
-  self->_distribution = new MishchenkoOrientationDistribution(
-      maximum_order, axis_ratio, cos2beta);
+  self->_distribution =
+      new MishchenkoOrientationDistribution(maximum_order, cos2beta);
 
   // everything went well: return 0
   return 0;

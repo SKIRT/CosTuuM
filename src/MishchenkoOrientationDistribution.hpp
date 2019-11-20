@@ -17,66 +17,35 @@
  *
  * The alignment distribution is given by
  * @f[
- *  p(\beta{}) = C\left[
- *    p_1 + \frac{5}{4} p_2 \left(\cos^2(\beta{}) - 1\right)
- *  \right],
+ *  p(\beta{}) =
+ *    \frac{1}{2} + \frac{5}{4} p_2 \left(3\cos^2(\beta{}) - 1\right),
  * @f]
- * with @f$p_1,p_2@f$ free parameters and @f$C@f$ a normalisation constant:
+ * with @f$p_2@f$ a free parameter. This distribution satisfies the
+ * normalisation condition
  * @f[
- *  C = \left( \int_0^\pi{} \left[
- *    p_1 + \frac{5}{4} p_2 \left(\cos^2(\beta{}) - 1\right)
- *  \right] \sin(\beta{}) d\beta{} \right)^{-1} =
- *  \left( 2 p_1 - \frac{5}{3} p_2 \right)^{-1}.
+ *  \int_0^{\pi{}} p(\beta{}) \sin(\beta{}) d\beta{} = 1,
  * @f]
+ * as can be easily checked (note that the expression given in Mishchenko (1991)
+ * is missing the factor @f$3@f$, while quoting the right expression in terms
+ * of the Legendre polynomial @f$P_2(\cos(\beta{}))@f$; this is likely a typo).
  *
  * The free parameter @f$p_2@f$ is linked to the distribution parameter
  * @f[
  *  \langle{} \cos^2(\beta{}) \rangle{} =
  *    \int_0^\pi{} \sin(\beta{}) \cos^2(\beta{}) p(\beta{}) d\beta{} =
- *    \frac{1}{3}C (2p_1-p_2)
+ *    \frac{1}{3} (2p_2 + 1)
  * @f]
- * (often quoted in literature). The parameter @f$p_1@f$ is determined from
- * the requirement
- * @f[
- *  p(0) = p(\pi{}) = Cp_1 = 0
- * @f]
- * for prolate spheroids, and
- * @f[
- *  p\left(\frac{\pi{}}{2}\right) = C\left(p_1 - \frac{5}{4}p_2\right) = 0
- * @f]
- * for oblate spheroids.
+ * (often quoted in literature).
  *
  * As in Mishchenko (1991), we will parameterise the distribution function
- * using @f$\langle{} \cos^2(\beta{}) \rangle{}@f$.
- *
- * Note that Mishchenko (1991) quotes the wrong expression for
- * @f$\langle{} \cos^2(\beta{}) \rangle{}@f$ and sets the parameter
- * @f$p_1=\frac{1}{2}@f$ for both oblate and prolate spheroids. The results in
- * Table 1 in this paper can however only be reproduced using the general
- * expression given above.
- *
- * Since OrientationDistribution computes the normalisation constant @f$C@f$
- * internally, we can set it to an arbitrary value and only need to compute the
- * parameters @f$p_1@f$ and @f$p_2@f$. For oblate spheroids, these are given by
+ * using @f$\langle{} \cos^2(\beta{}) \rangle{}@f$ and compute the distribution
+ * parameter from
  * @f[
- *   p_1 = \frac{5}{2} \langle{} \cos^2(\beta{}) \rangle{},
- * @f]
- * @f[
- *   p_2 = 2 \langle{} \cos^2(\beta{}) \rangle{}.
- * @f]
- * For prolate spheroids, we have
- * @f[
- *   p_1 = 0,
- * @f]
- * @f[
- *   p_2 = -3 \langle{} \cos^2(\beta{}) \rangle{}.
+ *  p_2 = \frac{3}{2} \langle{} \cos^2(\beta{}) \rangle{} - \frac{1}{2}.
  * @f]
  */
 class MishchenkoOrientationDistribution : public OrientationDistribution {
 private:
-  /*! @brief Parameter @f$p_1@f$. */
-  const float_type _p1;
-
   /*! @brief Parameter @f$p_2@f$. */
   const float_type _p2;
 
@@ -105,7 +74,7 @@ public:
   virtual float_type operator()(const float_type beta, const float_type cosbeta,
                                 const float_type sinbeta) const {
 
-    return _p1 - 1.25 * _p2 * sinbeta * sinbeta;
+    return 0.5 + 1.25 * _p2 * (3. * cosbeta * cosbeta - 1.);
   }
 
 public:
@@ -113,18 +82,13 @@ public:
    * @brief Constructor.
    *
    * @param nmax Highest order for which we store a coefficient.
-   * @param axis_ratio Axis ratio @f$d@f$ of the spheroidal scatterers, used to
-   * determine whether the prolate (@f$d < 1@f$) or oblate (@f$d > 1@f$)
-   * parameter formulae should be used.
    * @param cos2beta Parameter @f$\langle{} \cos^2(\beta{}) \rangle{}@f$.
    */
   inline MishchenkoOrientationDistribution(const uint_fast32_t nmax,
-                                           const float_type axis_ratio,
                                            const float_type cos2beta)
-      : OrientationDistribution(nmax),
-        _p1((axis_ratio < 1.) ? 0. : 2.5 * cos2beta),
-        _p2((axis_ratio < 1.) ? -3. * cos2beta : 2. * cos2beta) {
+      : OrientationDistribution(nmax), _p2(1.5 * cos2beta - 0.5) {
 
+    // initialise the distribution coefficients
     initialise();
   }
 
