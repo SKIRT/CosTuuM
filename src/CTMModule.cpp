@@ -108,7 +108,7 @@ static int TmatrixObject_init(TmatrixObject *self, PyObject *args,
   uint_fast32_t maximum_ngauss = 500;
 
   // always fixed (for now)
-  const float_type ratio_of_radii = 1.;
+  const float_type ratio_of_radii = 0.1;
 
   /// parse arguments
   // list of keywords (in the expected order)
@@ -186,19 +186,105 @@ static PyObject *TmatrixObject_get_nmax(TmatrixObject *self,
 }
 
 /**
- * @brief Get the extinction coefficient appropriately averaged over the
+ * @brief Get the absorption cross section appropriately averaged over the
  * outgoing angle @f$\theta{}@f$.
  *
  * @param self T-matrix object.
  * @param Py_UNUSED Additional arguments are not used but need to be present.
  * @return Integer Python object containing the maximum order.
  */
-static PyObject *
-TmatrixObject_get_average_extinction_coefficient(TmatrixObject *self,
-                                                 PyObject *Py_UNUSED(ignored)) {
+static PyObject *TmatrixObject_get_average_absorption_cross_section(
+    TmatrixObject *self, PyObject *Py_UNUSED(ignored)) {
   // wrap the returned value in a Python object
   return PyFloat_FromDouble(
-      self->_Tmatrix->get_average_extinction_coefficient(100));
+      self->_Tmatrix->get_average_absorption_cross_section(20));
+}
+
+/**
+ * @brief Get the absorption cross section for the given input angle(s).
+ *
+ * Required arguments are:
+ *  - theta: Input zenith angle (in radians).
+ *
+ * Additional optional arguments are:
+ *  - ngauss: Number of Gauss-Legendre quadrature points to use to compute the
+ *    integral to subtract the scattering contribution to the extinction.
+ *
+ * @param self T-matrix object being used.
+ * @param args Positional arguments.
+ * @param kwargs Keyword arguments.
+ * @return Pointer to an absorption cross section value or array that has the
+ * same shape as the input angles.
+ */
+static PyObject *TmatrixObject_get_absorption_cross_section(TmatrixObject *self,
+                                                            PyObject *args,
+                                                            PyObject *kwargs) {
+
+  // required arguments
+  PyArrayObject *thetas;
+
+  // optional arguments
+  uint_fast32_t ngauss = 100;
+
+  // list of keywords (see comment above)
+  static char *kwlist[] = {strdup("theta"), strdup("ngauss"), nullptr};
+
+  // parse positional and keyword arguments
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O&|I", kwlist,
+                                   PyArray_Converter, &thetas, &ngauss)) {
+    // again, we do not call ctm_error to avoid killing the Python interpreter
+    ctm_warning("Wrong arguments provided!");
+    // this time, a nullptr return will signal an error to Python
+    return nullptr;
+  }
+
+  // determine the size of the input arrays
+  npy_intp thetasize;
+
+  // get the number of dimensions for the theta array
+  const npy_intp thetadim = PyArray_NDIM(thetas);
+  // we only accept 0D (scalar) or 1D input
+  if (thetadim > 1) {
+    ctm_warning("Wrong shape for input array!");
+    return nullptr;
+  }
+  // check if we are in the 0D or 1D case
+  if (thetadim > 0) {
+    // if 1D, simply get the size from the 1 dimension
+    const npy_intp *thetadims = PyArray_DIMS(thetas);
+    thetasize = thetadims[0];
+  } else {
+    // if 0D, set the size to 1
+    thetasize = 1;
+    // reshape the array into a 1D array with 1 element, so that we can
+    // manipulate it in the same way as a 1D array
+    npy_intp newdims[1] = {1};
+    PyArray_Dims newdimsobj;
+    newdimsobj.ptr = newdims;
+    newdimsobj.len = 1;
+    thetas = reinterpret_cast<PyArrayObject *>(
+        PyArray_Newshape(thetas, &newdimsobj, NPY_ANYORDER));
+  }
+
+  // create an uninitialised double NumPy array to store the results
+  // shape: thetasize
+  npy_intp dims[1] = {thetasize};
+  PyArrayObject *Cabs = (PyArrayObject *)PyArray_SimpleNew(1, dims, NPY_DOUBLE);
+
+  // loop over all theta elements
+  for (npy_intp itheta = 0; itheta < thetasize; ++itheta) {
+    // get the corresponding theta angle
+    const float_type theta =
+        *(reinterpret_cast<double *>(PyArray_GETPTR1(thetas, itheta)));
+    *((float_type *)PyArray_GETPTR1(Cabs, itheta)) =
+        self->_Tmatrix->get_absorption_cross_section(theta, ngauss);
+  }
+
+  // tell Python we are done with the input objects (so that memory is properly
+  // deallocated)
+  Py_DECREF(thetas);
+
+  return PyArray_Return(Cabs);
 }
 
 /**
@@ -339,9 +425,14 @@ static PyMethodDef TmatrixObject_methods[] = {
      "Return the maximum order of the T-matrix."},
     {"get_extinction_matrix", (PyCFunction)TmatrixObject_get_extinction_matrix,
      METH_VARARGS | METH_KEYWORDS, "Return the extinction matrix."},
-    {"get_average_extinction_coefficient",
-     (PyCFunction)TmatrixObject_get_average_extinction_coefficient, METH_NOARGS,
-     "Return the angular average of the extinction coefficient."},
+    {"get_average_absorption_cross_section",
+     (PyCFunction)TmatrixObject_get_average_absorption_cross_section,
+     METH_NOARGS,
+     "Return the angular average of the absorption cross section."},
+    {"get_absorption_cross_section",
+     (PyCFunction)TmatrixObject_get_absorption_cross_section,
+     METH_VARARGS | METH_KEYWORDS,
+     "Return the absorption cross section for the given input angle(s)."},
     {nullptr}};
 
 /*! @brief Python Object type for the T-matrix (is edited in the module
@@ -505,9 +596,56 @@ static PyTypeObject MishchenkoOrientationDistributionObjectType = {
 
 /// CosTuuM module
 
+/**
+ * @brief Get the equal volume radius for the particle with the given equal area
+ * radius and axis ratio.
+ *
+ * Required arguments are:
+ *  - radius: Equal area radius (in input length units).
+ *  - axis_ratio: Axis ratio.
+ *
+ * @param self MishchenkoOrientationDistributionObject being used.
+ * @param args Positional arguments.
+ * @param kwargs Keyword arguments.
+ * @return Equal volume radius, in same length units as input.
+ */
+static PyObject *get_equal_volume_radius(PyObject *self, PyObject *args,
+                                         PyObject *kwargs) {
+
+  // required arguments
+  float_type radius;
+  float_type axis_ratio;
+
+  // list of keywords (see comment above)
+  static char *kwlist[] = {strdup("radius"), strdup("axis_ratio"), nullptr};
+
+  // parse positional and keyword arguments
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "dd", kwlist, &radius,
+                                   &axis_ratio)) {
+    // again, we do not call ctm_error to avoid killing the Python interpreter
+    ctm_warning("Wrong arguments provided!");
+    // this time, a nullptr return will signal an error to Python
+    return nullptr;
+  }
+
+  // return the array
+  return PyFloat_FromDouble(
+      SpecialFunctions::get_equal_volume_to_equal_surface_area_sphere_ratio(
+          axis_ratio) *
+      radius);
+}
+
+/*! @brief Methods exposed by the CTMmodule. */
+static PyMethodDef CTMmethods[] = {
+    {"get_equal_volume_radius", (PyCFunction)get_equal_volume_radius,
+     METH_VARARGS | METH_KEYWORDS,
+     "Get the equal volume radius for the particle with the given equal area "
+     "radius and axis ratio."},
+    {nullptr, nullptr, 0, nullptr}};
+
 /*! @brief Module definition for the CTM module. */
 static struct PyModuleDef CTMmodule = {PyModuleDef_HEAD_INIT, "CosTuuM",
-                                       "T-matrix module.", -1, 0};
+                                       "T-matrix module.", -1, CTMmethods};
 
 /**
  * @brief CosTuuM initialisation function.

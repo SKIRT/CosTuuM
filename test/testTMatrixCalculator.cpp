@@ -12,6 +12,7 @@
 #include "ShapeDistribution.hpp"
 #include "TMatrixCalculator.hpp"
 #include "UnitConverter.hpp"
+#include "Utilities.hpp"
 
 #include <fstream>
 #include <sstream>
@@ -34,10 +35,11 @@ int main(int argc, char **argv) {
   // control which tests are performed
   // ideally, this is all of them, but sometimes (temporarily) disabling some
   // can be useful
-  const bool do_benchmark_test = true;
-  const bool do_ensemble_test = true;
-  const bool do_astro_test = true;
-  const bool do_shape_test = true;
+  const bool do_benchmark_test = false;
+  const bool do_ensemble_test = false;
+  const bool do_astro_test = false;
+  const bool do_shape_test = false;
+  const bool do_fixed_orientation_test = true;
 
   /// benchmark test: check T matrix results against some results obtained
   /// with Mishchenko's original T matrix code for the same input values
@@ -325,6 +327,45 @@ int main(int argc, char **argv) {
         ctm_warning("Kshape(%" PRIuFAST8 ",%" PRIuFAST8 "): %g", i, j,
                     double(Kshape(i, j)));
       }
+    }
+  }
+
+  /// test to verify the fixed orientation get_scattering_matrix() function
+  if (do_fixed_orientation_test) {
+    const TMatrix *Tmatrix = TMatrixCalculator::calculate_TMatrix(
+        0.1, 0.5, 1.e-5, 2.e-6 * M_PI, 200, 1.e-4, 2,
+        std::complex<float_type>(1.5, 0.02), 500);
+
+    for (uint_fast32_t i = 0; i < 100; ++i) {
+
+      const double theta_in = Utilities::random_double() * M_PI;
+      const double phi_in = Utilities::random_double() * 2. * M_PI;
+      const double theta_out = Utilities::random_double() * M_PI;
+      const double phi_out = Utilities::random_double() * 2. * M_PI;
+
+      Matrix<std::complex<float_type>> Sslow =
+          Tmatrix->get_forward_scattering_matrix(0., 0., theta_in, phi_in,
+                                                 theta_out, phi_out);
+      Matrix<std::complex<float_type>> Sfast =
+          Tmatrix->get_forward_scattering_matrix(theta_in, phi_in, theta_out,
+                                                 phi_out);
+
+      assert_values_equal_rel(double(Sslow(0, 0).real()),
+                              double(Sfast(0, 0).real()), 1.e-6);
+      assert_values_equal_rel(double(Sslow(0, 0).imag()),
+                              double(Sfast(0, 0).imag()), 1.e-6);
+      assert_values_equal_rel(double(Sslow(0, 1).real()),
+                              double(Sfast(0, 1).real()), 1.e-6);
+      assert_values_equal_rel(double(Sslow(0, 1).imag()),
+                              double(Sfast(0, 1).imag()), 1.e-6);
+      assert_values_equal_rel(double(Sslow(1, 0).real()),
+                              double(Sfast(1, 0).real()), 1.e-6);
+      assert_values_equal_rel(double(Sslow(1, 0).imag()),
+                              double(Sfast(1, 0).imag()), 1.e-6);
+      assert_values_equal_rel(double(Sslow(1, 1).real()),
+                              double(Sfast(1, 1).real()), 1.e-6);
+      assert_values_equal_rel(double(Sslow(1, 1).imag()),
+                              double(Sfast(1, 1).imag()), 1.e-6);
     }
   }
 
