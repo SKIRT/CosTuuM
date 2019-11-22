@@ -271,14 +271,95 @@ static PyObject *TmatrixObject_get_absorption_cross_section(TmatrixObject *self,
   npy_intp dims[1] = {thetasize};
   PyArrayObject *Cabs = (PyArrayObject *)PyArray_SimpleNew(1, dims, NPY_DOUBLE);
 
-  // loop over all theta elements
-  for (npy_intp itheta = 0; itheta < thetasize; ++itheta) {
-    // get the corresponding theta angle
-    const float_type theta =
-        *(reinterpret_cast<double *>(PyArray_GETPTR1(thetas, itheta)));
-    *((float_type *)PyArray_GETPTR1(Cabs, itheta)) =
-        self->_Tmatrix->get_absorption_cross_section(theta, ngauss);
+  const float_type *thetadata =
+      reinterpret_cast<float_type *>(PyArray_DATA(thetas));
+  float_type *Cabsdata = reinterpret_cast<float_type *>(PyArray_DATA(Cabs));
+  self->_Tmatrix->get_absorption_cross_section(thetadata, thetasize, ngauss,
+                                               Cabsdata);
+
+  // tell Python we are done with the input objects (so that memory is properly
+  // deallocated)
+  Py_DECREF(thetas);
+
+  return PyArray_Return(Cabs);
+}
+
+/**
+ * @brief Get the absorption cross sections for the given input angle(s).
+ *
+ * Required arguments are:
+ *  - theta: Input zenith angle (in radians).
+ *
+ * Additional optional arguments are:
+ *  - ngauss: Number of Gauss-Legendre quadrature points to use to compute the
+ *    integral to subtract the scattering contribution to the extinction.
+ *
+ * @param self T-matrix object being used.
+ * @param args Positional arguments.
+ * @param kwargs Keyword arguments.
+ * @return Pointer to an array containing the cross section values. The array
+ * has two elements per input angle theta.
+ */
+static PyObject *
+TmatrixObject_get_absorption_cross_sections(TmatrixObject *self, PyObject *args,
+                                            PyObject *kwargs) {
+
+  // required arguments
+  PyArrayObject *thetas;
+
+  // optional arguments
+  uint_fast32_t ngauss = 100;
+
+  // list of keywords (see comment above)
+  static char *kwlist[] = {strdup("theta"), strdup("ngauss"), nullptr};
+
+  // parse positional and keyword arguments
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O&|I", kwlist,
+                                   PyArray_Converter, &thetas, &ngauss)) {
+    // again, we do not call ctm_error to avoid killing the Python interpreter
+    ctm_warning("Wrong arguments provided!");
+    // this time, a nullptr return will signal an error to Python
+    return nullptr;
   }
+
+  // determine the size of the input arrays
+  npy_intp thetasize;
+
+  // get the number of dimensions for the theta array
+  const npy_intp thetadim = PyArray_NDIM(thetas);
+  // we only accept 0D (scalar) or 1D input
+  if (thetadim > 1) {
+    ctm_warning("Wrong shape for input array!");
+    return nullptr;
+  }
+  // check if we are in the 0D or 1D case
+  if (thetadim > 0) {
+    // if 1D, simply get the size from the 1 dimension
+    const npy_intp *thetadims = PyArray_DIMS(thetas);
+    thetasize = thetadims[0];
+  } else {
+    // if 0D, set the size to 1
+    thetasize = 1;
+    // reshape the array into a 1D array with 1 element, so that we can
+    // manipulate it in the same way as a 1D array
+    npy_intp newdims[1] = {1};
+    PyArray_Dims newdimsobj;
+    newdimsobj.ptr = newdims;
+    newdimsobj.len = 1;
+    thetas = reinterpret_cast<PyArrayObject *>(
+        PyArray_Newshape(thetas, &newdimsobj, NPY_ANYORDER));
+  }
+
+  // create an uninitialised double NumPy array to store the results
+  // shape: thetasize x 2
+  npy_intp dims[2] = {thetasize, 2};
+  PyArrayObject *Cabs = (PyArrayObject *)PyArray_SimpleNew(2, dims, NPY_DOUBLE);
+
+  const float_type *thetadata =
+      reinterpret_cast<float_type *>(PyArray_DATA(thetas));
+  float_type *Cabsdata = reinterpret_cast<float_type *>(PyArray_DATA(Cabs));
+  self->_Tmatrix->get_absorption_cross_sections(thetadata, thetasize, ngauss,
+                                                Cabsdata);
 
   // tell Python we are done with the input objects (so that memory is properly
   // deallocated)
@@ -433,6 +514,10 @@ static PyMethodDef TmatrixObject_methods[] = {
      (PyCFunction)TmatrixObject_get_absorption_cross_section,
      METH_VARARGS | METH_KEYWORDS,
      "Return the absorption cross section for the given input angle(s)."},
+    {"get_absorption_cross_sections",
+     (PyCFunction)TmatrixObject_get_absorption_cross_sections,
+     METH_VARARGS | METH_KEYWORDS,
+     "Return both absorption cross sections for the given input angle(s)."},
     {nullptr}};
 
 /*! @brief Python Object type for the T-matrix (is edited in the module

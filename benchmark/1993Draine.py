@@ -86,7 +86,7 @@ Tmatrix = CosTuuM.TMatrix(
     cos2beta=1.0,
 )
 Qabsd1 = Tmatrix.get_average_absorption_cross_section() / (np.pi * ai ** 2)
-Qabsd1theta = Tmatrix.get_absorption_cross_section(theta=thetas) / (
+Qabsd1theta = Tmatrix.get_absorption_cross_sections(theta=thetas) / (
     np.pi * ai ** 2
 )
 Tmatrix = CosTuuM.TMatrix(
@@ -99,7 +99,7 @@ Tmatrix = CosTuuM.TMatrix(
 Qabsd2 = Tmatrix.get_average_absorption_cross_section() / (
     np.pi * CosTuuM.get_equal_volume_radius(ai, 2.0) ** 2
 )
-Qabsd2theta = Tmatrix.get_absorption_cross_section(theta=thetas) / (
+Qabsd2theta = Tmatrix.get_absorption_cross_sections(theta=thetas) / (
     np.pi * ai ** 2
 )
 Tmatrix = CosTuuM.TMatrix(
@@ -112,7 +112,7 @@ Tmatrix = CosTuuM.TMatrix(
 Qabsd2ia = Tmatrix.get_average_absorption_cross_section() / (
     np.pi * CosTuuM.get_equal_volume_radius(ai, 2.0) ** 2
 )
-Qabsd2thetaia = Tmatrix.get_absorption_cross_section(theta=thetas) / (
+Qabsd2thetaia = Tmatrix.get_absorption_cross_sections(theta=thetas) / (
     np.pi * ai ** 2
 )
 Tmatrix = CosTuuM.TMatrix(
@@ -125,7 +125,7 @@ Tmatrix = CosTuuM.TMatrix(
 Qabsd05 = Tmatrix.get_average_absorption_cross_section() / (
     np.pi * CosTuuM.get_equal_volume_radius(ai, 0.5) ** 2
 )
-Qabsd05theta = Tmatrix.get_absorption_cross_section(theta=thetas) / (
+Qabsd05theta = Tmatrix.get_absorption_cross_sections(theta=thetas) / (
     np.pi * ai ** 2
 )
 Tmatrix = CosTuuM.TMatrix(
@@ -138,65 +138,75 @@ Tmatrix = CosTuuM.TMatrix(
 Qabsd05ia = Tmatrix.get_average_absorption_cross_section() / (
     np.pi * CosTuuM.get_equal_volume_radius(ai, 0.5) ** 2
 )
-Qabsd05thetaia = Tmatrix.get_absorption_cross_section(theta=thetas) / (
+Qabsd05thetaia = Tmatrix.get_absorption_cross_sections(theta=thetas) / (
     np.pi * ai ** 2
 )
 
-pl.gca().axhline(y=propdata[lcol, wcol, 2], label="Laor \& Draine (1993)")
-pl.gca().axhline(y=Qabsd2, color="C2", linestyle="--")
-pl.gca().axhline(y=Qabsd05, color="C3", linestyle="--")
-pl.gca().axhline(y=Qabsd2ia, color="C4", linestyle="--")
-pl.gca().axhline(y=Qabsd05ia, color="C5", linestyle="--")
-pl.plot(
+fig, ax = pl.subplots(2, 1, sharex=True)
+
+ax[0].axhline(y=propdata[lcol, wcol, 2], label="Laor \& Draine (1993)")
+ax[0].axhline(y=Qabsd2, color="C2", linestyle="--")
+ax[0].axhline(y=Qabsd05, color="C3", linestyle="--")
+ax[0].axhline(y=Qabsd2ia, color="C4", linestyle="--")
+ax[0].axhline(y=Qabsd05ia, color="C5", linestyle="--")
+ax[0].plot(
     thetas,
-    Qabsd1theta,
+    Qabsd1theta[:, 0],
     "o",
     color="C1",
     label="CosTuuM spherical (no alignment)",
 )
-pl.plot(
+ax[0].plot(
     thetas,
-    Qabsd2theta,
+    Qabsd2theta[:, 0],
     "o",
     color="C2",
     label="CosTuuM oblate, perfect alignment",
 )
-pl.plot(
+ax[0].plot(
     thetas,
-    Qabsd05theta,
+    Qabsd05theta[:, 0],
     "o",
     color="C3",
     label="CosTuuM prolate, perfect alignment",
 )
-pl.plot(
+ax[0].plot(
     thetas,
-    Qabsd2thetaia,
+    Qabsd2thetaia[:, 0],
     "o",
     color="C4",
     label="CosTuuM oblate, imperfect alignment",
 )
-pl.plot(
+ax[0].plot(
     thetas,
-    Qabsd05thetaia,
+    Qabsd05thetaia[:, 0],
     "o",
     color="C5",
     label="CosTuuM prolate, imperfect alignment",
 )
 
-pl.title(
+ax[1].plot(thetas, Qabsd1theta[:, 1], "o", color="C1")
+ax[1].plot(thetas, Qabsd2theta[:, 1], "o", color="C2")
+ax[1].plot(thetas, Qabsd05theta[:, 1], "o", color="C3")
+ax[1].plot(thetas, Qabsd2thetaia[:, 1], "o", color="C4")
+ax[1].plot(thetas, Qabsd05thetaia[:, 1], "o", color="C5")
+
+ax[0].set_title(
     "grain size: ${0:.2f}\\mu{{}}$m, $\\lambda{{}} = {1:.2f}\\mu{{}}$m".format(
         ai * 1.0e6, wi * 1.0e6
     )
 )
-pl.xlabel("$\\theta{}$")
-pl.ylabel("$Q_{abs}$")
-pl.legend(loc="best")
+ax[0].set_ylabel("$Q_{abs}$")
+ax[1].set_xlabel("$\\theta{}$")
+ax[1].set_ylabel("$Q_{abspol}$")
+ax[0].legend(loc="best")
 pl.tight_layout()
 pl.savefig("1993Draine_theta.png", dpi=300)
 pl.close()
+exit()
 
-lcol = -1
-maxl = 80
+lcol = 18
+maxl = 100
 Qabsd1 = np.zeros(maxl)
 Qabsd2 = np.zeros(maxl)
 Qabsd05 = np.zeros(maxl)
@@ -206,9 +216,12 @@ for iw in range(maxl):
     wi = propdata[lcol, iw, 1]
     mri = mr(wi)
 
+    # using an axis ratio of exactly 1 causes small (~1%) deviations for
+    # some wavelengths. We follow Mishchenko's suggestion and use a value
+    # slightly higher than 1
     Tmatrix = CosTuuM.TMatrix(
         particle_radius=ai,
-        axis_ratio=1.0,
+        axis_ratio=1.00001,
         wavelength=wi,
         refractive_index=mri,
         cos2beta=1.0 / 3.0,

@@ -2093,48 +2093,147 @@ public:
   }
 
   /**
-   * @brief Get the absorption coefficient for the given zenith angle
-   * @f$\theta{}@f$.
+   * @brief Get the absorption cross sections @f$C_{abs}@f$ and @f$C_{abspol}@f$
+   * for the given zenith angle @f$\theta{}@f$.
    *
-   * @param theta Zenith angle, @f$\theta{}@f$ (in radians).
+   * @param theta Input zenith angle, @f$\theta{}@f$ (in radians).
    * @param ngauss Number of Gauss-Legendre quadrature points to use to compute
    * the average integral for the scattering coefficients.
-   * @return Corresponding absorption cross section (in m^2).
+   * @param do_Cabs Compute the absorption cross section @f$C_{abs}@f$?
+   * @param do_Cabspol Compute the linear polarization absorption cross section
+   * @f$C_{abspol}@f$?
+   * @param thetaGL Gauss-Legendre quadrature points for the zenith integration
+   * (in radians; of size ngauss).
+   * @param costhetaweightsGL Gauss-Legendre weights for the zenith integration
+   * (of size ngauss).
+   * @param phiGL Gauss-Legendre quadrature points for the azimuth integration
+   * (in radians; of size ngauss).
+   * @param phiweightsGL Gauss-Legendre weights for the azimuth integration
+   * (of size ngauss).
+   * @param result Array to store the result(s) in, in the order @f$C_{abs},
+   * C_{abspol}@f$. Only the elements that are requested are set.
    */
-  inline float_type
-  get_absorption_cross_section(const float_type theta,
-                               const uint_fast32_t ngauss) const {
-
-    std::vector<float_type> costheta(ngauss), costhetaweights(ngauss);
-    SpecialFunctions::get_gauss_legendre_points_and_weights<float_type>(
-        ngauss, costheta, costhetaweights);
-    std::vector<float_type> phi(ngauss), phiweights(ngauss);
-    SpecialFunctions::get_gauss_legendre_points_and_weights_ab<float_type>(
-        ngauss, 0., 2. * M_PI, phi, phiweights);
+  inline void get_absorption_cross_sections(
+      const float_type theta, const uint_fast32_t ngauss, const bool do_Cabs,
+      const bool do_Cabspol, const std::vector<float_type> &thetaGL,
+      const std::vector<float_type> &costhetaweightsGL,
+      const std::vector<float_type> &phiGL,
+      const std::vector<float_type> &phiweightsGL, float_type *result) const {
 
     Matrix<std::complex<float_type>> S =
         get_forward_scattering_matrix(theta, 0., theta, 0.);
 
-    float_type Kabs = 2. * M_PI * (S(0, 0) + S(1, 1)).imag() / _k;
-    for (uint_fast32_t itheta = 0; itheta < ngauss; ++itheta) {
-      for (uint_fast32_t iphi = 0; iphi < ngauss; ++iphi) {
-        const float_type theta_out = acos(costheta[itheta]);
-        const float_type phi_out = phi[iphi];
-        Matrix<std::complex<float_type>> Stp =
-            get_forward_scattering_matrix(theta, 0., theta_out, phi_out);
-        const float_type Z00 =
-            (0.5 * (Stp(0, 0) * conj(Stp(0, 0)) + Stp(0, 1) * conj(Stp(0, 1)) +
-                    Stp(1, 0) * conj(Stp(1, 0)) + Stp(1, 1) * conj(Stp(1, 1))))
-                .real();
-        Kabs -= Z00 * costhetaweights[itheta] * phiweights[iphi];
-      }
+    const float_type prefactor = 2. * M_PI / _k;
+    if (do_Cabs) {
+      result[0] = prefactor * (S(0, 0) + S(1, 1)).imag();
+    }
+    if (do_Cabspol) {
+      result[1] = prefactor * (S(0, 0) - S(1, 1)).imag();
     }
 
-    return Kabs;
+    for (uint_fast32_t itheta = 0; itheta < ngauss; ++itheta) {
+      const float_type theta_out = thetaGL[itheta];
+      for (uint_fast32_t iphi = 0; iphi < ngauss; ++iphi) {
+        const float_type phi_out = phiGL[iphi];
+
+        Matrix<std::complex<float_type>> Stp =
+            get_forward_scattering_matrix(theta, 0., theta_out, phi_out);
+
+        const float_type weight =
+            costhetaweightsGL[itheta] * phiweightsGL[iphi];
+        if (do_Cabs) {
+          const float_type Z00 =
+              (0.5 *
+               (Stp(0, 0) * conj(Stp(0, 0)) + Stp(0, 1) * conj(Stp(0, 1)) +
+                Stp(1, 0) * conj(Stp(1, 0)) + Stp(1, 1) * conj(Stp(1, 1))))
+                  .real();
+          result[0] -= Z00 * weight;
+        }
+
+        if (do_Cabspol) {
+          const float_type Z10 =
+              (0.5 *
+               (Stp(0, 0) * conj(Stp(0, 0)) + Stp(0, 1) * conj(Stp(0, 1)) -
+                Stp(1, 0) * conj(Stp(1, 0)) - Stp(1, 1) * conj(Stp(1, 1))))
+                  .real();
+          result[1] -= Z10 * weight;
+        }
+      }
+    }
   }
 
   /**
-   * @brief Get the extinction coefficient appropriately averaged over the
+   * @brief Get the absorption cross sectins @f$C_{abs}@f$ and @f$C_{abspol}@f$
+   * for the given zenith angle(s) @f$\theta{}@f$.
+   *
+   * @param theta Zenith angle(s), @f$\theta{}@f$ (in radians; of size ntheta).
+   * @param ntheta Number of input angles.
+   * @param ngauss Number of Gauss-Legendre quadrature points to use to compute
+   * the average integral for the scattering coefficients.
+   * @param Cabs Corresponding absorption cross sections, ordered per pair (in
+   * m^2; of size two times ntheta).
+   */
+  inline void get_absorption_cross_sections(const float_type *theta,
+                                            const uint_fast32_t ntheta,
+                                            const uint_fast32_t ngauss,
+                                            float_type *Cabs) const {
+
+    std::vector<float_type> thetaGL(ngauss), costhetaGL(ngauss),
+        costhetaweightsGL(ngauss);
+    SpecialFunctions::get_gauss_legendre_points_and_weights<float_type>(
+        ngauss, costhetaGL, costhetaweightsGL);
+    std::vector<float_type> phiGL(ngauss), phiweightsGL(ngauss);
+    SpecialFunctions::get_gauss_legendre_points_and_weights_ab<float_type>(
+        ngauss, 0., 2. * M_PI, phiGL, phiweightsGL);
+
+    for (uint_fast32_t igauss = 0; igauss < ngauss; ++igauss) {
+      thetaGL[igauss] = acos(costhetaGL[igauss]);
+    }
+
+    for (uint_fast32_t itheta = 0; itheta < ntheta; ++itheta) {
+      get_absorption_cross_sections(theta[itheta], ngauss, true, true, thetaGL,
+                                    costhetaweightsGL, phiGL, phiweightsGL,
+                                    &Cabs[2 * itheta]);
+    }
+  }
+
+  /**
+   * @brief Get the absorption cross section @f$C_{abs}@f$ for the given zenith
+   * angle(s) @f$\theta{}@f$.
+   *
+   * @param theta Zenith angle(s), @f$\theta{}@f$ (in radians; of size ntheta).
+   * @param ntheta Number of input angles.
+   * @param ngauss Number of Gauss-Legendre quadrature points to use to compute
+   * the average integral for the scattering coefficients.
+   * @param Cabs Corresponding absorption cross section(s) (in m^2; of size
+   * ntheta).
+   */
+  inline void get_absorption_cross_section(const float_type *theta,
+                                           const uint_fast32_t ntheta,
+                                           const uint_fast32_t ngauss,
+                                           float_type *Cabs) const {
+
+    std::vector<float_type> thetaGL(ngauss), costhetaGL(ngauss),
+        costhetaweightsGL(ngauss);
+    SpecialFunctions::get_gauss_legendre_points_and_weights<float_type>(
+        ngauss, costhetaGL, costhetaweightsGL);
+    std::vector<float_type> phiGL(ngauss), phiweightsGL(ngauss);
+    SpecialFunctions::get_gauss_legendre_points_and_weights_ab<float_type>(
+        ngauss, 0., 2. * M_PI, phiGL, phiweightsGL);
+
+    for (uint_fast32_t igauss = 0; igauss < ngauss; ++igauss) {
+      thetaGL[igauss] = acos(costhetaGL[igauss]);
+    }
+
+    for (uint_fast32_t itheta = 0; itheta < ntheta; ++itheta) {
+      get_absorption_cross_sections(theta[itheta], ngauss, true, false, thetaGL,
+                                    costhetaweightsGL, phiGL, phiweightsGL,
+                                    &Cabs[itheta]);
+    }
+  }
+
+  /**
+   * @brief Get the absorption cross section, appropriately averaged over the
    * outgoing angle @f$\theta{}@f$.
    *
    * @param ngauss Number of Gauss-Legendre quadrature points to use to compute
@@ -2144,18 +2243,29 @@ public:
   inline float_type
   get_average_absorption_cross_section(const uint_fast32_t ngauss) const {
 
-    std::vector<float_type> costheta(ngauss), costhetaweights(ngauss);
+    std::vector<float_type> thetaGL(ngauss), costhetaGL(ngauss),
+        costhetaweightsGL(ngauss);
     SpecialFunctions::get_gauss_legendre_points_and_weights<float_type>(
-        ngauss, costheta, costhetaweights);
+        ngauss, costhetaGL, costhetaweightsGL);
+    std::vector<float_type> phiGL(ngauss), phiweightsGL(ngauss);
+    SpecialFunctions::get_gauss_legendre_points_and_weights_ab<float_type>(
+        ngauss, 0., 2. * M_PI, phiGL, phiweightsGL);
+
+    for (uint_fast32_t igauss = 0; igauss < ngauss; ++igauss) {
+      thetaGL[igauss] = acos(costhetaGL[igauss]);
+    }
 
     float_type result = 0.;
     for (uint_fast32_t igauss = 0; igauss < ngauss; ++igauss) {
-      const float_type theta = acos(costheta[igauss]);
-      const float_type Kabs = get_absorption_cross_section(theta, ngauss);
-      result += 0.5 * Kabs * costhetaweights[igauss];
+      const float_type theta = thetaGL[igauss];
+      float_type Kabs;
+      get_absorption_cross_sections(theta, ngauss, true, false, thetaGL,
+                                    costhetaweightsGL, phiGL, phiweightsGL,
+                                    &Kabs);
+      result += Kabs * costhetaweightsGL[igauss];
     }
 
-    return result;
+    return 0.5 * result;
   }
 };
 
