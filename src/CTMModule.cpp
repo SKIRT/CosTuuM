@@ -45,7 +45,7 @@ static void TmatrixObject_dealloc(TmatrixObject *self) {
   // first free the wrapped T-matrix object
   delete self->_Tmatrix;
   // then free the Python object
-  Py_TYPE(self)->tp_free((PyObject *)self);
+  Py_TYPE(self)->tp_free(reinterpret_cast<PyObject *>(self));
 }
 
 /**
@@ -61,10 +61,11 @@ static void TmatrixObject_dealloc(TmatrixObject *self) {
 static PyObject *TmatrixObject_new(PyTypeObject *type, PyObject *args,
                                    PyObject *kwargs) {
   // allocate the Python object
-  TmatrixObject *self = (TmatrixObject *)type->tp_alloc(type, 0);
+  TmatrixObject *self =
+      reinterpret_cast<TmatrixObject *>(type->tp_alloc(type, 0));
   // set the wrapped T-matrix to a sensible initial value
   self->_Tmatrix = nullptr;
-  return (PyObject *)self;
+  return reinterpret_cast<PyObject *>(self);
 }
 
 /**
@@ -85,6 +86,8 @@ static PyObject *TmatrixObject_new(PyTypeObject *type, PyObject *args,
  *    T-matrix calculation as a multiple of the order for each iteration.
  *  - maximum_ngauss: Maximum number of Gauss-Legendre quadrature points to use
  *    during the T-matrix calculation.
+ *  - is_equal_volume_radius: Is the input particle radius an equal volume
+ *    radius?
  *
  * @param self T-matrix object that is being initialised.
  * @param args Positional arguments.
@@ -106,32 +109,41 @@ static int TmatrixObject_init(TmatrixObject *self, PyObject *args,
   uint_fast32_t maximum_order = 200;
   uint_fast32_t ndgs = 2;
   uint_fast32_t maximum_ngauss = 500;
-
-  // always fixed (for now)
-  const float_type ratio_of_radii = 0.1;
+  float_type ratio_of_radii = 1.;
 
   /// parse arguments
   // list of keywords (in the expected order)
   // note that we need to use strdup because the Python API expects char*,
   // while C++ strings are const char*
   // not doing this results in compilation warnings
-  static char *kwlist[] = {
-      strdup("particle_radius"), strdup("axis_ratio"),
-      strdup("wavelength"),      strdup("refractive_index"),
-      strdup("cos2beta"),        strdup("tolerance"),
-      strdup("maximum_order"),   strdup("gauss_legendre_factor"),
-      strdup("maximum_ngauss"),  nullptr};
+  static char *kwlist[] = {strdup("particle_radius"),
+                           strdup("axis_ratio"),
+                           strdup("wavelength"),
+                           strdup("refractive_index"),
+                           strdup("cos2beta"),
+                           strdup("tolerance"),
+                           strdup("maximum_order"),
+                           strdup("gauss_legendre_factor"),
+                           strdup("maximum_ngauss"),
+                           strdup("is_equal_volume_radius"),
+                           nullptr};
 
+  // allocate temporary variables to store double precision arguments
+  double particle_radius_d, axis_ratio_d, wavelength_d;
+  double cos2beta_d = static_cast<double>(cos2beta);
+  double tolerance_d = static_cast<double>(tolerance);
   // allocate a temporary variable to store the complex refractive index
   Py_complex mr_temp;
+  // allocate a temporary variable to store the equal volume radius boolean
+  int_fast32_t is_equal_volume_radius = true;
   // parse the keywords/positional arguments
   // d is a double
   // D is a complex double (Py_complex)
   // I is an unsigned integer
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "dddD|ddIII", kwlist,
-                                   &particle_radius, &axis_ratio, &wavelength,
-                                   &mr_temp, &cos2beta, &tolerance,
-                                   &maximum_order, &ndgs, &maximum_ngauss)) {
+  if (!PyArg_ParseTupleAndKeywords(
+          args, kwargs, "dddD|ddIIIp", kwlist, &particle_radius_d,
+          &axis_ratio_d, &wavelength_d, &mr_temp, &cos2beta_d, &tolerance_d,
+          &maximum_order, &ndgs, &maximum_ngauss, &is_equal_volume_radius)) {
     // PyArg_ParseTupleAndKeywords will return 0 if a required argument was
     // missing, if an argument of the wrong type was provided or if the number
     // of arguments does not match the expectation
@@ -142,10 +154,20 @@ static int TmatrixObject_init(TmatrixObject *self, PyObject *args,
     // exit code 1 signals to Python that something was wrong
     return 1;
   }
+  // unpack double precision arguments
+  particle_radius = particle_radius_d;
+  axis_ratio = axis_ratio_d;
+  wavelength = wavelength_d;
+  cos2beta = cos2beta_d;
+  tolerance = tolerance_d;
   // get the complex components from the Py_complex and store them in the
   // std::complex variable
   mr.real(mr_temp.real);
   mr.imag(mr_temp.imag);
+  // set the ratio_of_radii if it is not correct
+  if (!is_equal_volume_radius) {
+    ratio_of_radii = 0.1;
+  }
 
   // construct the T-matrix
   self->_Tmatrix = TMatrixCalculator::calculate_TMatrix(
@@ -196,8 +218,8 @@ static PyObject *TmatrixObject_get_nmax(TmatrixObject *self,
 static PyObject *TmatrixObject_get_average_absorption_cross_section(
     TmatrixObject *self, PyObject *Py_UNUSED(ignored)) {
   // wrap the returned value in a Python object
-  return PyFloat_FromDouble(
-      self->_Tmatrix->get_average_absorption_cross_section(20));
+  return PyFloat_FromDouble(static_cast<double>(
+      self->_Tmatrix->get_average_absorption_cross_section(20)));
 }
 
 /**
@@ -269,13 +291,22 @@ static PyObject *TmatrixObject_get_absorption_cross_section(TmatrixObject *self,
   // create an uninitialised double NumPy array to store the results
   // shape: thetasize
   npy_intp dims[1] = {thetasize};
-  PyArrayObject *Cabs = (PyArrayObject *)PyArray_SimpleNew(1, dims, NPY_DOUBLE);
+  PyArrayObject *Cabs =
+      reinterpret_cast<PyArrayObject *>(PyArray_SimpleNew(1, dims, NPY_DOUBLE));
 
-  const float_type *thetadata =
-      reinterpret_cast<float_type *>(PyArray_DATA(thetas));
-  float_type *Cabsdata = reinterpret_cast<float_type *>(PyArray_DATA(Cabs));
-  self->_Tmatrix->get_absorption_cross_section(thetadata, thetasize, ngauss,
-                                               Cabsdata);
+  const double *thetadata = reinterpret_cast<double *>(PyArray_DATA(thetas));
+  std::vector<float_type> thetadata_f(thetasize);
+  for (npy_intp i = 0; i < thetasize; ++i) {
+    thetadata_f[i] = thetadata[i];
+  }
+
+  double *Cabsdata = reinterpret_cast<double *>(PyArray_DATA(Cabs));
+  std::vector<float_type> Cabsdata_f(thetasize);
+  self->_Tmatrix->get_absorption_cross_section(&thetadata_f[0], thetasize,
+                                               ngauss, &Cabsdata_f[0]);
+  for (npy_intp i = 0; i < thetasize; ++i) {
+    Cabsdata[i] = static_cast<double>(Cabsdata_f[i]);
+  }
 
   // tell Python we are done with the input objects (so that memory is properly
   // deallocated)
@@ -353,19 +384,27 @@ TmatrixObject_get_absorption_cross_sections(TmatrixObject *self, PyObject *args,
   // create an uninitialised double NumPy array to store the results
   // shape: thetasize x 2
   npy_intp dims[2] = {thetasize, 2};
-  PyArrayObject *Cabs = (PyArrayObject *)PyArray_SimpleNew(2, dims, NPY_DOUBLE);
+  PyArrayObject *Cabs =
+      reinterpret_cast<PyArrayObject *>(PyArray_SimpleNew(2, dims, NPY_DOUBLE));
 
-  const float_type *thetadata =
-      reinterpret_cast<float_type *>(PyArray_DATA(thetas));
-  float_type *Cabsdata = reinterpret_cast<float_type *>(PyArray_DATA(Cabs));
-  self->_Tmatrix->get_absorption_cross_sections(thetadata, thetasize, ngauss,
-                                                Cabsdata);
+  const double *thetadata = reinterpret_cast<double *>(PyArray_DATA(thetas));
+  std::vector<float_type> thetadata_f(thetasize);
+  for (npy_intp i = 0; i < thetasize; ++i) {
+    thetadata_f[i] = thetadata[i];
+  }
+  double *Cabsdata = reinterpret_cast<double *>(PyArray_DATA(Cabs));
+  std::vector<float_type> Cabsdata_f(thetasize);
+  self->_Tmatrix->get_absorption_cross_sections(&thetadata_f[0], thetasize,
+                                                ngauss, &Cabsdata_f[0]);
+  for (npy_intp i = 0; i < thetasize; ++i) {
+    Cabsdata[i] = static_cast<double>(Cabsdata_f[i]);
+  }
 
   // tell Python we are done with the input objects (so that memory is properly
   // deallocated)
   Py_DECREF(thetas);
 
-  return PyArray_Return(Cabs);
+  return PyArray_Squeeze(Cabs);
 }
 
 /**
@@ -401,15 +440,21 @@ static PyObject *TmatrixObject_get_extinction_matrix(TmatrixObject *self,
   static char *kwlist[] = {strdup("theta"), strdup("phi"), strdup("alpha"),
                            strdup("beta"), nullptr};
 
+  // allocate temporary variables to store double precision arguments
+  double alpha_d = static_cast<double>(alpha);
+  double beta_d = static_cast<double>(beta);
   // parse positional and keyword arguments
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O&O&|dd", kwlist,
-                                   PyArray_Converter, &thetas,
-                                   PyArray_Converter, &phis, &alpha, &beta)) {
+  if (!PyArg_ParseTupleAndKeywords(
+          args, kwargs, "O&O&|dd", kwlist, PyArray_Converter, &thetas,
+          PyArray_Converter, &phis, &alpha_d, &beta_d)) {
     // again, we do not call ctm_error to avoid killing the Python interpreter
     ctm_warning("Wrong arguments provided!");
     // this time, a nullptr return will signal an error to Python
     return nullptr;
   }
+  // unpack double precision values
+  alpha = alpha_d;
+  beta = beta_d;
 
   // determine the size of the input arrays
   npy_intp thetasize;
@@ -462,7 +507,7 @@ static PyObject *TmatrixObject_get_extinction_matrix(TmatrixObject *self,
   // shape: thetasize x phisize x 4 x 4
   npy_intp dims[4] = {thetasize, phisize, 4, 4};
   PyArrayObject *numpy_array =
-      (PyArrayObject *)PyArray_SimpleNew(4, dims, NPY_DOUBLE);
+      reinterpret_cast<PyArrayObject *>(PyArray_SimpleNew(4, dims, NPY_DOUBLE));
 
   // loop over all theta elements
   for (npy_intp itheta = 0; itheta < thetasize; ++itheta) {
@@ -482,8 +527,8 @@ static PyObject *TmatrixObject_get_extinction_matrix(TmatrixObject *self,
       // copy the elements from the extinction matrix into the array
       for (uint_fast8_t i = 0; i < 4; ++i) {
         for (uint_fast8_t j = 0; j < 4; ++j) {
-          *((float_type *)PyArray_GETPTR4(numpy_array, itheta, iphi, i, j)) =
-              K(i, j);
+          *reinterpret_cast<double *>(PyArray_GETPTR4(
+              numpy_array, itheta, iphi, i, j)) = static_cast<double>(K(i, j));
         }
       }
     }
@@ -502,20 +547,22 @@ static PyObject *TmatrixObject_get_extinction_matrix(TmatrixObject *self,
 
 /*! @brief List of T-matrix object methods that are exposed to Python. */
 static PyMethodDef TmatrixObject_methods[] = {
-    {"get_nmax", (PyCFunction)TmatrixObject_get_nmax, METH_NOARGS,
-     "Return the maximum order of the T-matrix."},
-    {"get_extinction_matrix", (PyCFunction)TmatrixObject_get_extinction_matrix,
+    {"get_nmax", reinterpret_cast<PyCFunction>(TmatrixObject_get_nmax),
+     METH_NOARGS, "Return the maximum order of the T-matrix."},
+    {"get_extinction_matrix",
+     reinterpret_cast<PyCFunction>(TmatrixObject_get_extinction_matrix),
      METH_VARARGS | METH_KEYWORDS, "Return the extinction matrix."},
     {"get_average_absorption_cross_section",
-     (PyCFunction)TmatrixObject_get_average_absorption_cross_section,
+     reinterpret_cast<PyCFunction>(
+         TmatrixObject_get_average_absorption_cross_section),
      METH_NOARGS,
      "Return the angular average of the absorption cross section."},
     {"get_absorption_cross_section",
-     (PyCFunction)TmatrixObject_get_absorption_cross_section,
+     reinterpret_cast<PyCFunction>(TmatrixObject_get_absorption_cross_section),
      METH_VARARGS | METH_KEYWORDS,
      "Return the absorption cross section for the given input angle(s)."},
     {"get_absorption_cross_sections",
-     (PyCFunction)TmatrixObject_get_absorption_cross_sections,
+     reinterpret_cast<PyCFunction>(TmatrixObject_get_absorption_cross_sections),
      METH_VARARGS | METH_KEYWORDS,
      "Return both absorption cross sections for the given input angle(s)."},
     {nullptr}};
@@ -548,7 +595,7 @@ static void MishchenkoOrientationDistributionObject_dealloc(
   // first free the wrapped T-matrix object
   delete self->_distribution;
   // then free the Python object
-  Py_TYPE(self)->tp_free((PyObject *)self);
+  Py_TYPE(self)->tp_free(reinterpret_cast<PyObject *>(self));
 }
 
 /**
@@ -569,7 +616,7 @@ static PyObject *MishchenkoOrientationDistributionObject_new(PyTypeObject *type,
       (MishchenkoOrientationDistributionObject *)type->tp_alloc(type, 0);
   // set the wrapped T-matrix to a sensible initial value
   self->_distribution = nullptr;
-  return (PyObject *)self;
+  return reinterpret_cast<PyObject *>(self);
 }
 
 /**
@@ -606,10 +653,12 @@ static int MishchenkoOrientationDistributionObject_init(
   static char *kwlist[] = {strdup("axis_ratio"), strdup("cos2beta"),
                            strdup("maximum_order"), nullptr};
 
+  // allocate temporary variables to store double precision arguments
+  double cos2beta_d;
   // parse the keywords/positional arguments
   // d is a double
   // I is an unsigned integer
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "d|I", kwlist, &cos2beta,
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "d|I", kwlist, &cos2beta_d,
                                    &maximum_order)) {
     // PyArg_ParseTupleAndKeywords will return 0 if a required argument was
     // missing, if an argument of the wrong type was provided or if the number
@@ -621,6 +670,8 @@ static int MishchenkoOrientationDistributionObject_init(
     // exit code 1 signals to Python that something was wrong
     return 1;
   }
+  // unpack double precision arguments
+  cos2beta = cos2beta_d;
 
   self->_distribution =
       new MishchenkoOrientationDistribution(maximum_order, cos2beta);
@@ -650,26 +701,31 @@ static PyObject *MishchenkoOrientationDistributionObject_get_distribution(
   // list of keywords (see comment above)
   static char *kwlist[] = {strdup("beta"), nullptr};
 
+  // allocate temporary variables to store double precision arguments
+  double beta_d;
   // parse positional and keyword arguments
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "d", kwlist, &beta)) {
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "d", kwlist, &beta_d)) {
     // again, we do not call ctm_error to avoid killing the Python interpreter
     ctm_warning("Wrong arguments provided!");
     // this time, a nullptr return will signal an error to Python
     return nullptr;
   }
+  // unpack double precision arguments
+  beta = beta_d;
 
   const float_type value =
       (*static_cast<OrientationDistribution *>(self->_distribution))(beta);
 
   // return the array
-  return PyFloat_FromDouble(value);
+  return PyFloat_FromDouble(static_cast<double>(value));
 }
 
 /*! @brief List of MishchenkoOrientationDistributionObject methods that are
  *  exposed to Python. */
 static PyMethodDef MishchenkoOrientationDistributionObject_methods[] = {
     {"get_distribution",
-     (PyCFunction)MishchenkoOrientationDistributionObject_get_distribution,
+     reinterpret_cast<PyCFunction>(
+         MishchenkoOrientationDistributionObject_get_distribution),
      METH_VARARGS | METH_KEYWORDS, "Return the distribution function."},
     {nullptr}};
 
@@ -704,25 +760,31 @@ static PyObject *get_equal_volume_radius(PyObject *self, PyObject *args,
   // list of keywords (see comment above)
   static char *kwlist[] = {strdup("radius"), strdup("axis_ratio"), nullptr};
 
+  // allocate temporary variables to store double precision arguments
+  double radius_d, axis_ratio_d;
   // parse positional and keyword arguments
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "dd", kwlist, &radius,
-                                   &axis_ratio)) {
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "dd", kwlist, &radius_d,
+                                   &axis_ratio_d)) {
     // again, we do not call ctm_error to avoid killing the Python interpreter
     ctm_warning("Wrong arguments provided!");
     // this time, a nullptr return will signal an error to Python
     return nullptr;
   }
+  // unpack double precision arguments
+  radius = radius_d;
+  axis_ratio = axis_ratio_d;
 
   // return the array
-  return PyFloat_FromDouble(
+  return PyFloat_FromDouble(static_cast<double>(
       SpecialFunctions::get_equal_volume_to_equal_surface_area_sphere_ratio(
           axis_ratio) *
-      radius);
+      radius));
 }
 
 /*! @brief Methods exposed by the CTMmodule. */
 static PyMethodDef CTMmethods[] = {
-    {"get_equal_volume_radius", (PyCFunction)get_equal_volume_radius,
+    {"get_equal_volume_radius",
+     reinterpret_cast<PyCFunction>(get_equal_volume_radius),
      METH_VARARGS | METH_KEYWORDS,
      "Get the equal volume radius for the particle with the given equal area "
      "radius and axis ratio."},
@@ -753,9 +815,10 @@ PyMODINIT_FUNC PyInit_CosTuuM() {
   // portable (addition of a single element to the struct would break it)
   TmatrixObjectType.tp_name = "CosTuuM.TMatrix";
   TmatrixObjectType.tp_basicsize = sizeof(TmatrixObject);
-  TmatrixObjectType.tp_dealloc = (destructor)TmatrixObject_dealloc;
+  TmatrixObjectType.tp_dealloc =
+      reinterpret_cast<destructor>(TmatrixObject_dealloc);
   TmatrixObjectType.tp_methods = TmatrixObject_methods;
-  TmatrixObjectType.tp_init = (initproc)TmatrixObject_init;
+  TmatrixObjectType.tp_init = reinterpret_cast<initproc>(TmatrixObject_init);
   TmatrixObjectType.tp_new = TmatrixObject_new;
 
   // finalize creation of the TmatrixObjectType
@@ -763,7 +826,8 @@ PyMODINIT_FUNC PyInit_CosTuuM() {
   // add a T-matrix object to the module
   // any call to CTMmodule.TMatrix() will use this same object
   Py_INCREF(&TmatrixObjectType);
-  PyModule_AddObject(m, "TMatrix", (PyObject *)&TmatrixObjectType);
+  PyModule_AddObject(m, "TMatrix",
+                     reinterpret_cast<PyObject *>(&TmatrixObjectType));
 
   // set the required fields in the MishchenkoOrientationDistributionObjectType
   // struct
@@ -787,7 +851,8 @@ PyMODINIT_FUNC PyInit_CosTuuM() {
   // same object
   Py_INCREF(&MishchenkoOrientationDistributionObjectType);
   PyModule_AddObject(m, "MishchenkoOrientationDistribution",
-                     (PyObject *)&MishchenkoOrientationDistributionObjectType);
+                     reinterpret_cast<PyObject *>(
+                         &MishchenkoOrientationDistributionObjectType));
 
   // return the module object
   return m;

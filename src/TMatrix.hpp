@@ -2131,6 +2131,7 @@ public:
       result[1] = prefactor * (S(0, 0) - S(1, 1)).imag();
     }
 
+    const float_type half(0.5);
     for (uint_fast32_t itheta = 0; itheta < ngauss; ++itheta) {
       const float_type theta_out = thetaGL[itheta];
       for (uint_fast32_t iphi = 0; iphi < ngauss; ++iphi) {
@@ -2143,7 +2144,7 @@ public:
             costhetaweightsGL[itheta] * phiweightsGL[iphi];
         if (do_Cabs) {
           const float_type Z00 =
-              (0.5 *
+              (half *
                (Stp(0, 0) * conj(Stp(0, 0)) + Stp(0, 1) * conj(Stp(0, 1)) +
                 Stp(1, 0) * conj(Stp(1, 0)) + Stp(1, 1) * conj(Stp(1, 1))))
                   .real();
@@ -2152,7 +2153,7 @@ public:
 
         if (do_Cabspol) {
           const float_type Z10 =
-              (0.5 *
+              (half *
                (Stp(0, 0) * conj(Stp(0, 0)) + Stp(0, 1) * conj(Stp(0, 1)) -
                 Stp(1, 0) * conj(Stp(1, 0)) - Stp(1, 1) * conj(Stp(1, 1))))
                   .real();

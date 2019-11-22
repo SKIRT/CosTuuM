@@ -80,7 +80,7 @@ thetas = np.linspace(0.0, np.pi, 20)
 
 Tmatrix = CosTuuM.TMatrix(
     particle_radius=ai,
-    axis_ratio=1.0,
+    axis_ratio=1.00001,
     wavelength=wi,
     refractive_index=mri,
     cos2beta=1.0,
@@ -95,12 +95,13 @@ Tmatrix = CosTuuM.TMatrix(
     wavelength=wi,
     refractive_index=mri,
     cos2beta=1.0,
+    is_equal_volume_radius=False,
 )
 Qabsd2 = Tmatrix.get_average_absorption_cross_section() / (
     np.pi * CosTuuM.get_equal_volume_radius(ai, 2.0) ** 2
 )
 Qabsd2theta = Tmatrix.get_absorption_cross_sections(theta=thetas) / (
-    np.pi * ai ** 2
+    np.pi * CosTuuM.get_equal_volume_radius(ai, 2.0) ** 2
 )
 Tmatrix = CosTuuM.TMatrix(
     particle_radius=ai,
@@ -108,12 +109,13 @@ Tmatrix = CosTuuM.TMatrix(
     wavelength=wi,
     refractive_index=mri,
     cos2beta=3.0 / 5.0,
+    is_equal_volume_radius=False,
 )
 Qabsd2ia = Tmatrix.get_average_absorption_cross_section() / (
     np.pi * CosTuuM.get_equal_volume_radius(ai, 2.0) ** 2
 )
 Qabsd2thetaia = Tmatrix.get_absorption_cross_sections(theta=thetas) / (
-    np.pi * ai ** 2
+    np.pi * CosTuuM.get_equal_volume_radius(ai, 2.0) ** 2
 )
 Tmatrix = CosTuuM.TMatrix(
     particle_radius=ai,
@@ -121,12 +123,13 @@ Tmatrix = CosTuuM.TMatrix(
     wavelength=wi,
     refractive_index=mri,
     cos2beta=1.0,
+    is_equal_volume_radius=False,
 )
 Qabsd05 = Tmatrix.get_average_absorption_cross_section() / (
     np.pi * CosTuuM.get_equal_volume_radius(ai, 0.5) ** 2
 )
 Qabsd05theta = Tmatrix.get_absorption_cross_sections(theta=thetas) / (
-    np.pi * ai ** 2
+    np.pi * CosTuuM.get_equal_volume_radius(ai, 0.5) ** 2
 )
 Tmatrix = CosTuuM.TMatrix(
     particle_radius=ai,
@@ -134,12 +137,13 @@ Tmatrix = CosTuuM.TMatrix(
     wavelength=wi,
     refractive_index=mri,
     cos2beta=1.0 / 5.0,
+    is_equal_volume_radius=False,
 )
 Qabsd05ia = Tmatrix.get_average_absorption_cross_section() / (
     np.pi * CosTuuM.get_equal_volume_radius(ai, 0.5) ** 2
 )
 Qabsd05thetaia = Tmatrix.get_absorption_cross_sections(theta=thetas) / (
-    np.pi * ai ** 2
+    np.pi * CosTuuM.get_equal_volume_radius(ai, 0.5) ** 2
 )
 
 fig, ax = pl.subplots(2, 1, sharex=True)
@@ -199,11 +203,10 @@ ax[0].set_title(
 ax[0].set_ylabel("$Q_{abs}$")
 ax[1].set_xlabel("$\\theta{}$")
 ax[1].set_ylabel("$Q_{abspol}$")
-ax[0].legend(loc="best")
+ax[0].legend(loc="upper right")
 pl.tight_layout()
 pl.savefig("1993Draine_theta.png", dpi=300)
 pl.close()
-exit()
 
 lcol = 18
 maxl = 100
@@ -235,6 +238,7 @@ for iw in range(maxl):
         wavelength=wi,
         refractive_index=mri,
         cos2beta=1.0 / 3.0,
+        is_equal_volume_radius=False,
     )
     Qabsd2[iw] = Tmatrix.get_average_absorption_cross_section() / (
         np.pi * CosTuuM.get_equal_volume_radius(ai, 2.0) ** 2
@@ -245,6 +249,7 @@ for iw in range(maxl):
         wavelength=wi,
         refractive_index=mri,
         cos2beta=1.0 / 3.0,
+        is_equal_volume_radius=False,
     )
     Qabsd05[iw] = Tmatrix.get_average_absorption_cross_section() / (
         np.pi * CosTuuM.get_equal_volume_radius(ai, 0.5) ** 2
