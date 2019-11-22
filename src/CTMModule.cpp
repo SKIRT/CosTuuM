@@ -393,10 +393,10 @@ TmatrixObject_get_absorption_cross_sections(TmatrixObject *self, PyObject *args,
     thetadata_f[i] = thetadata[i];
   }
   double *Cabsdata = reinterpret_cast<double *>(PyArray_DATA(Cabs));
-  std::vector<float_type> Cabsdata_f(thetasize);
+  std::vector<float_type> Cabsdata_f(2 * thetasize);
   self->_Tmatrix->get_absorption_cross_sections(&thetadata_f[0], thetasize,
                                                 ngauss, &Cabsdata_f[0]);
-  for (npy_intp i = 0; i < thetasize; ++i) {
+  for (npy_intp i = 0; i < 2 * thetasize; ++i) {
     Cabsdata[i] = static_cast<double>(Cabsdata_f[i]);
   }
 
