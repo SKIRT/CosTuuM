@@ -35,10 +35,10 @@ int main(int argc, char **argv) {
   // control which tests are performed
   // ideally, this is all of them, but sometimes (temporarily) disabling some
   // can be useful
-  const bool do_benchmark_test = false;
-  const bool do_ensemble_test = false;
-  const bool do_astro_test = false;
-  const bool do_shape_test = false;
+  const bool do_benchmark_test = true;
+  const bool do_ensemble_test = true;
+  const bool do_astro_test = true;
+  const bool do_shape_test = true;
   const bool do_fixed_orientation_test = true;
 
   /// benchmark test: check T matrix results against some results obtained
