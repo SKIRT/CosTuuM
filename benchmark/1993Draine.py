@@ -4,10 +4,37 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as pl
 import scipy.interpolate as interpol
+import scipy.integrate as integ
 import re
 import CosTuuM
 
 pl.rcParams["text.usetex"] = True
+
+# integrand for the integral in the expression for the active surface area
+# ratio
+def active_surface_area_integrand(x, d4m1, d2m1):
+    return np.sqrt((d4m1 * x ** 2 + 1.0) / (d2m1 * x ** 2 + 1.0))
+
+
+# compute the ratio of the actual average active surface area of a spheroid
+# with axis ratio d, and the naive average active surface area pi*rV**2
+def get_active_surface_area_factor(d):
+    d4m1 = d ** 4 - 1.0
+    d2m1 = d ** 2 - 1.0
+    return (
+        0.5
+        * integ.quad(
+            active_surface_area_integrand, -1.0, 1.0, args=(d4m1, d2m1)
+        )[0]
+        / np.cbrt(d)
+    )
+
+
+# get the active surface area of the spheroid with the given equal volume
+# sphere radius and axis ratio
+def get_active_surface_area(rV, d):
+    return np.pi * rV ** 2 * get_active_surface_area_factor(d)
+
 
 # read the 1993Draine_optical_properties.txt file
 # we do several passes
@@ -97,12 +124,12 @@ Tmatrix = CosTuuM.TMatrix(
     cos2beta=1.0,
     is_equal_volume_radius=False,
 )
-Qabsd2 = Tmatrix.get_average_absorption_cross_section() / (
-    np.pi * CosTuuM.get_equal_volume_radius(ai, 2.0) ** 2
+Qabsd2 = Tmatrix.get_average_absorption_cross_section() / get_active_surface_area(
+    ai, 2.0
 )
-Qabsd2theta = Tmatrix.get_absorption_cross_sections(theta=thetas) / (
-    np.pi * CosTuuM.get_equal_volume_radius(ai, 2.0) ** 2
-)
+Qabsd2theta = Tmatrix.get_absorption_cross_sections(
+    theta=thetas
+) / get_active_surface_area(ai, 2.0)
 Tmatrix = CosTuuM.TMatrix(
     particle_radius=ai,
     axis_ratio=2.0,
@@ -111,12 +138,12 @@ Tmatrix = CosTuuM.TMatrix(
     cos2beta=3.0 / 5.0,
     is_equal_volume_radius=False,
 )
-Qabsd2ia = Tmatrix.get_average_absorption_cross_section() / (
-    np.pi * CosTuuM.get_equal_volume_radius(ai, 2.0) ** 2
+Qabsd2ia = Tmatrix.get_average_absorption_cross_section() / get_active_surface_area(
+    ai, 2.0
 )
-Qabsd2thetaia = Tmatrix.get_absorption_cross_sections(theta=thetas) / (
-    np.pi * CosTuuM.get_equal_volume_radius(ai, 2.0) ** 2
-)
+Qabsd2thetaia = Tmatrix.get_absorption_cross_sections(
+    theta=thetas
+) / get_active_surface_area(ai, 2.0)
 Tmatrix = CosTuuM.TMatrix(
     particle_radius=ai,
     axis_ratio=0.5,
@@ -125,12 +152,12 @@ Tmatrix = CosTuuM.TMatrix(
     cos2beta=1.0,
     is_equal_volume_radius=False,
 )
-Qabsd05 = Tmatrix.get_average_absorption_cross_section() / (
-    np.pi * CosTuuM.get_equal_volume_radius(ai, 0.5) ** 2
+Qabsd05 = Tmatrix.get_average_absorption_cross_section() / get_active_surface_area(
+    ai, 0.5
 )
-Qabsd05theta = Tmatrix.get_absorption_cross_sections(theta=thetas) / (
-    np.pi * CosTuuM.get_equal_volume_radius(ai, 0.5) ** 2
-)
+Qabsd05theta = Tmatrix.get_absorption_cross_sections(
+    theta=thetas
+) / get_active_surface_area(ai, 0.5)
 Tmatrix = CosTuuM.TMatrix(
     particle_radius=ai,
     axis_ratio=0.5,
@@ -139,12 +166,12 @@ Tmatrix = CosTuuM.TMatrix(
     cos2beta=1.0 / 5.0,
     is_equal_volume_radius=False,
 )
-Qabsd05ia = Tmatrix.get_average_absorption_cross_section() / (
-    np.pi * CosTuuM.get_equal_volume_radius(ai, 0.5) ** 2
+Qabsd05ia = Tmatrix.get_average_absorption_cross_section() / get_active_surface_area(
+    ai, 0.5
 )
-Qabsd05thetaia = Tmatrix.get_absorption_cross_sections(theta=thetas) / (
-    np.pi * CosTuuM.get_equal_volume_radius(ai, 0.5) ** 2
-)
+Qabsd05thetaia = Tmatrix.get_absorption_cross_sections(
+    theta=thetas
+) / get_active_surface_area(ai, 0.5)
 
 fig, ax = pl.subplots(2, 1, sharex=True)
 
@@ -240,8 +267,10 @@ for iw in range(maxl):
         cos2beta=1.0 / 3.0,
         is_equal_volume_radius=False,
     )
-    Qabsd2[iw] = Tmatrix.get_average_absorption_cross_section() / (
-        np.pi * CosTuuM.get_equal_volume_radius(ai, 2.0) ** 2
+    Qabsd2[
+        iw
+    ] = Tmatrix.get_average_absorption_cross_section() / get_active_surface_area(
+        ai, 0.5
     )
     Tmatrix = CosTuuM.TMatrix(
         particle_radius=ai,
@@ -251,8 +280,10 @@ for iw in range(maxl):
         cos2beta=1.0 / 3.0,
         is_equal_volume_radius=False,
     )
-    Qabsd05[iw] = Tmatrix.get_average_absorption_cross_section() / (
-        np.pi * CosTuuM.get_equal_volume_radius(ai, 0.5) ** 2
+    Qabsd05[
+        iw
+    ] = Tmatrix.get_average_absorption_cross_section() / get_active_surface_area(
+        ai, 0.5
     )
 
 fig, ax = pl.subplots(2, 1, sharex=True)
