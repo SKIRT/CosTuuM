@@ -8,8 +8,8 @@
 
 #include "Assert.hpp"
 #include "Configuration.hpp"
+#include "DraineHensleyShapeDistribution.hpp"
 #include "OrientationDistribution.hpp"
-#include "ShapeDistribution.hpp"
 #include "TMatrixCalculator.hpp"
 #include "UnitConverter.hpp"
 #include "Utilities.hpp"
@@ -289,7 +289,7 @@ int main(int argc, char **argv) {
   /// test the procedure to average over a shape distribution
   if (do_shape_test) {
 
-    ShapeDistribution shape_distribution;
+    DraineHensleyShapeDistribution shape_distribution;
 
     const uint_fast32_t ngauss = 100;
     std::vector<float_type> axis_ratio(ngauss), weights(ngauss);
@@ -315,6 +315,7 @@ int main(int argc, char **argv) {
       }
       delete Tmatrix;
     }
+    ctm_assert(norm > 0.);
     const float_type norm_inv = 1. / norm;
     for (uint_fast8_t i = 0; i < 4; ++i) {
       for (uint_fast8_t j = 0; j < 4; ++j) {

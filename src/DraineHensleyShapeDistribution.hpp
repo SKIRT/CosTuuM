@@ -168,6 +168,32 @@ private:
 
 public:
   /**
+   * @brief Get the minimum axis ratio @f$d@f$ for this distribution.
+   *
+   * We choose the upper and lower limits as the values of @f$d@f$ for which the
+   * distribution falls below @f$P(d)=0.15@f$. This arbitrary limit reproduces
+   * the relative importance of prolate and oblate particles reasonably well
+   * and was found to result in reasonable axis ratios that are not too
+   * problematic for the code.
+   *
+   * @return Minimum value for the distribution.
+   */
+  virtual float_type get_minimum_axis_ratio() const { return 0.15; }
+
+  /**
+   * @brief Get the maximum axis ratio @f$d@f$ for this distribution.
+   *
+   * We choose the upper and lower limits as the values of @f$d@f$ for which the
+   * distribution falls below @f$P(d)=0.15@f$. This arbitrary limit reproduces
+   * the relative importance of prolate and oblate particles reasonably well
+   * and was found to result in reasonable axis ratios that are not too
+   * problematic for the code.
+   *
+   * @return Maximum value for the distribution.
+   */
+  virtual float_type get_maximum_axis_ratio() const { return 2.31; }
+
+  /**
    * @brief Virtual shape distribution function.
    *
    * @param axis_ratio Input axis ratio, @f$d = \frac{a}{b}@f$.
@@ -175,30 +201,13 @@ public:
    */
   virtual float_type operator()(const float_type axis_ratio) const {
 
-    if (axis_ratio >= 0.12 && axis_ratio <= 3.68) {
+    if (axis_ratio >= get_minimum_axis_ratio() &&
+        axis_ratio <= get_maximum_axis_ratio()) {
       return cde2(get_shape_factor(axis_ratio)) * get_jacobian(axis_ratio);
     } else {
       return 0.;
     }
   }
-
-  /**
-   * @brief Get the minimum axis ratio @f$d@f$ for this distribution.
-   *
-   * The default version returns @f$0.5@f$.
-   *
-   * @return Minimum value for the distribution.
-   */
-  virtual float_type get_minimum_axis_ratio() const { return 0.12; }
-
-  /**
-   * @brief Get the maximum axis ratio @f$d@f$ for this distribution.
-   *
-   * The default version returns @f$1.5@f$.
-   *
-   * @return Maximum value for the distribution.
-   */
-  virtual float_type get_maximum_axis_ratio() const { return 3.68; }
 };
 
 #endif // DRAINEHENSLEYSHAPEDISTRIBUTION_HPP
