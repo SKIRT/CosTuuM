@@ -10,6 +10,8 @@
 
 #include "Configuration.hpp"
 
+#include <cmath>
+
 /**
  * @brief Interface for shape distributions.
  */
