@@ -133,8 +133,10 @@ public:
 
   /**
    * @brief Compute the scattering matrix.
+   *
+   * @param thread_id ID of the thread that executes the task.
    */
-  virtual void execute() {
+  virtual void execute(const int_fast32_t thread_id = 0) {
 
     const float_type cosalpha = cos(_alpha);
     const float_type sinalpha = sin(_alpha);

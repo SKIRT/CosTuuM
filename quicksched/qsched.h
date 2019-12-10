@@ -47,7 +47,7 @@ typedef int qsched_task_t;
 typedef int qsched_res_t;
 
 /** Type definition for the execution function in #qsched_run. */
-typedef void (*qsched_funtype)(int, void *);
+typedef void (*qsched_funtype)(int, int, void *);
 
 /** Timer types. */
 enum qsched_timer {

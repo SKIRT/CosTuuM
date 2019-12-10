@@ -76,8 +76,10 @@ public:
 
   /**
    * @brief Compute the factors.
+   *
+   * @param thread_id ID of the thread that executes the task.
    */
-  virtual void execute() {
+  virtual void execute(const int_fast32_t thread_id = 0) {
     const uint_fast32_t nmax = _dd.size();
     for (uint_fast32_t ni = 0; ni < nmax; ++ni) {
       const float_type nn((ni + 2.) * (ni + 1.));

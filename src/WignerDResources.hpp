@@ -93,8 +93,10 @@ public:
 
   /**
    * @brief Compute the factors.
+   *
+   * @param thread_id ID of the thread that executes the task.
    */
-  virtual void execute() {
+  virtual void execute(const int_fast32_t thread_id = 0) {
     for (uint_fast32_t ig = 1; ig < _ngauss + 1; ++ig) {
       const uint_fast32_t i1 = _ngauss + ig;
       const uint_fast32_t i2 = _ngauss - ig + 1;
@@ -234,8 +236,10 @@ public:
 
   /**
    * @brief Compute the factors.
+   *
+   * @param thread_id ID of the thread that executes the task.
    */
-  virtual void execute() {
+  virtual void execute(const int_fast32_t thread_id = 0) {
 
     const uint_fast32_t nmax = _converged_size.get_nmax();
     // skip tasks that are not required (we spawn tasks for all n, but only

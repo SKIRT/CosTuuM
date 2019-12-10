@@ -33,8 +33,10 @@ public:
 
   /**
    * @brief Execute the task.
+   *
+   * @param thread_id ID of the thread that executes the task.
    */
-  virtual void execute() = 0;
+  virtual void execute(const int_fast32_t thread_id) = 0;
 
   /**
    * @brief Get the computational cost of the task.
@@ -94,8 +96,12 @@ public:
 
   /**
    * @brief Execute the wrapped task.
+   *
+   * @param thread_id ID of the thread that executes the task.
    */
-  inline void execute() { _task->execute(); }
+  inline void execute(const int_fast32_t thread_id) {
+    _task->execute(thread_id);
+  }
 };
 
 /**
@@ -192,12 +198,14 @@ public:
   /**
    * @brief Runner function passed on to the QuickSched library.
    *
+   * @param thread_id ID of the thread that executes the task.
    * @param task_type Type of task being executed.
    * @param wrapped_task Void pointer to the wrapped task.
    */
-  inline static void execute_task(int task_type, void *wrapped_task) {
+  inline static void execute_task(int thread_id, int task_type,
+                                  void *wrapped_task) {
     WrappedTask *task = static_cast<WrappedTask *>(wrapped_task);
-    task->execute();
+    task->execute(thread_id);
   }
 
 public:

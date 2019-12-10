@@ -124,7 +124,6 @@ int main(int argc, char **argv) {
     const uint_fast32_t maximum_order = 100;
     const uint_fast32_t minimum_order = static_cast<uint_fast32_t>(
         std::max(float_type(4.), xev + 4.05 * cbrt(xev)));
-    const uint_fast32_t auxsize = 100;
 
     ctm_warning("Minimum order: %" PRIuFAST32, minimum_order);
 
@@ -135,10 +134,7 @@ int main(int argc, char **argv) {
 
       ConvergedSizeResources converged_size;
 
-      std::vector<TMatrixAuxiliarySpace *> auxspace(auxsize, nullptr);
-      for (uint_fast32_t i = 0; i < auxsize; ++i) {
-        auxspace[i] = new TMatrixAuxiliarySpace(maximum_order);
-      }
+      TMatrixAuxiliarySpaceManager aux_manager(1, maximum_order);
 
       std::vector<GaussBasedResources *> quadrature_points(
           maximum_order - minimum_order, nullptr);
@@ -181,9 +177,9 @@ int main(int argc, char **argv) {
         m0tasks[i] = new TMatrixM0Task(
             tolerance, minimum_order + i, ndgs * (minimum_order + i), nfactors,
             *quadrature_points[i], *geometries[i], *interactions[i],
-            *wignerdm0[i], *auxspace[0], Tmatrix, converged_size,
+            *wignerdm0[i], aux_manager, Tmatrix, converged_size,
             Tmatrix.get_m_resource(0));
-        m0tasks[i]->execute();
+        m0tasks[i]->execute(0);
       }
 
       ctm_warning("nmax: %" PRIuFAST32, Tmatrix.get_nmax());
@@ -202,10 +198,10 @@ int main(int argc, char **argv) {
 
       std::vector<TMatrixMAllTask *> malltask(maximum_order, nullptr);
       for (uint_fast32_t i = 0; i < maximum_order; ++i) {
-        malltask[i] = new TMatrixMAllTask(
-            1 + i, nfactors, *more_wigner[i], converged_size,
-            *auxspace[i % auxsize], Tmatrix, Tmatrix.get_m_resource(1 + i));
-        malltask[i]->execute();
+        malltask[i] = new TMatrixMAllTask(1 + i, nfactors, *more_wigner[i],
+                                          converged_size, aux_manager, Tmatrix,
+                                          Tmatrix.get_m_resource(1 + i));
+        malltask[i]->execute(0);
       }
 
       TMatrixQTask qtask(Tmatrix, Tmatrix.get_m_resource(0));
@@ -254,7 +250,6 @@ int main(int argc, char **argv) {
         }
       }
 
-      clear_vector(auxspace);
       clear_vector(quadrature_points);
       clear_vector(wignerdm0);
       clear_vector(geometries);
@@ -276,11 +271,7 @@ int main(int argc, char **argv) {
       ConvergedSizeResources converged_size;
       quicksched.register_resource(converged_size);
 
-      std::vector<TMatrixAuxiliarySpace *> auxspace(auxsize, nullptr);
-      for (uint_fast32_t i = 0; i < auxsize; ++i) {
-        auxspace[i] = new TMatrixAuxiliarySpace(maximum_order);
-        quicksched.register_resource(*auxspace[i]);
-      }
+      TMatrixAuxiliarySpaceManager aux_manager(4, maximum_order);
 
       TMatrixResource Tmatrix(maximum_order);
       for (uint_fast32_t m = 0; m < maximum_order + 1; ++m) {
@@ -337,7 +328,7 @@ int main(int argc, char **argv) {
         m0tasks[i] = new TMatrixM0Task(
             tolerance, minimum_order + i, ndgs * (minimum_order + i), nfactors,
             *quadrature_points[i], *geometries[i], *interactions[i],
-            *wignerdm0[i], *auxspace[0], Tmatrix, converged_size,
+            *wignerdm0[i], aux_manager, Tmatrix, converged_size,
             Tmatrix.get_m_resource(0));
         quicksched.register_task(*m0tasks[i]);
         m0tasks[i]->link_resources(quicksched);
@@ -374,9 +365,9 @@ int main(int argc, char **argv) {
 
       std::vector<TMatrixMAllTask *> malltask(maximum_order, nullptr);
       for (uint_fast32_t i = 0; i < maximum_order; ++i) {
-        malltask[i] = new TMatrixMAllTask(
-            1 + i, nfactors, *more_wigner[i], converged_size,
-            *auxspace[i % auxsize], Tmatrix, Tmatrix.get_m_resource(1 + i));
+        malltask[i] = new TMatrixMAllTask(1 + i, nfactors, *more_wigner[i],
+                                          converged_size, aux_manager, Tmatrix,
+                                          Tmatrix.get_m_resource(1 + i));
         quicksched.register_task(*malltask[i]);
         malltask[i]->link_resources(quicksched);
         quicksched.link_tasks(*more_wigner[i], *malltask[i]);
@@ -468,7 +459,6 @@ int main(int argc, char **argv) {
       quicksched.print_type_dict(typefile);
 
       // as so nicely stated throughout SWIFT: be clean
-      clear_vector(auxspace);
       clear_vector(quadrature_points);
       clear_vector(wignerdm0);
       clear_vector(geometries);
@@ -494,11 +484,7 @@ int main(int argc, char **argv) {
     quicksched.register_task(nfactors);
     nfactors.link_resources(quicksched);
 
-    std::vector<TMatrixAuxiliarySpace *> auxspace(auxsize, nullptr);
-    for (uint_fast32_t i = 0; i < auxsize; ++i) {
-      auxspace[i] = new TMatrixAuxiliarySpace(maximum_order);
-      quicksched.register_resource(*auxspace[i]);
-    }
+    TMatrixAuxiliarySpaceManager aux_manager(4, maximum_order);
 
     std::vector<GaussBasedResources *> quadrature_points(maximum_order - 1,
                                                          nullptr);
@@ -617,7 +603,7 @@ int main(int argc, char **argv) {
             tolerance, minimum_order + i, ndgs * (minimum_order + i), nfactors,
             *quadrature_points[minimum_order + i - 1], *geometries.back(),
             *interactions.back(), *wignerdm0[minimum_order + i - 1],
-            *auxspace[auxcount], *Tmatrices.back(), *converged_sizes.back(),
+            aux_manager, *Tmatrices.back(), *converged_sizes.back(),
             Tmatrices.back()->get_m_resource(0)));
         quicksched.register_task(*m0tasks.back());
         m0tasks.back()->link_resources(quicksched);
@@ -652,7 +638,7 @@ int main(int argc, char **argv) {
 
         malltasks.push_back(new TMatrixMAllTask(
             1 + i, nfactors, *wignerdmalls.back(), *converged_sizes.back(),
-            *auxspace[auxcount], *Tmatrices.back(),
+            aux_manager, *Tmatrices.back(),
             Tmatrices.back()->get_m_resource(1 + i)));
         quicksched.register_task(*malltasks.back());
         malltasks.back()->link_resources(quicksched);
@@ -707,7 +693,6 @@ int main(int argc, char **argv) {
       }
     }
 
-    clear_vector(auxspace);
     clear_vector(quadrature_points);
     clear_vector(wignerdm0);
     clear_vector(converged_sizes);

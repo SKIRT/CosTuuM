@@ -311,7 +311,7 @@ void qsched_run_openmp(struct qsched *s, int nr_threads, qsched_funtype fun) {
     while ((t = qsched_gettask(s, qid)) != NULL) {
 
       /* Call the user-supplied function on the task with its data. */
-      fun(t->type, &s->data[t->data]);
+      fun(t->qid, t->type, &s->data[t->data]);
 
       /* Mark that task as done. */
       qsched_done(s, t);
@@ -421,7 +421,7 @@ void *qsched_pthread_run(void *in) {
     while ((t = qsched_gettask(s, tid)) != NULL) {
 
       /* Call the user-supplied function on the task with its data. */
-      s->fun(t->type, &s->data[t->data]);
+      s->fun(t->qid, t->type, &s->data[t->data]);
 
       /* Mark that task as done. */
       qsched_done(s, t);

@@ -238,7 +238,7 @@ public:
 /**
  * @brief Auxiliary data space for the T matrix calculation.
  */
-class TMatrixAuxiliarySpace : public Resource {
+class TMatrixAuxiliarySpace {
 
   /*! @brief Grant access to @f$m=0@f$ computation task. */
   friend class TMatrixM0Task;
@@ -340,6 +340,54 @@ public:
 };
 
 /**
+ * @brief Manager for TMatrixAuxiliary space classes.
+ */
+class TMatrixAuxiliarySpaceManager {
+private:
+  /*! @brief Vector of preallocated auxiliary spaces. */
+  std::vector<TMatrixAuxiliarySpace *> _spaces;
+
+public:
+  /**
+   * @brief Constructor.
+   *
+   * @param num_threads Number of threads that is used (and number of
+   * auxiliary spaces to allocate).
+   * @param maximum_order Maximum order of any T-matrix that will be computed,
+   * used to set the size of the auxiliary space.
+   */
+  inline TMatrixAuxiliarySpaceManager(const int_fast32_t num_threads,
+                                      const uint_fast32_t maximum_order)
+      : _spaces(num_threads, nullptr) {
+    for (int_fast32_t i = 0; i < num_threads; ++i) {
+      _spaces[i] = new TMatrixAuxiliarySpace(maximum_order);
+    }
+  }
+
+  /**
+   * @brief Destructor.
+   *
+   * Deallocate the auxiliary spaces.
+   */
+  inline ~TMatrixAuxiliarySpaceManager() {
+    for (uint_fast32_t i = 0; i < _spaces.size(); ++i) {
+      delete _spaces[i];
+    }
+  }
+
+  /**
+   * @brief Get a reference to the auxiliary space for the thread with the
+   * given ID.
+   *
+   * @param thread_id Thread ID.
+   * @return Corresponding auxiliary space.
+   */
+  inline TMatrixAuxiliarySpace &get_space(int_fast32_t thread_id) {
+    return *_spaces[thread_id];
+  }
+};
+
+/**
  * @brief Compute the @f$m=0@f$ part of the T-matrix for a given @f$n_{max}@f$.
  */
 class TMatrixM0Task : public Task {
@@ -370,8 +418,9 @@ private:
   /*! @brief Precomputed @f$m=0@f$ Wigner D functions (read only). */
   const WignerDm0Resources &_wigner;
 
-  /*! @brief Auxiliary space used to store intermediate calculations. */
-  TMatrixAuxiliarySpace &_aux;
+  /*! @brief Auxiliary space manager used to obtain space to store intermediate
+   *  calculations. */
+  TMatrixAuxiliarySpaceManager &_aux_manager;
 
   /*! @brief TMatrix space containing the result. */
   TMatrixResource &_Tmatrix;
@@ -401,28 +450,27 @@ public:
    * @param interaction Precomputed interaction specific quadrature points (read
    * only).
    * @param wigner Precomputed @f$m=0@f$ Wigner D functions (read only).
-   * @param aux Auxiliary space used to store intermediate calculations.
+   * @param aux_manager Auxiliary space manager used to obtain space to store
+   * intermediate calculations.
    * @param Tmatrix TMatrix space containing the result.
    * @param converged_size Resource containing the converged order and number of
    * quadrature points.
    * @param m_resource Resource that guarantees unique access to the @f$m=0@f$
    * values of the T-matrix.
    */
-  inline TMatrixM0Task(const float_type tolerance, const uint_fast32_t nmax,
-                       const uint_fast32_t ngauss,
-                       const NBasedResources &nfactors,
-                       const GaussBasedResources &quadrature_points,
-                       const ParticleGeometryResource &geometry,
-                       const InteractionResource &interaction,
-                       const WignerDm0Resources &wigner,
-                       TMatrixAuxiliarySpace &aux, TMatrixResource &Tmatrix,
-                       ConvergedSizeResources &converged_size,
-                       const Resource &m_resource)
+  inline TMatrixM0Task(
+      const float_type tolerance, const uint_fast32_t nmax,
+      const uint_fast32_t ngauss, const NBasedResources &nfactors,
+      const GaussBasedResources &quadrature_points,
+      const ParticleGeometryResource &geometry,
+      const InteractionResource &interaction, const WignerDm0Resources &wigner,
+      TMatrixAuxiliarySpaceManager &aux_manager, TMatrixResource &Tmatrix,
+      ConvergedSizeResources &converged_size, const Resource &m_resource)
       : _tolerance(tolerance), _nmax(nmax), _ngauss(ngauss),
         _nfactors(nfactors), _quadrature_points(quadrature_points),
         _geometry(geometry), _interaction(interaction), _wigner(wigner),
-        _aux(aux), _Tmatrix(Tmatrix), _converged_size(converged_size),
-        _m_resource(m_resource) {}
+        _aux_manager(aux_manager), _Tmatrix(Tmatrix),
+        _converged_size(converged_size), _m_resource(m_resource) {}
 
   virtual ~TMatrixM0Task() {}
 
@@ -433,7 +481,6 @@ public:
    */
   inline void link_resources(QuickSched &quicksched) {
     // write access
-    quicksched.link_task_and_resource(*this, _aux, true);
     quicksched.link_task_and_resource(*this, _m_resource, true);
     quicksched.link_task_and_resource(*this, _converged_size, true);
 
@@ -447,8 +494,10 @@ public:
 
   /**
    * @brief Compute the @f$m=0@f$ elements of the T-matrix.
+   *
+   * @param thread_id ID of the thread that executes the task.
    */
-  virtual void execute() {
+  virtual void execute(const int_fast32_t thread_id) {
 
     // check if we need to do something
     if (_Tmatrix._dQscattering > 0.) {
@@ -459,7 +508,9 @@ public:
       }
     }
 
-    _aux.reset();
+    TMatrixAuxiliarySpace &aux = _aux_manager.get_space(thread_id);
+
+    aux.reset();
 
     for (uint_fast32_t n1 = 1; n1 < _nmax + 1; ++n1) {
       // n1 * (n1 + 1)
@@ -542,10 +593,10 @@ public:
           }
           // prefactor sqrt{(2n1+1)*(2n2+1)/[n1*(n1+1)*n2*(n2+1)]}
           const float_type an12 = 2. * _nfactors.get_ann(n1, n2);
-          _aux._J12(n1 - 1, n2 - 1) = an12 * this_J12;
-          _aux._J21(n1 - 1, n2 - 1) = an12 * this_J21;
-          _aux._RgJ12(n1 - 1, n2 - 1) = an12 * this_RgJ12;
-          _aux._RgJ21(n1 - 1, n2 - 1) = an12 * this_RgJ21;
+          aux._J12(n1 - 1, n2 - 1) = an12 * this_J12;
+          aux._J21(n1 - 1, n2 - 1) = an12 * this_J21;
+          aux._RgJ12(n1 - 1, n2 - 1) = an12 * this_RgJ12;
+          aux._RgJ21(n1 - 1, n2 - 1) = an12 * this_RgJ21;
         }
       }
     }
@@ -562,30 +613,30 @@ public:
         // sign differences are due to a sign difference between the
         // implementation and documentation
         const std::complex<float_type> this_J12 =
-            -icompl * _aux._J12(n1 - 1, n2 - 1);
+            -icompl * aux._J12(n1 - 1, n2 - 1);
         const std::complex<float_type> this_RgJ12 =
-            -icompl * _aux._RgJ12(n1 - 1, n2 - 1);
+            -icompl * aux._RgJ12(n1 - 1, n2 - 1);
         const std::complex<float_type> this_J21 =
-            icompl * _aux._J21(n1 - 1, n2 - 1);
+            icompl * aux._J21(n1 - 1, n2 - 1);
         const std::complex<float_type> this_RgJ21 =
-            icompl * _aux._RgJ21(n1 - 1, n2 - 1);
+            icompl * aux._RgJ21(n1 - 1, n2 - 1);
 
-        _aux._Q(k1 - 1, k2 - 1) = _interaction.get_k2mr() * this_J21 +
-                                  _interaction.get_k2() * this_J12;
-        _aux._RgQ(k1 - 1, k2 - 1) = _interaction.get_k2mr() * this_RgJ21 +
-                                    _interaction.get_k2() * this_RgJ12;
+        aux._Q(k1 - 1, k2 - 1) = _interaction.get_k2mr() * this_J21 +
+                                 _interaction.get_k2() * this_J12;
+        aux._RgQ(k1 - 1, k2 - 1) = _interaction.get_k2mr() * this_RgJ21 +
+                                   _interaction.get_k2() * this_RgJ12;
 
-        _aux._Q(kk1 - 1, kk2 - 1) = _interaction.get_k2mr() * this_J12 +
-                                    _interaction.get_k2() * this_J21;
-        _aux._RgQ(kk1 - 1, kk2 - 1) = _interaction.get_k2mr() * this_RgJ12 +
-                                      _interaction.get_k2() * this_RgJ21;
+        aux._Q(kk1 - 1, kk2 - 1) = _interaction.get_k2mr() * this_J12 +
+                                   _interaction.get_k2() * this_J21;
+        aux._RgQ(kk1 - 1, kk2 - 1) = _interaction.get_k2mr() * this_RgJ12 +
+                                     _interaction.get_k2() * this_RgJ21;
       }
     }
 
     // func_TT
     const uint_fast32_t nmax2 = 2 * _nmax;
-    _aux._Q.plu_inverse(nmax2, &_aux._pivot_array[0], _aux._pivot_array.size(),
-                        &_aux._work[0], _aux._work.size());
+    aux._Q.plu_inverse(nmax2, &aux._pivot_array[0], aux._pivot_array.size(),
+                       &aux._work[0], aux._work.size());
 
     for (uint_fast32_t i = 0; i < _nmax; ++i) {
       for (uint_fast32_t j = 0; j < _nmax; ++j) {
@@ -594,13 +645,11 @@ public:
         _Tmatrix._T[0](i, _nmax + j) = 0.;
         _Tmatrix._T[0](_nmax + i, _nmax + j) = 0.;
         for (uint_fast32_t k = 0; k < nmax2; ++k) {
-          _Tmatrix._T[0](i, j) -= _aux._RgQ(i, k) * _aux._Q(k, j);
-          _Tmatrix._T[0](_nmax + i, j) -=
-              _aux._RgQ(_nmax + i, k) * _aux._Q(k, j);
-          _Tmatrix._T[0](i, _nmax + j) -=
-              _aux._RgQ(i, k) * _aux._Q(k, _nmax + j);
+          _Tmatrix._T[0](i, j) -= aux._RgQ(i, k) * aux._Q(k, j);
+          _Tmatrix._T[0](_nmax + i, j) -= aux._RgQ(_nmax + i, k) * aux._Q(k, j);
+          _Tmatrix._T[0](i, _nmax + j) -= aux._RgQ(i, k) * aux._Q(k, _nmax + j);
           _Tmatrix._T[0](_nmax + i, _nmax + j) -=
-              _aux._RgQ(_nmax + i, k) * _aux._Q(k, _nmax + j);
+              aux._RgQ(_nmax + i, k) * aux._Q(k, _nmax + j);
         }
       }
     }
@@ -669,8 +718,9 @@ private:
   /*! @brief Converged T-matrix variables. */
   const ConvergedSizeResources &_converged_size;
 
-  /*! @brief Auxiliary space used to store intermediate calculations. */
-  TMatrixAuxiliarySpace &_aux;
+  /*! @brief Auxiliary space manager used to obtain space to store intermediate
+   *  calculations. */
+  TMatrixAuxiliarySpaceManager &_aux_manager;
 
   /*! @brief TMatrix space containing the result. */
   TMatrixResource &_Tmatrix;
@@ -687,7 +737,8 @@ public:
    * @param nfactors Precomputed @f$n@f$ factors (read only).
    * @param wigner Precomputed @f$m>0@f$ Wigner D functions (read only).
    * @param converged_size Converged T-matrix variables (read only).
-   * @param aux Auxiliary space used to store intermediate calculations.
+   * @param aux_manager Auxiliary space manager used to obtain space to store
+   * intermediate calculations.
    * @param Tmatrix TMatrix space containing the result.
    * @param m_resource Resource that guarantees unique access to the @f$m=0@f$
    * values of the T-matrix.
@@ -695,11 +746,11 @@ public:
   inline TMatrixMAllTask(const uint_fast32_t m, const NBasedResources &nfactors,
                          const WignerDmn0Resources &wigner,
                          const ConvergedSizeResources &converged_size,
-                         TMatrixAuxiliarySpace &aux, TMatrixResource &Tmatrix,
-                         const Resource &m_resource)
+                         TMatrixAuxiliarySpaceManager &aux_manager,
+                         TMatrixResource &Tmatrix, const Resource &m_resource)
       : _m(m), _nfactors(nfactors), _wigner(wigner),
-        _converged_size(converged_size), _aux(aux), _Tmatrix(Tmatrix),
-        _m_resource(m_resource) {}
+        _converged_size(converged_size), _aux_manager(aux_manager),
+        _Tmatrix(Tmatrix), _m_resource(m_resource) {}
 
   virtual ~TMatrixMAllTask() {}
 
@@ -710,7 +761,6 @@ public:
    */
   inline void link_resources(QuickSched &quicksched) {
     // write access
-    quicksched.link_task_and_resource(*this, _aux, true);
     quicksched.link_task_and_resource(*this, _m_resource, true);
 
     // read access
@@ -721,8 +771,10 @@ public:
 
   /**
    * @brief Compute the @f$m>0@f$ elements of the T-matrix.
+   *
+   * @param thread_id ID of the thread that executes the task.
    */
-  virtual void execute() {
+  virtual void execute(const int_fast32_t thread_id) {
 
     // since we don't know how many elements the T matrix will have before
     // we create the tasks, we might have tasks for elements of the T matrix
@@ -732,7 +784,9 @@ public:
       return;
     }
 
-    _aux.reset();
+    TMatrixAuxiliarySpace &aux = _aux_manager.get_space(thread_id);
+
+    aux.reset();
 
     const uint_fast32_t ngauss = _converged_size.get_ngauss();
     const GaussBasedResources &quadrature_points =
@@ -873,14 +927,14 @@ public:
         }
         // prefactor sqrt{(2n1+1)*(2n2+1)/[n1*(n1+1)*n2*(n2+1)]}
         const float_type an12 = 2. * _nfactors.get_ann(n1, n2);
-        _aux._J11(n1 - 1, n2 - 1) = this_J11 * an12;
-        _aux._J12(n1 - 1, n2 - 1) = this_J12 * an12;
-        _aux._J21(n1 - 1, n2 - 1) = this_J21 * an12;
-        _aux._J22(n1 - 1, n2 - 1) = this_J22 * an12;
-        _aux._RgJ11(n1 - 1, n2 - 1) = this_RgJ11 * an12;
-        _aux._RgJ12(n1 - 1, n2 - 1) = this_RgJ12 * an12;
-        _aux._RgJ21(n1 - 1, n2 - 1) = this_RgJ21 * an12;
-        _aux._RgJ22(n1 - 1, n2 - 1) = this_RgJ22 * an12;
+        aux._J11(n1 - 1, n2 - 1) = this_J11 * an12;
+        aux._J12(n1 - 1, n2 - 1) = this_J12 * an12;
+        aux._J21(n1 - 1, n2 - 1) = this_J21 * an12;
+        aux._J22(n1 - 1, n2 - 1) = this_J22 * an12;
+        aux._RgJ11(n1 - 1, n2 - 1) = this_RgJ11 * an12;
+        aux._RgJ12(n1 - 1, n2 - 1) = this_RgJ12 * an12;
+        aux._RgJ21(n1 - 1, n2 - 1) = this_RgJ21 * an12;
+        aux._RgJ22(n1 - 1, n2 - 1) = this_RgJ22 * an12;
       }
     }
     for (uint_fast32_t n1 = _m; n1 < nmax + 1; ++n1) {
@@ -895,45 +949,43 @@ public:
         // to compensate for this, we multiply J12 and J21 with -i too
         // we then multiply J11 and J22 with -1, so that it is wrong again?
         // not sure how to make sense of this...
-        const std::complex<float_type> this_J11 = -_aux._J11(n1 - 1, n2 - 1);
-        const std::complex<float_type> this_RgJ11 =
-            -_aux._RgJ11(n1 - 1, n2 - 1);
+        const std::complex<float_type> this_J11 = -aux._J11(n1 - 1, n2 - 1);
+        const std::complex<float_type> this_RgJ11 = -aux._RgJ11(n1 - 1, n2 - 1);
         const std::complex<float_type> this_J12 =
-            -icompl * _aux._J12(n1 - 1, n2 - 1);
+            -icompl * aux._J12(n1 - 1, n2 - 1);
         const std::complex<float_type> this_RgJ12 =
-            -icompl * _aux._RgJ12(n1 - 1, n2 - 1);
+            -icompl * aux._RgJ12(n1 - 1, n2 - 1);
         const std::complex<float_type> this_J21 =
-            icompl * _aux._J21(n1 - 1, n2 - 1);
+            icompl * aux._J21(n1 - 1, n2 - 1);
         const std::complex<float_type> this_RgJ21 =
-            icompl * _aux._RgJ21(n1 - 1, n2 - 1);
-        const std::complex<float_type> this_J22 = -_aux._J22(n1 - 1, n2 - 1);
-        const std::complex<float_type> this_RgJ22 =
-            -_aux._RgJ22(n1 - 1, n2 - 1);
+            icompl * aux._RgJ21(n1 - 1, n2 - 1);
+        const std::complex<float_type> this_J22 = -aux._J22(n1 - 1, n2 - 1);
+        const std::complex<float_type> this_RgJ22 = -aux._RgJ22(n1 - 1, n2 - 1);
 
-        _aux._Q(k1 - 1, k2 - 1) =
+        aux._Q(k1 - 1, k2 - 1) =
             interaction.get_k2mr() * this_J21 + interaction.get_k2() * this_J12;
-        _aux._RgQ(k1 - 1, k2 - 1) = interaction.get_k2mr() * this_RgJ21 +
-                                    interaction.get_k2() * this_RgJ12;
+        aux._RgQ(k1 - 1, k2 - 1) = interaction.get_k2mr() * this_RgJ21 +
+                                   interaction.get_k2() * this_RgJ12;
 
-        _aux._Q(k1 - 1, kk2 - 1) =
+        aux._Q(k1 - 1, kk2 - 1) =
             interaction.get_k2mr() * this_J11 + interaction.get_k2() * this_J22;
-        _aux._RgQ(k1 - 1, kk2 - 1) = interaction.get_k2mr() * this_RgJ11 +
-                                     interaction.get_k2() * this_RgJ22;
+        aux._RgQ(k1 - 1, kk2 - 1) = interaction.get_k2mr() * this_RgJ11 +
+                                    interaction.get_k2() * this_RgJ22;
 
-        _aux._Q(kk1 - 1, k2 - 1) =
+        aux._Q(kk1 - 1, k2 - 1) =
             interaction.get_k2mr() * this_J22 + interaction.get_k2() * this_J11;
-        _aux._RgQ(kk1 - 1, k2 - 1) = interaction.get_k2mr() * this_RgJ22 +
-                                     interaction.get_k2() * this_RgJ11;
+        aux._RgQ(kk1 - 1, k2 - 1) = interaction.get_k2mr() * this_RgJ22 +
+                                    interaction.get_k2() * this_RgJ11;
 
-        _aux._Q(kk1 - 1, kk2 - 1) =
+        aux._Q(kk1 - 1, kk2 - 1) =
             interaction.get_k2mr() * this_J12 + interaction.get_k2() * this_J21;
-        _aux._RgQ(kk1 - 1, kk2 - 1) = interaction.get_k2mr() * this_RgJ12 +
-                                      interaction.get_k2() * this_RgJ21;
+        aux._RgQ(kk1 - 1, kk2 - 1) = interaction.get_k2mr() * this_RgJ12 +
+                                     interaction.get_k2() * this_RgJ21;
       }
     }
 
-    _aux._Q.plu_inverse(nm2, &_aux._pivot_array[0], _aux._pivot_array.size(),
-                        &_aux._work[0], _aux._work.size());
+    aux._Q.plu_inverse(nm2, &aux._pivot_array[0], aux._pivot_array.size(),
+                       &aux._work[0], aux._work.size());
 
     for (uint_fast32_t i = 0; i < nm; ++i) {
       for (uint_fast32_t j = 0; j < nm; ++j) {
@@ -942,11 +994,11 @@ public:
         _Tmatrix._T[_m](i, nm + j) = 0.;
         _Tmatrix._T[_m](nm + i, nm + j) = 0.;
         for (uint_fast32_t k = 0; k < nm2; ++k) {
-          _Tmatrix._T[_m](i, j) -= _aux._RgQ(i, k) * _aux._Q(k, j);
-          _Tmatrix._T[_m](nm + i, j) -= _aux._RgQ(nm + i, k) * _aux._Q(k, j);
-          _Tmatrix._T[_m](i, nm + j) -= _aux._RgQ(i, k) * _aux._Q(k, nm + j);
+          _Tmatrix._T[_m](i, j) -= aux._RgQ(i, k) * aux._Q(k, j);
+          _Tmatrix._T[_m](nm + i, j) -= aux._RgQ(nm + i, k) * aux._Q(k, j);
+          _Tmatrix._T[_m](i, nm + j) -= aux._RgQ(i, k) * aux._Q(k, nm + j);
           _Tmatrix._T[_m](nm + i, nm + j) -=
-              _aux._RgQ(nm + i, k) * _aux._Q(k, nm + j);
+              aux._RgQ(nm + i, k) * aux._Q(k, nm + j);
         }
       }
     }
@@ -999,8 +1051,10 @@ public:
 
   /**
    * @brief Compute the scattering and extinction coefficients.
+   *
+   * @param thread_id ID of the thread that executes the task.
    */
-  virtual void execute() {
+  virtual void execute(const int_fast32_t thread_id = 0) {
 
     _Tmatrix._Qscattering = 0.;
     for (uint_fast32_t n1 = 1; n1 < _Tmatrix._nmax + 1; ++n1) {

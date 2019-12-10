@@ -71,15 +71,15 @@ private:
 
 public:
   /**
-   * @brief MatrixMultiplicationTask
+   * @brief Constructor.
    *
-   * @param i
-   * @param j
-   * @param m
-   * @param k
-   * @param a
-   * @param b
-   * @param c
+   * @param i Row index.
+   * @param j Column index.
+   * @param m Number of rows in the first matrix.
+   * @param k Number of columns in the second matrix.
+   * @param a Matrix A.
+   * @param b Matrix B.
+   * @param c Result matrix.
    */
   MatrixMultiplicationTask(const uint_fast32_t i, const uint_fast32_t j,
                            const uint_fast32_t m, const uint_fast32_t k,
@@ -89,9 +89,11 @@ public:
   virtual ~MatrixMultiplicationTask() {}
 
   /**
-   * @brief execute
+   * @brief Execute the task.
+   *
+   * @param thread_id ID of the thread that executes the task.
    */
-  virtual void execute() {
+  virtual void execute(const int_fast32_t thread_id) {
     matmul(32, 32, _k * 32, &_a[_d[0] * 32], _m * 32, &_b[_k * 32 * _d[1] * 32],
            _k * 32, &_c[_d[0] * 32 + _m * 32 * _d[1] * 32], _m * 32);
   }
@@ -214,11 +216,7 @@ int main(int argc, char **argv) {
     ConvergedSizeResources converged_size;
     quicksched.register_resource(converged_size);
 
-    std::vector<TMatrixAuxiliarySpace *> auxspace(auxsize, nullptr);
-    for (uint_fast32_t i = 0; i < auxsize; ++i) {
-      auxspace[i] = new TMatrixAuxiliarySpace(maximum_order);
-      quicksched.register_resource(*auxspace[i]);
-    }
+    TMatrixAuxiliarySpaceManager aux_manager(4, maximum_order);
 
     std::vector<GaussBasedResources *> gaussfactors(maxgauss, nullptr);
     std::vector<WignerDm0Resources *> wignerm0factors(maxgauss, nullptr);
@@ -259,9 +257,8 @@ int main(int argc, char **argv) {
 
       tmatrixm0tasks[ig] = new TMatrixM0Task(
           1.e-4, 50, ig + 20, nfactors, *gaussfactors[ig], *geometryfactors[ig],
-          *interactionfactors[ig], *wignerm0factors[ig],
-          *auxspace[ig % auxsize], *tmatrices[ig], converged_size,
-          tmatrices[ig]->get_m_resource(0));
+          *interactionfactors[ig], *wignerm0factors[ig], aux_manager,
+          *tmatrices[ig], converged_size, tmatrices[ig]->get_m_resource(0));
       quicksched.register_task(*tmatrixm0tasks[ig]);
       tmatrixm0tasks[ig]->link_resources(quicksched);
       quicksched.link_tasks(nfactors, *tmatrixm0tasks[ig]);
@@ -286,9 +283,6 @@ int main(int argc, char **argv) {
       quicksched.print_task(*tmatrixm0tasks[ig], taskfile);
       delete tmatrices[ig];
       delete tmatrixm0tasks[ig];
-    }
-    for (uint_fast32_t i = 0; i < auxsize; ++i) {
-      delete auxspace[i];
     }
     std::ofstream typefile("test_quicksched_types.txt");
     typefile << "# type\tlabel\n";

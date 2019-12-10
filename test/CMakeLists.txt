@@ -132,5 +132,5 @@ add_unit_test(NAME testDraineHensleyShapeDistribution
 ### Done adding unit tests. Create the 'make check' target #####################
 ### Do not touch these lines unless you know what you're doing! ################
 add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
-                                  -R testTMatrixCalculator
+                                  -R testTaskBasedTMatrixCalculation
                         DEPENDS ${TESTNAMES})

@@ -165,8 +165,10 @@ public:
 
   /**
    * @brief Compute the factors.
+   *
+   * @param thread_id ID of the thread that executes the task.
    */
-  virtual void execute() {
+  virtual void execute(const int_fast32_t thread_id = 0) {
 
     for (uint_fast32_t ig = 0; ig < 2 * _ngauss; ++ig) {
       _kr[ig] = _k * _geometry.get_r(ig);

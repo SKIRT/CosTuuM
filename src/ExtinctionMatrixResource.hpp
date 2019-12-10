@@ -67,8 +67,10 @@ public:
 
   /**
    * @brief Compute the extinction matrix.
+   *
+   * @param thread_id ID of the thread that executes the task.
    */
-  virtual void execute() {
+  virtual void execute(const int_fast32_t thread_id = 0) {
 
     // compute all sines and cosines in one go; we need all of them anyway
     const float_type costheta_l = cos(_theta);

@@ -103,8 +103,10 @@ public:
 
   /**
    * @brief Compute the factors.
+   *
+   * @param thread_id ID of the thread that executes the task.
    */
-  virtual void execute() {
+  virtual void execute(const int_fast32_t thread_id = 0) {
 
     SpecialFunctions::get_r_dr_spheroid(&_quadrature_points.get_costhetas()[0],
                                         _r2.size(), _R_V, _axis_ratio, &_r2[0],
