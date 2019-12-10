@@ -122,6 +122,25 @@ public:
   virtual ~ScatteringMatrixResource() {}
 
   /**
+   * @brief Get the size in memory of a hypothetical ScatteringMatrixResource
+   * object with the given parameters.
+   *
+   * @param maximum_order Maximum order of the hypothetical object.
+   * @return Size in bytes that the object would occupy.
+   */
+  static inline size_t get_memory_size(const uint_fast32_t maximum_order) {
+    // storage space for class variables
+    size_t size = sizeof(ScatteringMatrixResource);
+    // float_type matrices
+    size += (16 + 9 + 5 * 6 + 2 * 4) * sizeof(float_type);
+    // complex matrices
+    size += (maximum_order * maximum_order + 4) * 2 * sizeof(float_type);
+    // Wigner D arrays
+    size += 4 * maximum_order * sizeof(float_type);
+    return size;
+  }
+
+  /**
    * @brief Link the resources for this task.
    *
    * @param quicksched QuickSched library.

@@ -71,6 +71,53 @@ int main(int argc, char **argv) {
   const bool do_quicksched_test = true;
   const bool do_full_benchmark_test = true;
 
+  {
+    const uint_fast32_t maximum_order = 100;
+    const uint_fast32_t ndgs = 2;
+    ctm_warning("Memory estimate:");
+    ctm_warning("NBasedResources: %s",
+                Utilities::human_readable_bytes(
+                    NBasedResources::get_memory_size(maximum_order))
+                    .c_str());
+    ctm_warning(
+        "TMatrixAuxiliarySpaceManager: %s",
+        Utilities::human_readable_bytes(
+            TMatrixAuxiliarySpaceManager::get_memory_size(1, maximum_order))
+            .c_str());
+    ctm_warning("GaussBasedResources: %s",
+                Utilities::human_readable_bytes(
+                    GaussBasedResources::get_memory_size(ndgs * maximum_order))
+                    .c_str());
+    ctm_warning("WignerDm0Resources: %s",
+                Utilities::human_readable_bytes(
+                    WignerDm0Resources::get_memory_size(maximum_order,
+                                                        ndgs * maximum_order))
+                    .c_str());
+    ctm_warning(
+        "ParticleGeometryResource: %s",
+        Utilities::human_readable_bytes(
+            ParticleGeometryResource::get_memory_size(ndgs * maximum_order))
+            .c_str());
+    ctm_warning("InteractionResource: %s",
+                Utilities::human_readable_bytes(
+                    InteractionResource::get_memory_size(maximum_order,
+                                                         ndgs * maximum_order))
+                    .c_str());
+    ctm_warning("TMatrixResource: %s",
+                Utilities::human_readable_bytes(
+                    TMatrixResource::get_memory_size(maximum_order))
+                    .c_str());
+    ctm_warning("WignerDmn0Resources: %s",
+                Utilities::human_readable_bytes(
+                    WignerDmn0Resources::get_memory_size(maximum_order,
+                                                         ndgs * maximum_order))
+                    .c_str());
+    ctm_warning("ScatteringMatrixResource: %s",
+                Utilities::human_readable_bytes(
+                    ScatteringMatrixResource::get_memory_size(maximum_order))
+                    .c_str());
+  }
+
   if (do_serial_test || do_quicksched_test) {
     std::ifstream ifile("test_tmatrixcalculator.txt");
     std::string line;
@@ -171,6 +218,7 @@ int main(int argc, char **argv) {
       }
 
       TMatrixResource Tmatrix(maximum_order);
+
       std::vector<TMatrixM0Task *> m0tasks(maximum_order - minimum_order,
                                            nullptr);
       for (uint_fast32_t i = 0; i < maximum_order - minimum_order; ++i) {

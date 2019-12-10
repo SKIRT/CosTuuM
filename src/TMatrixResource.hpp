@@ -376,6 +376,22 @@ public:
   }
 
   /**
+   * @brief Get the size in memory of a hypothetical
+   * TMatrixAuxiliarySpaceManager object with the given parameters.
+   *
+   * @param num_threads Number of threads or number of auxiliary spaces.
+   * @param maximum_order Maximum order of the hypothetical spaces.
+   * @return Size in bytes that the object would occupy.
+   */
+  static inline size_t get_memory_size(const int_fast32_t num_threads,
+                                       const uint_fast32_t maximum_order) {
+    // storage space for class variables
+    size_t size = sizeof(TMatrixAuxiliarySpaceManager);
+    size += num_threads * TMatrixAuxiliarySpace::get_memory_size(maximum_order);
+    return size;
+  }
+
+  /**
    * @brief Get a reference to the auxiliary space for the thread with the
    * given ID.
    *
