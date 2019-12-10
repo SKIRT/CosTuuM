@@ -11,6 +11,7 @@
 #define INTERACTIONRESOURCE_HPP
 
 #include "Configuration.hpp"
+#include "ConvergedSizeResources.hpp"
 #include "GaussBasedResources.hpp"
 #include "Matrix.hpp"
 #include "ParticleGeometryResource.hpp"
@@ -331,6 +332,10 @@ private:
   /*! @brief Geometrical factors for this particle (read only). */
   const ParticleGeometryResource &_geometry;
 
+  /*! @brief Resource keeping track of the convergence of the calculation (read
+   *  only). */
+  const ConvergedSizeResources &_converged_size;
+
   /*! @brief InteractionResource object to operate on. */
   InteractionResource &_interaction;
 
@@ -341,13 +346,16 @@ public:
    * @param nmax Maximum order of the spherical basis functions, @f$n_{max}@f$.
    * @param ngauss Number of Gauss-Legendre quadrature points, @f$n_{GL}@f$.
    * @param geometry Geometrical factors for this particle.
+   * @param converged_size Resource keeping track of the convergence of the
+   * calculation.
    * @param interaction InteractionResource object to operate on.
    */
   inline InteractionTask(const uint_fast32_t nmax, const uint_fast32_t ngauss,
                          const ParticleGeometryResource &geometry,
+                         const ConvergedSizeResources &converged_size,
                          InteractionResource &interaction)
       : _nmax(nmax), _ngauss(ngauss), _geometry(geometry),
-        _interaction(interaction) {}
+        _converged_size(converged_size), _interaction(interaction) {}
 
   virtual ~InteractionTask() {}
 
@@ -362,6 +370,7 @@ public:
 
     // read access
     quicksched.link_task_and_resource(*this, _geometry, false);
+    quicksched.link_task_and_resource(*this, _converged_size, false);
   }
 
   /**
@@ -370,6 +379,11 @@ public:
    * @param thread_id ID of the thread that executes the task.
    */
   virtual void execute(const int_fast32_t thread_id = 0) {
+
+    if (_converged_size.is_converged()) {
+      // skip this task if the T-matrix was already converged
+      return;
+    }
 
     for (uint_fast32_t ig = 0; ig < 2 * _ngauss; ++ig) {
       _interaction._kr[ig] = _interaction._k * _geometry.get_r(ig);

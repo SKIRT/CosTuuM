@@ -225,14 +225,6 @@ public:
    * @return Wavenumber.
    */
   inline float_type get_wavenumber() const { return _wavenumber; }
-
-  /**
-   * @brief Reset the relative differences to force an update of the T-matrix.
-   */
-  inline void reset_relative_differences() {
-    _dQextinction = -1.;
-    _dQscattering = -1.;
-  }
 };
 
 /**
@@ -516,12 +508,9 @@ public:
   virtual void execute(const int_fast32_t thread_id) {
 
     // check if we need to do something
-    if (_Tmatrix._dQscattering > 0.) {
-      if (_Tmatrix._dQscattering <= _tolerance &&
-          _Tmatrix._dQextinction <= _tolerance) {
-        // tolerance was already reached; abort task
-        return;
-      }
+    if (_converged_size.is_converged()) {
+      // tolerance was already reached; abort task
+      return;
     }
 
     TMatrixAuxiliarySpace &aux = _aux_manager.get_space(thread_id);
@@ -704,6 +693,13 @@ public:
                                     _Tmatrix._Qscattering);
       _Tmatrix._dQextinction = fabs((old_Qextinction - _Tmatrix._Qextinction) /
                                     _Tmatrix._Qextinction);
+    }
+
+    if (_Tmatrix._dQscattering > 0.) {
+      if (_Tmatrix._dQscattering <= _tolerance &&
+          _Tmatrix._dQextinction <= _tolerance) {
+        _converged_size._is_converged = true;
+      }
     }
   }
 

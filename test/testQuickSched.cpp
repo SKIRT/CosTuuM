@@ -250,7 +250,7 @@ int main(int argc, char **argv) {
       quicksched.register_resource(*interactionfactors[ig]);
       interaction_tasks[ig] =
           new InteractionTask(maximum_order, ig + 20, *geometryfactors[ig],
-                              *interactionfactors[ig]);
+                              converged_size, *interactionfactors[ig]);
       quicksched.register_task(*interaction_tasks[ig]);
       interaction_tasks[ig]->link_resources(quicksched);
       quicksched.link_tasks(*geometryfactors[ig], *interaction_tasks[ig]);

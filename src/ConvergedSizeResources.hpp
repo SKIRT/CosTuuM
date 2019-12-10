@@ -51,13 +51,17 @@ private:
   /*! @brief Interaction variables for the converged T-matrix. */
   const InteractionResource *_interaction;
 
+  /*! @brief Flag signaling whether or not the T-matrix caluclation is
+   *  converged. */
+  bool _is_converged;
+
 public:
   /**
    * @brief Empty constructor.
    */
   inline ConvergedSizeResources()
       : _nmax(0), _ngauss(0), _quadrature_points(nullptr), _geometry(nullptr),
-        _interaction(nullptr) {}
+        _interaction(nullptr), _is_converged(false) {}
 
   /**
    * @brief Get the maximum order.
@@ -99,6 +103,13 @@ public:
   inline const InteractionResource *get_interaction() const {
     return _interaction;
   }
+
+  /**
+   * @brief Is the T-matrix calculation converged?
+   *
+   * @return True if the calculation is converged.
+   */
+  inline bool is_converged() const { return _is_converged; }
 };
 
 #endif // CONVERGEDSIZERESOURCES_HPP
