@@ -39,7 +39,9 @@ public:
              const uint_fast32_t nmax) const {
 
     if (equal_volume_radius < 1.e-7) {
-      return new OrientationDistribution(nmax);
+      OrientationDistribution *distribution = new OrientationDistribution(nmax);
+      distribution->initialise();
+      return distribution;
     } else {
       return new DavisGreensteinOrientationDistribution(nmax, axis_ratio);
     }
