@@ -222,6 +222,7 @@ int main(int argc, char **argv) {
     std::vector<WignerDm0Resources *> wignerm0factors(maxgauss, nullptr);
     std::vector<ParticleGeometryResource *> geometryfactors(maxgauss, nullptr);
     std::vector<InteractionResource *> interactionfactors(maxgauss, nullptr);
+    std::vector<InteractionTask *> interaction_tasks(maxgauss, nullptr);
     std::vector<TMatrixResource *> tmatrices(maxgauss, nullptr);
     std::vector<TMatrixM0Task *> tmatrixm0tasks(maxgauss, nullptr);
     for (uint_fast32_t ig = 0; ig < maxgauss; ++ig) {
@@ -244,13 +245,15 @@ int main(int argc, char **argv) {
       geometryfactors[ig]->link_resources(quicksched);
       quicksched.link_tasks(*gaussfactors[ig], *geometryfactors[ig]);
 
-      interactionfactors[ig] =
-          new InteractionResource(100., std::complex<float_type>(1., 0.02),
-                                  maximum_order, ig + 20, *geometryfactors[ig]);
+      interactionfactors[ig] = new InteractionResource(
+          100., std::complex<float_type>(1., 0.02), maximum_order, ig + 20);
       quicksched.register_resource(*interactionfactors[ig]);
-      quicksched.register_task(*interactionfactors[ig]);
-      interactionfactors[ig]->link_resources(quicksched);
-      quicksched.link_tasks(*geometryfactors[ig], *interactionfactors[ig]);
+      interaction_tasks[ig] =
+          new InteractionTask(maximum_order, ig + 20, *geometryfactors[ig],
+                              *interactionfactors[ig]);
+      quicksched.register_task(*interaction_tasks[ig]);
+      interaction_tasks[ig]->link_resources(quicksched);
+      quicksched.link_tasks(*geometryfactors[ig], *interaction_tasks[ig]);
 
       tmatrices[ig] = new TMatrixResource(maximum_order);
       quicksched.register_resource(tmatrices[ig]->get_m_resource(0));
@@ -262,7 +265,7 @@ int main(int argc, char **argv) {
       quicksched.register_task(*tmatrixm0tasks[ig]);
       tmatrixm0tasks[ig]->link_resources(quicksched);
       quicksched.link_tasks(nfactors, *tmatrixm0tasks[ig]);
-      quicksched.link_tasks(*interactionfactors[ig], *tmatrixm0tasks[ig]);
+      quicksched.link_tasks(*interaction_tasks[ig], *tmatrixm0tasks[ig]);
       quicksched.link_tasks(*wignerm0factors[ig], *tmatrixm0tasks[ig]);
     }
 
@@ -278,8 +281,9 @@ int main(int argc, char **argv) {
       delete wignerm0factors[ig];
       quicksched.print_task(*geometryfactors[ig], taskfile);
       delete geometryfactors[ig];
-      quicksched.print_task(*interactionfactors[ig], taskfile);
+      quicksched.print_task(*interaction_tasks[ig], taskfile);
       delete interactionfactors[ig];
+      delete interaction_tasks[ig];
       quicksched.print_task(*tmatrixm0tasks[ig], taskfile);
       delete tmatrices[ig];
       delete tmatrixm0tasks[ig];

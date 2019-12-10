@@ -29,7 +29,11 @@ using namespace std;
  * precomputed, particle specific geometric factors, and a specific choice of
  * particle refractive index and interaction wavelength.
  */
-class InteractionResource : public Resource, public Task, public Computable {
+class InteractionResource : public Resource {
+
+  /*! @brief Grant access to computation tasks. */
+  friend class InteractionTask;
+
 private:
   /*! @brief Maximum order of the spherical basis functions, @f$n_{max}@f$. */
   const uint_fast32_t _nmax;
@@ -88,9 +92,6 @@ private:
    *  matrix). */
   Matrix<std::complex<float_type>> _djkrmr;
 
-  /*! @brief Geometrical factors for this particle (read only). */
-  const ParticleGeometryResource &_geometry;
-
 public:
   /**
    * @brief Constructor.
@@ -99,20 +100,18 @@ public:
    * @param refractive_index Refractive index of the material, @f$m_r@f$.
    * @param nmax Maximum order of spherical basis, @f$n_{max}@f$.
    * @param ngauss Number of Gauss-Legendre quadrature points, @f$n_{GL}@f$.
-   * @param geometry Geometrical factors for this particle (read only).
    */
   inline InteractionResource(const float_type wavelength,
                              const std::complex<float_type> refractive_index,
                              const uint_fast32_t nmax,
-                             const uint_fast32_t ngauss,
-                             const ParticleGeometryResource &geometry)
+                             const uint_fast32_t ngauss)
       : _nmax(nmax), _ngauss(ngauss), _k(2. * M_PI / wavelength), _k2(_k * _k),
         _kmr(refractive_index * _k), _k2mr(refractive_index * _k2),
         _kr(2 * ngauss, float_type(0.)), _krinv(2 * ngauss, float_type(0.)),
         _krmr(2 * ngauss, float_type(0.)), _krmrinv(2 * ngauss, float_type(0.)),
         _jkr(2 * ngauss, nmax), _ykr(2 * ngauss, nmax), _djkr(2 * ngauss, nmax),
         _dykr(2 * ngauss, nmax), _jkrmr(2 * ngauss, nmax),
-        _djkrmr(2 * ngauss, nmax), _geometry(geometry) {}
+        _djkrmr(2 * ngauss, nmax) {}
 
   virtual ~InteractionResource() {}
 
@@ -151,63 +150,6 @@ public:
   }
 
   /**
-   * @brief Link the resources for this task.
-   *
-   * @param quicksched QuickSched library.
-   */
-  inline void link_resources(QuickSched &quicksched) {
-    // write access
-    quicksched.link_task_and_resource(*this, *this, true);
-
-    // read access
-    quicksched.link_task_and_resource(*this, _geometry, false);
-  }
-
-  /**
-   * @brief Compute the factors.
-   *
-   * @param thread_id ID of the thread that executes the task.
-   */
-  virtual void execute(const int_fast32_t thread_id = 0) {
-
-    for (uint_fast32_t ig = 0; ig < 2 * _ngauss; ++ig) {
-      _kr[ig] = _k * _geometry.get_r(ig);
-      _krmr[ig] = _kmr * _geometry.get_r(ig);
-      _krinv[ig] = float_type(1.) / _kr[ig];
-      _krmrinv[ig] = std::complex<float_type>(1.) / _krmr[ig];
-    }
-
-    ctm_assert_no_nans(_kr, 2 * _ngauss);
-    ctm_assert_no_nans(_krmr, 2 * _ngauss);
-    ctm_assert_no_nans(_krinv, 2 * _ngauss);
-    ctm_assert_no_nans(_krmrinv, 2 * _ngauss);
-
-    for (uint_fast32_t ig = 0; ig < 2 * _ngauss; ++ig) {
-      SpecialFunctions::spherical_j_jdj_array(_nmax, _kr[ig], _jkr.get_row(ig),
-                                              _djkr.get_row(ig));
-      SpecialFunctions::spherical_y_ydy_array(_nmax, _kr[ig], _ykr.get_row(ig),
-                                              _dykr.get_row(ig));
-      SpecialFunctions::spherical_j_jdj_array(
-          _nmax, _krmr[ig], _jkrmr.get_row(ig), _djkrmr.get_row(ig));
-
-      ctm_assert_message_no_nans(_jkr.get_row(ig), _nmax, "_nmax: %" PRIuFAST32,
-                                 _nmax);
-      ctm_assert_message_no_nans(_djkr.get_row(ig), _nmax,
-                                 "_nmax: %" PRIuFAST32, _nmax);
-      ctm_assert_message_no_nans(_ykr.get_row(ig), _nmax, "_nmax: %" PRIuFAST32,
-                                 _nmax);
-      ctm_assert_message_no_nans(_dykr.get_row(ig), _nmax,
-                                 "_nmax: %" PRIuFAST32, _nmax);
-      ctm_assert_message_no_nans(_jkrmr.get_row(ig), _nmax,
-                                 "_nmax: %" PRIuFAST32, _nmax);
-      ctm_assert_message_no_nans(_djkrmr.get_row(ig), _nmax,
-                                 "_nmax: %" PRIuFAST32, _nmax);
-    }
-
-    make_available();
-  }
-
-  /**
    * @brief Get the computational cost of this task.
    *
    * @return Computational cost.
@@ -219,33 +161,21 @@ public:
    *
    * @return Wavenumber.
    */
-  inline float_type get_k() const {
-    // check that the resource was actually computed
-    check_use();
-    return _k;
-  }
+  inline float_type get_k() const { return _k; }
 
   /**
    * @brief Get the wavenumber squared.
    *
    * @return Wavenumber squared.
    */
-  inline float_type get_k2() const {
-    // check that the resource was actually computed
-    check_use();
-    return _k2;
-  }
+  inline float_type get_k2() const { return _k2; }
 
   /**
    * @brief Get the wavenumber squared times the refractive index.
    *
    * @return Wavenumber squared times the refractive index.
    */
-  inline std::complex<float_type> get_k2mr() const {
-    // check that the resource was actually computed
-    check_use();
-    return _k2mr;
-  }
+  inline std::complex<float_type> get_k2mr() const { return _k2mr; }
 
   /**
    * @brief Get the wavenumber multiplied with the radius for the given Gauss-
@@ -256,8 +186,6 @@ public:
    */
   inline float_type get_kr(const uint_fast32_t ig) const {
     ctm_assert(ig < 2 * _ngauss);
-    // check that the resource was actually computed
-    check_use();
     return _kr[ig];
   }
 
@@ -270,8 +198,6 @@ public:
    */
   inline float_type get_krinv(const uint_fast32_t ig) const {
     ctm_assert(ig < 2 * _ngauss);
-    // check that the resource was actually computed
-    check_use();
     return _krinv[ig];
   }
 
@@ -284,8 +210,6 @@ public:
    */
   inline std::complex<float_type> get_krmr(const uint_fast32_t ig) const {
     ctm_assert(ig < 2 * _ngauss);
-    // check that the resource was actually computed
-    check_use();
     return _krmr[ig];
   }
 
@@ -298,8 +222,6 @@ public:
    */
   inline std::complex<float_type> get_krmrinv(const uint_fast32_t ig) const {
     ctm_assert(ig < 2 * _ngauss);
-    // check that the resource was actually computed
-    check_use();
     return _krmrinv[ig];
   }
 
@@ -315,8 +237,6 @@ public:
                             const uint_fast32_t n) const {
     ctm_assert(ig < 2 * _ngauss);
     ctm_assert(n - 1 < _nmax);
-    // check that the resource was actually computed
-    check_use();
     return _jkr(ig, n - 1);
   }
 
@@ -332,8 +252,6 @@ public:
                             const uint_fast32_t n) const {
     ctm_assert(ig < 2 * _ngauss);
     ctm_assert(n - 1 < _nmax);
-    // check that the resource was actually computed
-    check_use();
     return _ykr(ig, n - 1);
   }
 
@@ -349,8 +267,6 @@ public:
                              const uint_fast32_t n) const {
     ctm_assert(ig < 2 * _ngauss);
     ctm_assert(n - 1 < _nmax);
-    // check that the resource was actually computed
-    check_use();
     return _djkr(ig, n - 1);
   }
 
@@ -366,8 +282,6 @@ public:
                              const uint_fast32_t n) const {
     ctm_assert(ig < 2 * _ngauss);
     ctm_assert(n - 1 < _nmax);
-    // check that the resource was actually computed
-    check_use();
     return _dykr(ig, n - 1);
   }
 
@@ -383,8 +297,6 @@ public:
                                             const uint_fast32_t n) const {
     ctm_assert(ig < 2 * _ngauss);
     ctm_assert(n - 1 < _nmax);
-    // check that the resource was actually computed
-    check_use();
     return _jkrmr(ig, n - 1);
   }
 
@@ -400,9 +312,102 @@ public:
                                              const uint_fast32_t n) const {
     ctm_assert(ig < 2 * _ngauss);
     ctm_assert(n - 1 < _nmax);
-    // check that the resource was actually computed
-    check_use();
     return _djkrmr(ig, n - 1);
+  }
+};
+
+/**
+ * @brief Task that computes interaction resources for a specific order and
+ * number of quadrature points.
+ */
+class InteractionTask : public Task {
+private:
+  /*! @brief Maximum order of the spherical basis functions, @f$n_{max}@f$. */
+  const uint_fast32_t _nmax;
+
+  /*! @brief Number of Gauss-Legendre quadrature points, @f$n_{GL}@f$. */
+  const uint_fast32_t _ngauss;
+
+  /*! @brief Geometrical factors for this particle (read only). */
+  const ParticleGeometryResource &_geometry;
+
+  /*! @brief InteractionResource object to operate on. */
+  InteractionResource &_interaction;
+
+public:
+  /**
+   * @brief Constructor.
+   *
+   * @param nmax Maximum order of the spherical basis functions, @f$n_{max}@f$.
+   * @param ngauss Number of Gauss-Legendre quadrature points, @f$n_{GL}@f$.
+   * @param geometry Geometrical factors for this particle.
+   * @param interaction InteractionResource object to operate on.
+   */
+  inline InteractionTask(const uint_fast32_t nmax, const uint_fast32_t ngauss,
+                         const ParticleGeometryResource &geometry,
+                         InteractionResource &interaction)
+      : _nmax(nmax), _ngauss(ngauss), _geometry(geometry),
+        _interaction(interaction) {}
+
+  virtual ~InteractionTask() {}
+
+  /**
+   * @brief Link the resources for this task.
+   *
+   * @param quicksched QuickSched library.
+   */
+  inline void link_resources(QuickSched &quicksched) {
+    // write access
+    quicksched.link_task_and_resource(*this, _interaction, true);
+
+    // read access
+    quicksched.link_task_and_resource(*this, _geometry, false);
+  }
+
+  /**
+   * @brief Compute the factors.
+   *
+   * @param thread_id ID of the thread that executes the task.
+   */
+  virtual void execute(const int_fast32_t thread_id = 0) {
+
+    for (uint_fast32_t ig = 0; ig < 2 * _ngauss; ++ig) {
+      _interaction._kr[ig] = _interaction._k * _geometry.get_r(ig);
+      _interaction._krmr[ig] = _interaction._kmr * _geometry.get_r(ig);
+      _interaction._krinv[ig] = float_type(1.) / _interaction._kr[ig];
+      _interaction._krmrinv[ig] =
+          std::complex<float_type>(1.) / _interaction._krmr[ig];
+    }
+
+    ctm_assert_no_nans(_interaction._kr, 2 * _ngauss);
+    ctm_assert_no_nans(_interaction._krmr, 2 * _ngauss);
+    ctm_assert_no_nans(_interaction._krinv, 2 * _ngauss);
+    ctm_assert_no_nans(_interaction._krmrinv, 2 * _ngauss);
+
+    for (uint_fast32_t ig = 0; ig < 2 * _ngauss; ++ig) {
+      SpecialFunctions::spherical_j_jdj_array(_nmax, _interaction._kr[ig],
+                                              _interaction._jkr.get_row(ig),
+                                              _interaction._djkr.get_row(ig));
+      SpecialFunctions::spherical_y_ydy_array(_nmax, _interaction._kr[ig],
+                                              _interaction._ykr.get_row(ig),
+                                              _interaction._dykr.get_row(ig));
+      SpecialFunctions::spherical_j_jdj_array(_nmax, _interaction._krmr[ig],
+                                              _interaction._jkrmr.get_row(ig),
+                                              _interaction._djkrmr.get_row(ig));
+
+      ctm_assert_message_no_nans(_interaction._jkr.get_row(ig), _nmax,
+                                 "_nmax: %" PRIuFAST32, _nmax);
+      ctm_assert_message_no_nans(_interaction._djkr.get_row(ig), _nmax,
+                                 "_nmax: %" PRIuFAST32, _nmax);
+      ctm_assert_message_no_nans(_interaction._ykr.get_row(ig), _nmax,
+                                 "_nmax: %" PRIuFAST32, _nmax);
+      ctm_assert_message_no_nans(_interaction._dykr.get_row(ig), _nmax,
+                                 "_nmax: %" PRIuFAST32, _nmax);
+      ctm_assert_message_no_nans(_interaction._jkrmr.get_row(ig), _nmax,
+                                 "_nmax: %" PRIuFAST32, _nmax);
+      ctm_assert_message_no_nans(_interaction._djkrmr.get_row(ig), _nmax,
+                                 "_nmax: %" PRIuFAST32, _nmax);
+    }
   }
 };
 
