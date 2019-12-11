@@ -29,9 +29,6 @@ class ParticleGeometryResource : public Resource,
                                  public Task,
                                  public Computable {
 private:
-  /*! @brief Equal volume sphere radius, @f$R_V@f$. */
-  const float_type _R_V;
-
   /*! @brief Axis ratio of the spheroid, @f$d = \frac{a}{b}@f$. */
   const float_type _axis_ratio;
 
@@ -54,19 +51,16 @@ public:
   /**
    * @brief Constructor.
    *
-   * @param R_V Equal volume sphere radius, @f$R_V@f$.
    * @param axis_ratio Axis ratio of the spheroid, @f$d = \frac{a}{b}@f$.
    * @param ngauss Number of Gauss-Legendre quadrature points, @f$n_{GL}@f$.
    * @param quadrature_points Gauss-Legendre quadrature points (to be computed
    * before this task is executed!).
    */
-  inline ParticleGeometryResource(const float_type R_V,
-                                  const float_type axis_ratio,
+  inline ParticleGeometryResource(const float_type axis_ratio,
                                   const uint_fast32_t ngauss,
                                   const GaussBasedResources &quadrature_points)
-      : _R_V(R_V), _axis_ratio(axis_ratio), _r(2 * ngauss, 0.),
-        _r2(2 * ngauss, 0.), _dr_over_r(2 * ngauss, 0.),
-        _quadrature_points(quadrature_points) {}
+      : _axis_ratio(axis_ratio), _r(2 * ngauss, 0.), _r2(2 * ngauss, 0.),
+        _dr_over_r(2 * ngauss, 0.), _quadrature_points(quadrature_points) {}
 
   virtual ~ParticleGeometryResource() {}
 
@@ -109,7 +103,7 @@ public:
   virtual void execute(const int_fast32_t thread_id = 0) {
 
     SpecialFunctions::get_r_dr_spheroid(&_quadrature_points.get_costhetas()[0],
-                                        _r2.size(), _R_V, _axis_ratio, &_r2[0],
+                                        _r2.size(), _axis_ratio, &_r2[0],
                                         &_dr_over_r[0]);
     for (uint_fast32_t ig = 0; ig < _r2.size(); ++ig) {
       _r[ig] = sqrt(_r2[ig]);

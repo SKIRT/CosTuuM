@@ -769,8 +769,8 @@ public:
 
   /**
    * @brief Get the radius (squared) and derivative w.r.t. azimuthal angle
-   * divided by the radius for an spheroid with the given equal volume sphere
-   * radius and axis ratio, for the given input azimuthal angles.
+   * divided by the radius for a spheroid with the given axis ratio, for the
+   * given input azimuthal angles.
    *
    * The equation of a spheroid is
    * @f[
@@ -801,38 +801,46 @@ public:
    *      = \frac{a\sin(\theta{})\cos(\theta{})(d^2-1)}{
    *        \left(\sin^2(\theta{}) + d^2\cos^2(\theta{})\right)^{\frac{3}{2}}}
    *      = r \frac{\sin(\theta{})\cos(\theta{})(d^2-1)}{
-   *        \sin^2(\theta{}) + d^2\cos^2(\theta{})}
+   *        \sin^2(\theta{}) + d^2\cos^2(\theta{})}.
    * @f]
+   *
+   * Note that the radii for a given axis ratio can be calculated for a
+   * representative radius @f$R_V=1@f$. The radii for another value of @f$R_V@f$
+   * can then be obtained by simply multiplying with that value of @f$R_V@f$.
+   * The derivatives that are output by this function are per construction
+   * independent of the value of @f$R_V@f$ and only depend on the axis ratio.
    *
    * @param costheta Cosine of the azimuthal angles, @f$\cos(\theta{})@f$. We
    * assume that values are given in order from low to high, and are symmetric
    * w.r.t. @f$0@f$.
    * @param size Size of the input and output arrays.
-   * @param R_V Equal volume sphere radius, @f$R_V@f$.
    * @param axis_ratio Ratio of horizontal to vertical axis,
    * @f$d = \frac{a}{b}@f$.
    * @param r2 Output radii squared, @f$r^2(\theta{})@f$. This vector should be
    * preallocated with the correct size, i.e. the same size as the input vector.
+   * To obtain the actual radii for a particle with @f$R_V\neq{}1@f$, these
+   * values need to be multiplied with @f$R_V^2@f$.
    * @param dr_over_r Derivative over radius,
    * @f$\frac{1}{r(\theta{})}\frac{dr(\theta{})}{d\theta{}}@f$. This vector
    * should be preallocated with the correct size, i.e. the same size as the
-   * input vector.
+   * input vector. Given its definition, these values are independent of a
+   * specific choice of @f$R_V@f$.
    * @tparam DATA_TYPE Data type of input and output values.
    */
   template <typename DATA_TYPE>
-  static inline void
-  get_r_dr_spheroid(const DATA_TYPE *costheta, const uint_fast32_t size,
-                    const DATA_TYPE R_V, const DATA_TYPE axis_ratio,
-                    DATA_TYPE *r2, DATA_TYPE *dr_over_r) {
+  static inline void get_r_dr_spheroid(const DATA_TYPE *costheta,
+                                       const uint_fast32_t size,
+                                       const DATA_TYPE axis_ratio,
+                                       DATA_TYPE *r2, DATA_TYPE *dr_over_r) {
 
     // compute the horizontal axis length
-    const DATA_TYPE a = R_V * cbrt(axis_ratio);
+    const DATA_TYPE a = cbrt(axis_ratio);
     const DATA_TYPE a2 = a * a;
     const DATA_TYPE axis_ratio2 = axis_ratio * axis_ratio;
     const DATA_TYPE axis_ratio2m1 = axis_ratio2 - 1.;
     for (uint_fast32_t i = 0; i < size / 2; ++i) {
       const DATA_TYPE costheta2 = costheta[i] * costheta[i];
-      const DATA_TYPE sintheta2 = 1. - costheta2;
+      const DATA_TYPE sintheta2 = (1. - costheta[i]) * (1. + costheta[i]);
       const DATA_TYPE sintheta = sqrt(sintheta2);
       const DATA_TYPE r2_over_a2 = 1. / (sintheta2 + axis_ratio2 * costheta2);
       r2[i] = a2 * r2_over_a2;

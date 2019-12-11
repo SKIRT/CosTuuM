@@ -217,6 +217,8 @@ int main(int argc, char **argv) {
     quicksched.register_resource(converged_size);
 
     TMatrixAuxiliarySpaceManager aux_manager(4, maximum_order);
+    InteractionVariables interaction_variables(
+        10., 100., std::complex<float_type>(1., 0.02));
 
     std::vector<GaussBasedResources *> gaussfactors(maxgauss, nullptr);
     std::vector<WignerDm0Resources *> wignerm0factors(maxgauss, nullptr);
@@ -239,18 +241,17 @@ int main(int argc, char **argv) {
       quicksched.link_tasks(*gaussfactors[ig], *wignerm0factors[ig]);
 
       geometryfactors[ig] =
-          new ParticleGeometryResource(10., 0.5, ig + 20, *gaussfactors[ig]);
+          new ParticleGeometryResource(0.5, ig + 20, *gaussfactors[ig]);
       quicksched.register_resource(*geometryfactors[ig]);
       quicksched.register_task(*geometryfactors[ig]);
       geometryfactors[ig]->link_resources(quicksched);
       quicksched.link_tasks(*gaussfactors[ig], *geometryfactors[ig]);
 
-      interactionfactors[ig] = new InteractionResource(
-          100., std::complex<float_type>(1., 0.02), maximum_order, ig + 20);
+      interactionfactors[ig] = new InteractionResource(maximum_order, ig + 20);
       quicksched.register_resource(*interactionfactors[ig]);
-      interaction_tasks[ig] =
-          new InteractionTask(maximum_order, ig + 20, *geometryfactors[ig],
-                              converged_size, *interactionfactors[ig]);
+      interaction_tasks[ig] = new InteractionTask(
+          maximum_order, ig + 20, *geometryfactors[ig], converged_size,
+          interaction_variables, *interactionfactors[ig]);
       quicksched.register_task(*interaction_tasks[ig]);
       interaction_tasks[ig]->link_resources(quicksched);
       quicksched.link_tasks(*geometryfactors[ig], *interaction_tasks[ig]);
@@ -260,8 +261,9 @@ int main(int argc, char **argv) {
 
       tmatrixm0tasks[ig] = new TMatrixM0Task(
           1.e-4, 50, ig + 20, nfactors, *gaussfactors[ig], *geometryfactors[ig],
-          *interactionfactors[ig], *wignerm0factors[ig], aux_manager,
-          *tmatrices[ig], converged_size, tmatrices[ig]->get_m_resource(0));
+          interaction_variables, *interactionfactors[ig], *wignerm0factors[ig],
+          aux_manager, *tmatrices[ig], converged_size,
+          tmatrices[ig]->get_m_resource(0));
       quicksched.register_task(*tmatrixm0tasks[ig]);
       tmatrixm0tasks[ig]->link_resources(quicksched);
       quicksched.link_tasks(nfactors, *tmatrixm0tasks[ig]);

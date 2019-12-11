@@ -420,6 +420,9 @@ private:
   /*! @brief Precomputed geometry specific quadrature points (read only). */
   const ParticleGeometryResource &_geometry;
 
+  /*! @brief Interaction variables (read only). */
+  const InteractionVariables _interaction_variables;
+
   /*! @brief Precomputed interaction specific quadrature points (read only). */
   const InteractionResource &_interaction;
 
@@ -455,6 +458,7 @@ public:
    * only).
    * @param geometry Precomputed geometry specific quadrature points (read
    * only).
+   * @param interaction_variables Interaction variables (read only).
    * @param interaction Precomputed interaction specific quadrature points (read
    * only).
    * @param wigner Precomputed @f$m=0@f$ Wigner D functions (read only).
@@ -471,14 +475,16 @@ public:
       const uint_fast32_t ngauss, const NBasedResources &nfactors,
       const GaussBasedResources &quadrature_points,
       const ParticleGeometryResource &geometry,
+      const InteractionVariables &interaction_variables,
       const InteractionResource &interaction, const WignerDm0Resources &wigner,
       TMatrixAuxiliarySpaceManager &aux_manager, TMatrixResource &Tmatrix,
       ConvergedSizeResources &converged_size, const Resource &m_resource)
       : _tolerance(tolerance), _nmax(nmax), _ngauss(ngauss),
         _nfactors(nfactors), _quadrature_points(quadrature_points),
-        _geometry(geometry), _interaction(interaction), _wigner(wigner),
-        _aux_manager(aux_manager), _Tmatrix(Tmatrix),
-        _converged_size(converged_size), _m_resource(m_resource) {}
+        _geometry(geometry), _interaction_variables(interaction_variables),
+        _interaction(interaction), _wigner(wigner), _aux_manager(aux_manager),
+        _Tmatrix(Tmatrix), _converged_size(converged_size),
+        _m_resource(m_resource) {}
 
   virtual ~TMatrixM0Task() {}
 
@@ -567,6 +573,9 @@ public:
             const std::complex<float_type> c5 = c1 * krmrinvi;
             const std::complex<float_type> b5 = b1 * krmrinvi;
 
+            // note that r2 here actually is (r2/R_V^2)
+            // this is okay, since this factor appears in all elements of the
+            // Q matrix, so it will divide out when multiplying with the inverse
             const float_type wr2i = _quadrature_points.get_weight(ig - 1) *
                                     _geometry.get_r2(ig - 1);
             const float_type dr_over_ri = _geometry.get_dr_over_r(ig - 1);
@@ -626,15 +635,23 @@ public:
         const std::complex<float_type> this_RgJ21 =
             icompl * aux._RgJ21(n1 - 1, n2 - 1);
 
-        aux._Q(k1 - 1, k2 - 1) = _interaction.get_k2mr() * this_J21 +
-                                 _interaction.get_k2() * this_J12;
-        aux._RgQ(k1 - 1, k2 - 1) = _interaction.get_k2mr() * this_RgJ21 +
-                                   _interaction.get_k2() * this_RgJ12;
+        aux._Q(k1 - 1, k2 - 1) =
+            _interaction_variables.get_material_wavenumber_times_wavenumber() *
+                this_J21 +
+            _interaction_variables.get_wavenumber_squared() * this_J12;
+        aux._RgQ(k1 - 1, k2 - 1) =
+            _interaction_variables.get_material_wavenumber_times_wavenumber() *
+                this_RgJ21 +
+            _interaction_variables.get_wavenumber_squared() * this_RgJ12;
 
-        aux._Q(kk1 - 1, kk2 - 1) = _interaction.get_k2mr() * this_J12 +
-                                   _interaction.get_k2() * this_J21;
-        aux._RgQ(kk1 - 1, kk2 - 1) = _interaction.get_k2mr() * this_RgJ12 +
-                                     _interaction.get_k2() * this_RgJ21;
+        aux._Q(kk1 - 1, kk2 - 1) =
+            _interaction_variables.get_material_wavenumber_times_wavenumber() *
+                this_J12 +
+            _interaction_variables.get_wavenumber_squared() * this_J21;
+        aux._RgQ(kk1 - 1, kk2 - 1) =
+            _interaction_variables.get_material_wavenumber_times_wavenumber() *
+                this_RgJ12 +
+            _interaction_variables.get_wavenumber_squared() * this_RgJ21;
       }
     }
 
@@ -662,7 +679,7 @@ public:
     // set the order and number of quadrature poitns of the T-matrix
     _Tmatrix._nmax = _nmax;
     _Tmatrix._ngauss = _ngauss;
-    _Tmatrix._wavenumber = _interaction.get_k();
+    _Tmatrix._wavenumber = _interaction_variables.get_wavenumber();
 
     _converged_size._nmax = _nmax;
     _converged_size._ngauss = _ngauss;
@@ -730,6 +747,9 @@ private:
   /*! @brief Converged T-matrix variables. */
   const ConvergedSizeResources &_converged_size;
 
+  /*! @brief Interaction variables. */
+  const InteractionVariables &_interaction_variables;
+
   /*! @brief Auxiliary space manager used to obtain space to store intermediate
    *  calculations. */
   TMatrixAuxiliarySpaceManager &_aux_manager;
@@ -749,6 +769,7 @@ public:
    * @param nfactors Precomputed @f$n@f$ factors (read only).
    * @param wigner Precomputed @f$m>0@f$ Wigner D functions (read only).
    * @param converged_size Converged T-matrix variables (read only).
+   * @param interaction_variables Interaction variables (read only).
    * @param aux_manager Auxiliary space manager used to obtain space to store
    * intermediate calculations.
    * @param Tmatrix TMatrix space containing the result.
@@ -758,11 +779,13 @@ public:
   inline TMatrixMAllTask(const uint_fast32_t m, const NBasedResources &nfactors,
                          const WignerDmn0Resources &wigner,
                          const ConvergedSizeResources &converged_size,
+                         const InteractionVariables &interaction_variables,
                          TMatrixAuxiliarySpaceManager &aux_manager,
                          TMatrixResource &Tmatrix, const Resource &m_resource)
       : _m(m), _nfactors(nfactors), _wigner(wigner),
-        _converged_size(converged_size), _aux_manager(aux_manager),
-        _Tmatrix(Tmatrix), _m_resource(m_resource) {}
+        _converged_size(converged_size),
+        _interaction_variables(interaction_variables),
+        _aux_manager(aux_manager), _Tmatrix(Tmatrix), _m_resource(m_resource) {}
 
   virtual ~TMatrixMAllTask() {}
 
@@ -858,6 +881,9 @@ public:
           const float_type dr_over_ri = geometry.get_dr_over_r(ig);
 
           if (sign < 0) {
+            // note that r2 here actually is (r2/R_V^2)
+            // this is okay, since this factor appears in all elements of the
+            // Q matrix, so it will divide out when multiplying with the inverse
             const float_type dsi = quadrature_points.get_sinthetainv(ig) * _m *
                                    quadrature_points.get_weight(ig) *
                                    geometry.get_r2(ig);
@@ -897,6 +923,9 @@ public:
             //    * jn2(krmr) * ([kr*jn1(kr]'/kr) / krmr
             this_RgJ22 += e1 * c6 + e2 * c7 + e3 * c8;
           } else {
+            // note that r2 here actually is (r2/R_V^2)
+            // this is okay, since this factor appears in all elements of the
+            // Q matrix, so it will divide out when multiplying with the inverse
             const float_type wr2i =
                 quadrature_points.get_weight(ig) * geometry.get_r2(ig);
             const float_type dssi = quadrature_points.get_sintheta2inv(ig) * m2;
@@ -975,24 +1004,40 @@ public:
         const std::complex<float_type> this_RgJ22 = -aux._RgJ22(n1 - 1, n2 - 1);
 
         aux._Q(k1 - 1, k2 - 1) =
-            interaction.get_k2mr() * this_J21 + interaction.get_k2() * this_J12;
-        aux._RgQ(k1 - 1, k2 - 1) = interaction.get_k2mr() * this_RgJ21 +
-                                   interaction.get_k2() * this_RgJ12;
+            _interaction_variables.get_material_wavenumber_times_wavenumber() *
+                this_J21 +
+            _interaction_variables.get_wavenumber_squared() * this_J12;
+        aux._RgQ(k1 - 1, k2 - 1) =
+            _interaction_variables.get_material_wavenumber_times_wavenumber() *
+                this_RgJ21 +
+            _interaction_variables.get_wavenumber_squared() * this_RgJ12;
 
         aux._Q(k1 - 1, kk2 - 1) =
-            interaction.get_k2mr() * this_J11 + interaction.get_k2() * this_J22;
-        aux._RgQ(k1 - 1, kk2 - 1) = interaction.get_k2mr() * this_RgJ11 +
-                                    interaction.get_k2() * this_RgJ22;
+            _interaction_variables.get_material_wavenumber_times_wavenumber() *
+                this_J11 +
+            _interaction_variables.get_wavenumber_squared() * this_J22;
+        aux._RgQ(k1 - 1, kk2 - 1) =
+            _interaction_variables.get_material_wavenumber_times_wavenumber() *
+                this_RgJ11 +
+            _interaction_variables.get_wavenumber_squared() * this_RgJ22;
 
         aux._Q(kk1 - 1, k2 - 1) =
-            interaction.get_k2mr() * this_J22 + interaction.get_k2() * this_J11;
-        aux._RgQ(kk1 - 1, k2 - 1) = interaction.get_k2mr() * this_RgJ22 +
-                                    interaction.get_k2() * this_RgJ11;
+            _interaction_variables.get_material_wavenumber_times_wavenumber() *
+                this_J22 +
+            _interaction_variables.get_wavenumber_squared() * this_J11;
+        aux._RgQ(kk1 - 1, k2 - 1) =
+            _interaction_variables.get_material_wavenumber_times_wavenumber() *
+                this_RgJ22 +
+            _interaction_variables.get_wavenumber_squared() * this_RgJ11;
 
         aux._Q(kk1 - 1, kk2 - 1) =
-            interaction.get_k2mr() * this_J12 + interaction.get_k2() * this_J21;
-        aux._RgQ(kk1 - 1, kk2 - 1) = interaction.get_k2mr() * this_RgJ12 +
-                                     interaction.get_k2() * this_RgJ21;
+            _interaction_variables.get_material_wavenumber_times_wavenumber() *
+                this_J12 +
+            _interaction_variables.get_wavenumber_squared() * this_J21;
+        aux._RgQ(kk1 - 1, kk2 - 1) =
+            _interaction_variables.get_material_wavenumber_times_wavenumber() *
+                this_RgJ12 +
+            _interaction_variables.get_wavenumber_squared() * this_RgJ21;
       }
     }
 

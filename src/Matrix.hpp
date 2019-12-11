@@ -58,6 +58,22 @@ public:
   }
 
   /**
+   * @brief Get the number of rows in the matrix.
+   *
+   * @return Number of rows in the matrix.
+   */
+  inline uint_fast32_t get_number_of_rows() const { return _number_of_rows; }
+
+  /**
+   * @brief Get the number of columns in the matrix.
+   *
+   * @return Number of columns in the matrix.
+   */
+  inline uint_fast32_t get_number_of_columns() const {
+    return _number_of_columns;
+  }
+
+  /**
    * @brief Access operator.
    *
    * This function performs the bookkeeping required to figure out where in the

@@ -25,22 +25,17 @@ using namespace boost::multiprecision;
 #else
 using namespace std;
 #endif
+
 /**
- * @brief Precomputed factors that depend on precomputed Gauss-Legendre factors,
- * precomputed, particle specific geometric factors, and a specific choice of
- * particle refractive index and interaction wavelength.
+ * @brief Scalar variables involved in a particle - photon interaction.
  */
-class InteractionResource : public Resource {
-
-  /*! @brief Grant access to computation tasks. */
-  friend class InteractionTask;
-
+class InteractionVariables {
 private:
-  /*! @brief Maximum order of the spherical basis functions, @f$n_{max}@f$. */
-  const uint_fast32_t _nmax;
+  /*! @brief Equal volume sphere radius, @f$R_V@f$ (in m). */
+  const float_type _R_V;
 
-  /*! @brief Number of Gauss-Legendre quadrature points, @f$n_{GL}@f$. */
-  const uint_fast32_t _ngauss;
+  /*! @brief Wavelenght, @f$\lambda{}@f$ (in m). */
+  const float_type _wavelength;
 
   /*! @brief Wavenumber, @f$k = \frac{2\pi{}}{\lambda{}}@f$. */
   const float_type _k;
@@ -54,6 +49,74 @@ private:
   /*! @brief Wavenumber squared times refractive index, @f$m_rk^2@f$. */
   const std::complex<float_type> _k2mr;
 
+public:
+  /**
+   * @brief Constructor.
+   *
+   * @param R_V Equal volume sphere radius, @f$R_V@f$ (in m).
+   * @param wavelength Wavelength of incident radiation, @f$\lambda{}@f$ (in m).
+   * @param refractive_index Refractive index of the material, @f$m_r@f$.
+   */
+  inline InteractionVariables(const float_type R_V, const float_type wavelength,
+                              const std::complex<float_type> refractive_index)
+      : _R_V(R_V), _wavelength(wavelength), _k(2. * M_PI / wavelength),
+        _k2(_k * _k), _kmr(refractive_index * _k),
+        _k2mr(refractive_index * _k2) {}
+
+  /**
+   * @brief Get the equal volume radius, @f$R_V@f$.
+   *
+   * @return Equal volume radius, @f$R_V@f$.
+   */
+  inline float_type get_equal_volume_radius() const { return _R_V; }
+
+  /**
+   * @brief Get the wavenumber, @f$k@f$.
+   *
+   * @return Wavenumber, @f$k@f$.
+   */
+  inline float_type get_wavenumber() const { return _k; }
+
+  /**
+   * @brief Get the wavenumber squared, @f$k^2@f$.
+   *
+   * @return Wavenumber squared, @f$k^2@f$.
+   */
+  inline float_type get_wavenumber_squared() const { return _k2; }
+
+  /**
+   * @brief Get the wavenumber times the refractive index of the material,
+   * @f$m_rk@f$.
+   *
+   * @return Wavenumber times refractive index, @f$m_rk@f$.
+   */
+  inline std::complex<float_type> get_material_wavenumber() const {
+    return _kmr;
+  }
+
+  /**
+   * @brief Get the wavenumber squared times the refractive index of the
+   * material, @f$m_rk^2@f$.
+   *
+   * @return Wavenumber squared times refractive index, @f$m_rk^2@f$.
+   */
+  inline std::complex<float_type>
+  get_material_wavenumber_times_wavenumber() const {
+    return _k2mr;
+  }
+};
+
+/**
+ * @brief Precomputed factors that depend on precomputed Gauss-Legendre factors,
+ * precomputed, particle specific geometric factors, and a specific choice of
+ * particle refractive index and interaction wavelength.
+ */
+class InteractionResource : public Resource {
+
+  /*! @brief Grant access to computation tasks. */
+  friend class InteractionTask;
+
+private:
   /*! @brief Precomputed factors @f$kr@f$ (array of size @f$2n_{GL}@f$). */
   std::vector<float_type> _kr;
 
@@ -97,18 +160,12 @@ public:
   /**
    * @brief Constructor.
    *
-   * @param wavelength Wavelength of incident radiation, @f$\lambda{}@f$.
-   * @param refractive_index Refractive index of the material, @f$m_r@f$.
    * @param nmax Maximum order of spherical basis, @f$n_{max}@f$.
    * @param ngauss Number of Gauss-Legendre quadrature points, @f$n_{GL}@f$.
    */
-  inline InteractionResource(const float_type wavelength,
-                             const std::complex<float_type> refractive_index,
-                             const uint_fast32_t nmax,
+  inline InteractionResource(const uint_fast32_t nmax,
                              const uint_fast32_t ngauss)
-      : _nmax(nmax), _ngauss(ngauss), _k(2. * M_PI / wavelength), _k2(_k * _k),
-        _kmr(refractive_index * _k), _k2mr(refractive_index * _k2),
-        _kr(2 * ngauss, float_type(0.)), _krinv(2 * ngauss, float_type(0.)),
+      : _kr(2 * ngauss, float_type(0.)), _krinv(2 * ngauss, float_type(0.)),
         _krmr(2 * ngauss, float_type(0.)), _krmrinv(2 * ngauss, float_type(0.)),
         _jkr(2 * ngauss, nmax), _ykr(2 * ngauss, nmax), _djkr(2 * ngauss, nmax),
         _dykr(2 * ngauss, nmax), _jkrmr(2 * ngauss, nmax),
@@ -155,28 +212,7 @@ public:
    *
    * @return Computational cost.
    */
-  virtual int_fast32_t get_cost() const { return 157675 * _ngauss - 755642; }
-
-  /**
-   * @brief Get the wavenumber.
-   *
-   * @return Wavenumber.
-   */
-  inline float_type get_k() const { return _k; }
-
-  /**
-   * @brief Get the wavenumber squared.
-   *
-   * @return Wavenumber squared.
-   */
-  inline float_type get_k2() const { return _k2; }
-
-  /**
-   * @brief Get the wavenumber squared times the refractive index.
-   *
-   * @return Wavenumber squared times the refractive index.
-   */
-  inline std::complex<float_type> get_k2mr() const { return _k2mr; }
+  virtual int_fast32_t get_cost() const { return 157675 * _kr.size() - 755642; }
 
   /**
    * @brief Get the wavenumber multiplied with the radius for the given Gauss-
@@ -186,7 +222,7 @@ public:
    * @return Corresponding value of @f$kr@f$.
    */
   inline float_type get_kr(const uint_fast32_t ig) const {
-    ctm_assert(ig < 2 * _ngauss);
+    ctm_assert(ig < _kr.size());
     return _kr[ig];
   }
 
@@ -198,7 +234,7 @@ public:
    * @return Corresponding value of @f$\frac{1}{kr}@f$.
    */
   inline float_type get_krinv(const uint_fast32_t ig) const {
-    ctm_assert(ig < 2 * _ngauss);
+    ctm_assert(ig < _krinv.size());
     return _krinv[ig];
   }
 
@@ -210,7 +246,7 @@ public:
    * @return Corresponding value of @f$km_rr@f$.
    */
   inline std::complex<float_type> get_krmr(const uint_fast32_t ig) const {
-    ctm_assert(ig < 2 * _ngauss);
+    ctm_assert(ig < _krmr.size());
     return _krmr[ig];
   }
 
@@ -222,7 +258,7 @@ public:
    * @return Corresponding value of @f$\frac{1}{km_rr}@f$.
    */
   inline std::complex<float_type> get_krmrinv(const uint_fast32_t ig) const {
-    ctm_assert(ig < 2 * _ngauss);
+    ctm_assert(ig < _krmrinv.size());
     return _krmrinv[ig];
   }
 
@@ -236,8 +272,8 @@ public:
    */
   inline float_type get_jkr(const uint_fast32_t ig,
                             const uint_fast32_t n) const {
-    ctm_assert(ig < 2 * _ngauss);
-    ctm_assert(n - 1 < _nmax);
+    ctm_assert(ig < _jkr.get_number_of_rows());
+    ctm_assert(n - 1 < _jkr.get_number_of_columns());
     return _jkr(ig, n - 1);
   }
 
@@ -251,8 +287,8 @@ public:
    */
   inline float_type get_ykr(const uint_fast32_t ig,
                             const uint_fast32_t n) const {
-    ctm_assert(ig < 2 * _ngauss);
-    ctm_assert(n - 1 < _nmax);
+    ctm_assert(ig < _ykr.get_number_of_rows());
+    ctm_assert(n - 1 < _ykr.get_number_of_columns());
     return _ykr(ig, n - 1);
   }
 
@@ -266,8 +302,8 @@ public:
    */
   inline float_type get_djkr(const uint_fast32_t ig,
                              const uint_fast32_t n) const {
-    ctm_assert(ig < 2 * _ngauss);
-    ctm_assert(n - 1 < _nmax);
+    ctm_assert(ig < _djkr.get_number_of_rows());
+    ctm_assert(n - 1 < _djkr.get_number_of_columns());
     return _djkr(ig, n - 1);
   }
 
@@ -281,8 +317,8 @@ public:
    */
   inline float_type get_dykr(const uint_fast32_t ig,
                              const uint_fast32_t n) const {
-    ctm_assert(ig < 2 * _ngauss);
-    ctm_assert(n - 1 < _nmax);
+    ctm_assert(ig < _dykr.get_number_of_rows());
+    ctm_assert(n - 1 < _dykr.get_number_of_columns());
     return _dykr(ig, n - 1);
   }
 
@@ -296,8 +332,8 @@ public:
    */
   inline std::complex<float_type> get_jkrmr(const uint_fast32_t ig,
                                             const uint_fast32_t n) const {
-    ctm_assert(ig < 2 * _ngauss);
-    ctm_assert(n - 1 < _nmax);
+    ctm_assert(ig < _jkrmr.get_number_of_rows());
+    ctm_assert(n - 1 < _jkrmr.get_number_of_columns());
     return _jkrmr(ig, n - 1);
   }
 
@@ -311,8 +347,8 @@ public:
    */
   inline std::complex<float_type> get_djkrmr(const uint_fast32_t ig,
                                              const uint_fast32_t n) const {
-    ctm_assert(ig < 2 * _ngauss);
-    ctm_assert(n - 1 < _nmax);
+    ctm_assert(ig < _djkrmr.get_number_of_rows());
+    ctm_assert(n - 1 < _djkrmr.get_number_of_columns());
     return _djkrmr(ig, n - 1);
   }
 };
@@ -336,6 +372,9 @@ private:
    *  only). */
   const ConvergedSizeResources &_converged_size;
 
+  /*! @brief Interaction variables for this interaction (read only). */
+  const InteractionVariables &_interaction_variables;
+
   /*! @brief InteractionResource object to operate on. */
   InteractionResource &_interaction;
 
@@ -348,14 +387,18 @@ public:
    * @param geometry Geometrical factors for this particle.
    * @param converged_size Resource keeping track of the convergence of the
    * calculation.
+   * @param interaction_variables Interaction variables for this interaction.
    * @param interaction InteractionResource object to operate on.
    */
   inline InteractionTask(const uint_fast32_t nmax, const uint_fast32_t ngauss,
                          const ParticleGeometryResource &geometry,
                          const ConvergedSizeResources &converged_size,
+                         const InteractionVariables &interaction_variables,
                          InteractionResource &interaction)
       : _nmax(nmax), _ngauss(ngauss), _geometry(geometry),
-        _converged_size(converged_size), _interaction(interaction) {}
+        _converged_size(converged_size),
+        _interaction_variables(interaction_variables),
+        _interaction(interaction) {}
 
   virtual ~InteractionTask() {}
 
@@ -386,8 +429,13 @@ public:
     }
 
     for (uint_fast32_t ig = 0; ig < 2 * _ngauss; ++ig) {
-      _interaction._kr[ig] = _interaction._k * _geometry.get_r(ig);
-      _interaction._krmr[ig] = _interaction._kmr * _geometry.get_r(ig);
+      _interaction._kr[ig] = _interaction_variables.get_wavenumber() *
+                             _geometry.get_r(ig) *
+                             _interaction_variables.get_equal_volume_radius();
+      _interaction._krmr[ig] =
+          _interaction_variables.get_material_wavenumber() *
+          _geometry.get_r(ig) *
+          _interaction_variables.get_equal_volume_radius();
       _interaction._krinv[ig] = float_type(1.) / _interaction._kr[ig];
       _interaction._krmrinv[ig] =
           std::complex<float_type>(1.) / _interaction._krmr[ig];

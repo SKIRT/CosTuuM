@@ -181,6 +181,9 @@ int main(int argc, char **argv) {
 
       ConvergedSizeResources converged_size;
 
+      InteractionVariables interaction_variables(R_V, wavelength,
+                                                 refractive_index);
+
       TMatrixAuxiliarySpaceManager aux_manager(1, maximum_order);
 
       std::vector<GaussBasedResources *> quadrature_points(
@@ -204,7 +207,7 @@ int main(int argc, char **argv) {
           maximum_order - minimum_order, nullptr);
       for (uint_fast32_t i = 0; i < maximum_order - minimum_order; ++i) {
         geometries[i] = new ParticleGeometryResource(
-            R_V, axis_ratio, ndgs * (minimum_order + i), *quadrature_points[i]);
+            axis_ratio, ndgs * (minimum_order + i), *quadrature_points[i]);
         geometries[i]->execute();
       }
 
@@ -213,8 +216,7 @@ int main(int argc, char **argv) {
       std::vector<InteractionTask *> interaction_tasks(
           maximum_order - minimum_order, nullptr);
       for (uint_fast32_t i = 0; i < maximum_order - minimum_order; ++i) {
-        interactions[i] = new InteractionResource(wavelength, refractive_index,
-                                                  minimum_order + i,
+        interactions[i] = new InteractionResource(minimum_order + i,
                                                   ndgs * (minimum_order + i));
         // note that the converged_size we pass on to this task will always
         // say the T-matrix was not converged yet (the initial value), since
@@ -222,7 +224,7 @@ int main(int argc, char **argv) {
         // order of the calculations here!
         interaction_tasks[i] = new InteractionTask(
             minimum_order + i, ndgs * (minimum_order + i), *geometries[i],
-            converged_size, *interactions[i]);
+            converged_size, interaction_variables, *interactions[i]);
         interaction_tasks[i]->execute();
       }
 
@@ -233,9 +235,9 @@ int main(int argc, char **argv) {
       for (uint_fast32_t i = 0; i < maximum_order - minimum_order; ++i) {
         m0tasks[i] = new TMatrixM0Task(
             tolerance, minimum_order + i, ndgs * (minimum_order + i), nfactors,
-            *quadrature_points[i], *geometries[i], *interactions[i],
-            *wignerdm0[i], aux_manager, Tmatrix, converged_size,
-            Tmatrix.get_m_resource(0));
+            *quadrature_points[i], *geometries[i], interaction_variables,
+            *interactions[i], *wignerdm0[i], aux_manager, Tmatrix,
+            converged_size, Tmatrix.get_m_resource(0));
         m0tasks[i]->execute(0);
       }
 
@@ -256,7 +258,8 @@ int main(int argc, char **argv) {
       std::vector<TMatrixMAllTask *> malltask(maximum_order, nullptr);
       for (uint_fast32_t i = 0; i < maximum_order; ++i) {
         malltask[i] = new TMatrixMAllTask(1 + i, nfactors, *more_wigner[i],
-                                          converged_size, aux_manager, Tmatrix,
+                                          converged_size, interaction_variables,
+                                          aux_manager, Tmatrix,
                                           Tmatrix.get_m_resource(1 + i));
         malltask[i]->execute(0);
       }
@@ -331,8 +334,9 @@ int main(int argc, char **argv) {
 
       TMatrixAuxiliarySpaceManager aux_manager(4, maximum_order);
 
-      InteractionResource interaction(wavelength, refractive_index,
-                                      maximum_order, ndgs * maximum_order);
+      InteractionVariables interaction_variables(R_V, wavelength,
+                                                 refractive_index);
+      InteractionResource interaction(maximum_order, ndgs * maximum_order);
       quicksched.register_resource(interaction);
 
       TMatrixResource Tmatrix(maximum_order);
@@ -365,7 +369,7 @@ int main(int argc, char **argv) {
           maximum_order - minimum_order, nullptr);
       for (uint_fast32_t i = 0; i < maximum_order - minimum_order; ++i) {
         geometries[i] = new ParticleGeometryResource(
-            R_V, axis_ratio, ndgs * (minimum_order + i), *quadrature_points[i]);
+            axis_ratio, ndgs * (minimum_order + i), *quadrature_points[i]);
         quicksched.register_resource(*geometries[i]);
         quicksched.register_task(*geometries[i]);
         geometries[i]->link_resources(quicksched);
@@ -375,9 +379,9 @@ int main(int argc, char **argv) {
       std::vector<InteractionTask *> interaction_tasks(
           maximum_order - minimum_order, nullptr);
       for (uint_fast32_t i = 0; i < maximum_order - minimum_order; ++i) {
-        interaction_tasks[i] =
-            new InteractionTask(minimum_order + i, ndgs * (minimum_order + i),
-                                *geometries[i], converged_size, interaction);
+        interaction_tasks[i] = new InteractionTask(
+            minimum_order + i, ndgs * (minimum_order + i), *geometries[i],
+            converged_size, interaction_variables, interaction);
         quicksched.register_task(*interaction_tasks[i]);
         interaction_tasks[i]->link_resources(quicksched);
         quicksched.link_tasks(*geometries[i], *interaction_tasks[i]);
@@ -388,8 +392,9 @@ int main(int argc, char **argv) {
       for (uint_fast32_t i = 0; i < maximum_order - minimum_order; ++i) {
         m0tasks[i] = new TMatrixM0Task(
             tolerance, minimum_order + i, ndgs * (minimum_order + i), nfactors,
-            *quadrature_points[i], *geometries[i], interaction, *wignerdm0[i],
-            aux_manager, Tmatrix, converged_size, Tmatrix.get_m_resource(0));
+            *quadrature_points[i], *geometries[i], interaction_variables,
+            interaction, *wignerdm0[i], aux_manager, Tmatrix, converged_size,
+            Tmatrix.get_m_resource(0));
         quicksched.register_task(*m0tasks[i]);
         m0tasks[i]->link_resources(quicksched);
         quicksched.link_tasks(nfactors, *m0tasks[i]);
@@ -427,7 +432,8 @@ int main(int argc, char **argv) {
       std::vector<TMatrixMAllTask *> malltask(maximum_order, nullptr);
       for (uint_fast32_t i = 0; i < maximum_order; ++i) {
         malltask[i] = new TMatrixMAllTask(1 + i, nfactors, *more_wigner[i],
-                                          converged_size, aux_manager, Tmatrix,
+                                          converged_size, interaction_variables,
+                                          aux_manager, Tmatrix,
                                           Tmatrix.get_m_resource(1 + i));
         quicksched.register_task(*malltask[i]);
         malltask[i]->link_resources(quicksched);
@@ -570,6 +576,7 @@ int main(int argc, char **argv) {
     std::vector<TMatrixQTask *> Qtasks;
     std::vector<ScatteringMatrixResource *> Zmatrices;
     std::vector<ParticleGeometryResource *> geometries;
+    std::vector<InteractionVariables *> interaction_variables;
     std::vector<InteractionResource *> interactions;
     std::vector<InteractionTask *> interaction_tasks;
     std::vector<TMatrixM0Task *> m0tasks;
@@ -642,13 +649,15 @@ int main(int argc, char **argv) {
       for (uint_fast32_t m = 0; m < maximum_order + 1; ++m) {
         quicksched.register_resource(Tmatrices.back()->get_m_resource(m));
       }
-      interactions.push_back(new InteractionResource(
-          wavelength, refractive_index, maximum_order, ndgs * maximum_order));
+      interaction_variables.push_back(
+          new InteractionVariables(R_V, wavelength, refractive_index));
+      interactions.push_back(
+          new InteractionResource(maximum_order, ndgs * maximum_order));
       quicksched.register_resource(*interactions.back());
 
       for (uint_fast32_t i = 0; i < maximum_order - minimum_order; ++i) {
         geometries.push_back(new ParticleGeometryResource(
-            R_V, axis_ratio, ndgs * (minimum_order + i),
+            axis_ratio, ndgs * (minimum_order + i),
             *quadrature_points[minimum_order + i - 1]));
         quicksched.register_resource(*geometries.back());
         quicksched.register_task(*geometries.back());
@@ -658,7 +667,8 @@ int main(int argc, char **argv) {
 
         interaction_tasks.push_back(new InteractionTask(
             minimum_order + i, ndgs * (minimum_order + i), *geometries.back(),
-            *converged_sizes.back(), *interactions.back()));
+            *converged_sizes.back(), *interaction_variables.back(),
+            *interactions.back()));
         quicksched.register_task(*interaction_tasks.back());
         interaction_tasks.back()->link_resources(quicksched);
         quicksched.link_tasks(*geometries.back(), *interaction_tasks.back());
@@ -666,9 +676,9 @@ int main(int argc, char **argv) {
         m0tasks.push_back(new TMatrixM0Task(
             tolerance, minimum_order + i, ndgs * (minimum_order + i), nfactors,
             *quadrature_points[minimum_order + i - 1], *geometries.back(),
-            *interactions.back(), *wignerdm0[minimum_order + i - 1],
-            aux_manager, *Tmatrices.back(), *converged_sizes.back(),
-            Tmatrices.back()->get_m_resource(0)));
+            *interaction_variables.back(), *interactions.back(),
+            *wignerdm0[minimum_order + i - 1], aux_manager, *Tmatrices.back(),
+            *converged_sizes.back(), Tmatrices.back()->get_m_resource(0)));
         quicksched.register_task(*m0tasks.back());
         m0tasks.back()->link_resources(quicksched);
         quicksched.link_tasks(nfactors, *m0tasks.back());
@@ -704,7 +714,7 @@ int main(int argc, char **argv) {
 
         malltasks.push_back(new TMatrixMAllTask(
             1 + i, nfactors, *wignerdmalls.back(), *converged_sizes.back(),
-            aux_manager, *Tmatrices.back(),
+            *interaction_variables.back(), aux_manager, *Tmatrices.back(),
             Tmatrices.back()->get_m_resource(1 + i)));
         quicksched.register_task(*malltasks.back());
         malltasks.back()->link_resources(quicksched);
@@ -766,6 +776,7 @@ int main(int argc, char **argv) {
     clear_vector(Qtasks);
     clear_vector(Zmatrices);
     clear_vector(geometries);
+    clear_vector(interaction_variables);
     clear_vector(interactions);
     clear_vector(interaction_tasks);
     clear_vector(m0tasks);
