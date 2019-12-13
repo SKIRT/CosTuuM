@@ -31,6 +31,8 @@ public:
    */
   inline Task() : _task_id(0) {}
 
+  virtual ~Task() {}
+
   /**
    * @brief Execute the task.
    *

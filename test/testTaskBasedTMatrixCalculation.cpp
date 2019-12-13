@@ -515,7 +515,6 @@ int main(int argc, char **argv) {
   // code
   if (do_full_benchmark_test) {
 
-    const uint_fast32_t auxsize = 100;
     const uint_fast32_t maximum_order = 40;
     const uint_fast32_t ndgs = 2;
 
@@ -560,7 +559,6 @@ int main(int argc, char **argv) {
     std::vector<float_type> refQextvec;
     std::vector<float_type> refwalbvec;
     std::vector<Matrix<float_type>> refZvec;
-    uint_fast32_t auxcount = 0;
     std::ifstream ifile("test_tmatrixcalculator.txt");
     std::string line;
     // skip the first comment line
@@ -688,8 +686,6 @@ int main(int argc, char **argv) {
         quicksched.link_tasks(*malltasks.back(), *Qtasks.back());
         quicksched.link_tasks(*malltasks.back(), *Zmatrices.back());
       }
-
-      auxcount = (auxcount + 1) % auxsize;
     }
 
     quicksched.execute_tasks(4);

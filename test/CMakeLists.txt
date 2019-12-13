@@ -117,9 +117,9 @@ if(HAVE_TASKS)
   set(TESTTASKBASEDTMATRIXCALCULATION_SOURCES
       testTaskBasedTMatrixCalculation.cpp
   )
-add_unit_test(NAME testTaskBasedTMatrixCalculation
-              SOURCES ${TESTTASKBASEDTMATRIXCALCULATION_SOURCES}
-              LIBS ${LIBQUICKSCHED})
+  add_unit_test(NAME testTaskBasedTMatrixCalculation
+                SOURCES ${TESTTASKBASEDTMATRIXCALCULATION_SOURCES}
+                LIBS ${LIBQUICKSCHED})
 endif(HAVE_TASKS)
 
 ## Unit test for DraineHensleyShapeDistribution
@@ -128,6 +128,16 @@ set(TESTDRAINEHENSLEYSHAPEDISTRIBUTION_SOURCES
 )
 add_unit_test(NAME testDraineHensleyShapeDistribution
               SOURCES ${TESTDRAINEHENSLEYSHAPEDISTRIBUTION_SOURCES})
+
+## Unit test for TaskManager
+if(HAVE_TASKS)
+  set(TESTTASKMANAGER_SOURCES
+      testTaskManager.cpp
+  )
+  add_unit_test(NAME testTaskManager
+                SOURCES ${TESTTASKMANAGER_SOURCES}
+                LIBS ${LIBQUICKSCHED})
+endif(HAVE_TASKS)
 
 ### Done adding unit tests. Create the 'make check' target #####################
 ### Do not touch these lines unless you know what you're doing! ################
