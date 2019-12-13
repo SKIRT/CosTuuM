@@ -130,6 +130,7 @@ public:
    * @return Corresponding radius, @f$r@f$.
    */
   inline float_type get_r(const uint_fast32_t ig) const {
+    ctm_assert(ig < _r.size());
     // check that the resource was actually computed
     check_use();
     return _r[ig];
@@ -142,6 +143,7 @@ public:
    * @return Corresponding radius squared, @f$r^2@f$.
    */
   inline float_type get_r2(const uint_fast32_t ig) const {
+    ctm_assert(ig < _r2.size());
     // check that the resource was actually computed
     check_use();
     return _r2[ig];
@@ -155,6 +157,7 @@ public:
    * \frac{d}{d\theta{}} r(\theta{})@f$.
    */
   inline float_type get_dr_over_r(const uint_fast32_t ig) const {
+    ctm_assert(ig < _dr_over_r.size());
     // check that the resource was actually computed
     check_use();
     return _dr_over_r[ig];

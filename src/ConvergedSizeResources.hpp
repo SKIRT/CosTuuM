@@ -23,8 +23,9 @@ using namespace std;
 #endif
 
 class GaussBasedResources;
-class ParticleGeometryResource;
 class InteractionResource;
+class ParticleGeometryResource;
+class WignerDResources;
 
 /**
  * @brief Maximum order and number of Gauss-Legendre quadrature points for a
@@ -51,6 +52,9 @@ private:
   /*! @brief Interaction variables for the converged T-matrix. */
   const InteractionResource *_interaction;
 
+  /*! @brief Wigner D functions for the converged T-matrix. */
+  const WignerDResources *_wigner_d;
+
   /*! @brief Flag signaling whether or not the T-matrix caluclation is
    *  converged. */
   bool _is_converged;
@@ -61,7 +65,7 @@ public:
    */
   inline ConvergedSizeResources()
       : _nmax(0), _ngauss(0), _quadrature_points(nullptr), _geometry(nullptr),
-        _interaction(nullptr), _is_converged(false) {}
+        _interaction(nullptr), _wigner_d(nullptr), _is_converged(false) {}
 
   /**
    * @brief Get the maximum order.
@@ -103,6 +107,13 @@ public:
   inline const InteractionResource *get_interaction() const {
     return _interaction;
   }
+
+  /**
+   * @brief Get the Wigner D functions for the converged T-matrix.
+   *
+   * @return Wigner D functions.
+   */
+  inline const WignerDResources *get_wigner_d() const { return _wigner_d; }
 
   /**
    * @brief Is the T-matrix calculation converged?

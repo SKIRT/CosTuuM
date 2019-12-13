@@ -58,9 +58,6 @@ private:
    *  T-matrix. */
   uint_fast32_t _ngauss;
 
-  /*! @brief Wavenumber for which this T-matrix was computed. */
-  float_type _wavenumber;
-
   /*! @brief T-matrix itself. Is in fact a @f$n_{max}+1@f$ element vector for
    *  which every element is a @f$2n_{max}\times{}2n_{max}@f$ matrix. */
   std::vector<Matrix<std::complex<float_type>>> _T;
@@ -99,9 +96,8 @@ public:
    * from this resource, used to initialise the internal storage space.
    */
   inline TMatrixResource(const uint_fast32_t maximum_order)
-      : _nmax(0), _ngauss(0), _wavenumber(0), _m_resources(maximum_order + 1),
-        _Qscattering(0.), _Qextinction(0.), _dQscattering(-2.),
-        _dQextinction(-2.) {
+      : _nmax(0), _ngauss(0), _m_resources(maximum_order + 1), _Qscattering(0.),
+        _Qextinction(0.), _dQscattering(-2.), _dQextinction(-2.) {
     _T.reserve(maximum_order + 1);
     for (uint_fast32_t m = 0; m < maximum_order + 1; ++m) {
       const uint_fast32_t nm = maximum_order + 1 - m;
@@ -218,13 +214,6 @@ public:
    * @return Number of Gauss-Legendre quadrature points, @f$n_{GL}@f$.
    */
   inline uint_fast32_t get_ngauss() const { return _ngauss; }
-
-  /**
-   * @brief Get the wavenumber for which this T-matrix was computed.
-   *
-   * @return Wavenumber.
-   */
-  inline float_type get_wavenumber() const { return _wavenumber; }
 };
 
 /**
@@ -427,7 +416,7 @@ private:
   const InteractionResource &_interaction;
 
   /*! @brief Precomputed @f$m=0@f$ Wigner D functions (read only). */
-  const WignerDm0Resources &_wigner;
+  const WignerDResources &_wigner;
 
   /*! @brief Auxiliary space manager used to obtain space to store intermediate
    *  calculations. */
@@ -476,7 +465,7 @@ public:
       const GaussBasedResources &quadrature_points,
       const ParticleGeometryResource &geometry,
       const InteractionVariables &interaction_variables,
-      const InteractionResource &interaction, const WignerDm0Resources &wigner,
+      const InteractionResource &interaction, const WignerDResources &wigner,
       TMatrixAuxiliarySpaceManager &aux_manager, TMatrixResource &Tmatrix,
       ConvergedSizeResources &converged_size, const Resource &m_resource)
       : _tolerance(tolerance), _nmax(nmax), _ngauss(ngauss),
@@ -534,10 +523,10 @@ public:
         // filter out half the components because of symmetry
         if ((n1 + n2) % 2 == 0) {
           for (uint_fast32_t ig = 1; ig < _ngauss + 1; ++ig) {
-            const float_type wigner_n1 = _wigner.get_wigner_d(ig - 1, n1);
-            const float_type dwigner_n1 = _wigner.get_dwigner_d(ig - 1, n1);
-            const float_type wigner_n2 = _wigner.get_wigner_d(ig - 1, n2);
-            const float_type dwigner_n2 = _wigner.get_dwigner_d(ig - 1, n2);
+            const float_type wigner_n1 = _wigner.get_wigner_d(0, ig - 1, n1);
+            const float_type dwigner_n1 = _wigner.get_dwigner_d(0, ig - 1, n1);
+            const float_type wigner_n2 = _wigner.get_wigner_d(0, ig - 1, n2);
+            const float_type dwigner_n2 = _wigner.get_dwigner_d(0, ig - 1, n2);
 
             const float_type wn1dwn2 = wigner_n1 * dwigner_n2;
             const float_type dwn1wn2 = dwigner_n1 * wigner_n2;
@@ -679,13 +668,13 @@ public:
     // set the order and number of quadrature poitns of the T-matrix
     _Tmatrix._nmax = _nmax;
     _Tmatrix._ngauss = _ngauss;
-    _Tmatrix._wavenumber = _interaction_variables.get_wavenumber();
 
     _converged_size._nmax = _nmax;
     _converged_size._ngauss = _ngauss;
     _converged_size._quadrature_points = &_quadrature_points;
     _converged_size._geometry = &_geometry;
     _converged_size._interaction = &_interaction;
+    _converged_size._wigner_d = &_wigner;
 
     // update Q coefficients
     const float_type old_Qscattering = _Tmatrix._Qscattering;
@@ -741,9 +730,6 @@ private:
   /*! @brief Precomputed @f$n@f$ factors (read only). */
   const NBasedResources &_nfactors;
 
-  /*! @brief Precomputed @f$m>0@f$ Wigner D functions (read only). */
-  const WignerDmn0Resources &_wigner;
-
   /*! @brief Converged T-matrix variables. */
   const ConvergedSizeResources &_converged_size;
 
@@ -767,7 +753,6 @@ public:
    *
    * @param m @f$m@f$ value.
    * @param nfactors Precomputed @f$n@f$ factors (read only).
-   * @param wigner Precomputed @f$m>0@f$ Wigner D functions (read only).
    * @param converged_size Converged T-matrix variables (read only).
    * @param interaction_variables Interaction variables (read only).
    * @param aux_manager Auxiliary space manager used to obtain space to store
@@ -777,13 +762,11 @@ public:
    * values of the T-matrix.
    */
   inline TMatrixMAllTask(const uint_fast32_t m, const NBasedResources &nfactors,
-                         const WignerDmn0Resources &wigner,
                          const ConvergedSizeResources &converged_size,
                          const InteractionVariables &interaction_variables,
                          TMatrixAuxiliarySpaceManager &aux_manager,
                          TMatrixResource &Tmatrix, const Resource &m_resource)
-      : _m(m), _nfactors(nfactors), _wigner(wigner),
-        _converged_size(converged_size),
+      : _m(m), _nfactors(nfactors), _converged_size(converged_size),
         _interaction_variables(interaction_variables),
         _aux_manager(aux_manager), _Tmatrix(Tmatrix), _m_resource(m_resource) {}
 
@@ -800,7 +783,6 @@ public:
 
     // read access
     quicksched.link_task_and_resource(*this, _nfactors, false);
-    quicksched.link_task_and_resource(*this, _wigner, false);
     quicksched.link_task_and_resource(*this, _converged_size, false);
   }
 
@@ -828,6 +810,7 @@ public:
         *_converged_size.get_quadrature_points();
     const ParticleGeometryResource &geometry = *_converged_size.get_geometry();
     const InteractionResource &interaction = *_converged_size.get_interaction();
+    const WignerDResources &wigner_d = *_converged_size.get_wigner_d();
 
     const float_type m2 = _m * _m;
     const uint_fast32_t nm = nmax + 1 - _m;
@@ -844,10 +827,10 @@ public:
             this_RgJ11, this_RgJ12, this_RgJ21, this_RgJ22;
         const int_fast8_t sign = ((n1 + n2) % 2 == 0) ? 1 : -1;
         for (uint_fast32_t ig = 0; ig < ngauss; ++ig) {
-          const float_type wigner_n1 = _wigner.get_wigner_d(ig, n1);
-          const float_type dwigner_n1 = _wigner.get_dwigner_d(ig, n1);
-          const float_type wigner_n2 = _wigner.get_wigner_d(ig, n2);
-          const float_type dwigner_n2 = _wigner.get_dwigner_d(ig, n2);
+          const float_type wigner_n1 = wigner_d.get_wigner_d(_m, ig, n1);
+          const float_type dwigner_n1 = wigner_d.get_dwigner_d(_m, ig, n1);
+          const float_type wigner_n2 = wigner_d.get_wigner_d(_m, ig, n2);
+          const float_type dwigner_n2 = wigner_d.get_dwigner_d(_m, ig, n2);
 
           const float_type wn1wn2 = wigner_n1 * wigner_n2;
           const float_type wn1dwn2 = wigner_n1 * dwigner_n2;

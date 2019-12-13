@@ -180,7 +180,7 @@ int main(int argc, char **argv) {
     size += maxgauss * gaussresourcesize;
 
     const size_t wignerm0resourcesize =
-        WignerDm0Resources::get_memory_size(maximum_order, maxgauss);
+        WignerDResources::get_memory_size(maximum_order, maxgauss);
     ctm_warning("WignerDResources: %s",
                 Utilities::human_readable_bytes(wignerm0resourcesize).c_str());
     size += maxgauss * wignerm0resourcesize;
@@ -221,7 +221,7 @@ int main(int argc, char **argv) {
         10., 100., std::complex<float_type>(1., 0.02));
 
     std::vector<GaussBasedResources *> gaussfactors(maxgauss, nullptr);
-    std::vector<WignerDm0Resources *> wignerm0factors(maxgauss, nullptr);
+    std::vector<WignerDResources *> wignerm0factors(maxgauss, nullptr);
     std::vector<ParticleGeometryResource *> geometryfactors(maxgauss, nullptr);
     std::vector<InteractionResource *> interactionfactors(maxgauss, nullptr);
     std::vector<InteractionTask *> interaction_tasks(maxgauss, nullptr);
@@ -234,7 +234,7 @@ int main(int argc, char **argv) {
       gaussfactors[ig]->link_resources(quicksched);
 
       wignerm0factors[ig] =
-          new WignerDm0Resources(maximum_order, ig + 20, *gaussfactors[ig]);
+          new WignerDResources(maximum_order, ig + 20, *gaussfactors[ig]);
       quicksched.register_resource(*wignerm0factors[ig]);
       quicksched.register_task(*wignerm0factors[ig]);
       wignerm0factors[ig]->link_resources(quicksched);

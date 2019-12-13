@@ -35,6 +35,9 @@ private:
   /*! @brief Input azimuth angle (in radians). */
   const float_type _phi;
 
+  /*! @brief Interaction variables. */
+  const InteractionVariables &_interaction_variables;
+
   /*! @brief T-matrix to use. */
   const TMatrixResource &_Tmatrix;
 
@@ -47,11 +50,14 @@ public:
    *
    * @param theta Input zenith angle (in radians).
    * @param phi Input azimuth angle (in radians).
+   * @param interaction_variables Interaction variables.
    * @param Tmatrix T-matrix to use.
    */
   ExtinctionMatrixResource(const float_type theta, const float_type phi,
+                           const InteractionVariables &interaction_variables,
                            const TMatrixResource &Tmatrix)
-      : _theta(theta), _phi(phi), _Tmatrix(Tmatrix), _K(4, 4) {}
+      : _theta(theta), _phi(phi), _interaction_variables(interaction_variables),
+        _Tmatrix(Tmatrix), _K(4, 4) {}
 
   virtual ~ExtinctionMatrixResource() {}
 
@@ -281,7 +287,7 @@ public:
       }
     }
     // now divide all expressions by the wavenumber
-    const float_type kinv = 1. / _Tmatrix.get_wavenumber();
+    const float_type kinv = 1. / _interaction_variables.get_wavenumber();
     S(0, 0) *= kinv;
     S(0, 1) *= kinv;
     S(1, 0) *= kinv;

@@ -238,6 +238,15 @@ public:
   inline ~QuickSched() { qsched_free(&_s); }
 
   /**
+   * @brief Get the number of threads used during parallel execution.
+   *
+   * @return Number of threads.
+   */
+  inline int_fast32_t get_number_of_threads() const {
+    return _number_of_threads;
+  }
+
+  /**
    * @brief Execute all tasks that were added previously.
    *
    * @param number_of_threads Number of threads to use.

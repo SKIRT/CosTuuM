@@ -47,6 +47,9 @@ private:
   /*! @brief Output azimuth angle (in radians). */
   const float_type _phi_out;
 
+  /*! @brief Interaction variables. */
+  const InteractionVariables &_interaction_variables;
+
   /*! @brief T-matrix to use. */
   const TMatrixResource &_Tmatrix;
 
@@ -105,19 +108,22 @@ public:
    * @param phi_in Input azimuth angle (in radians).
    * @param theta_out Output zenith angle (in radians).
    * @param phi_out Output azimuth angle (in radians).
+   * @param interaction_variables Interaction variables.
    * @param Tmatrix T-matrix to use.
    * @param nmax Maximum order of the T-matrix.
    */
   ScatteringMatrixResource(const float_type alpha, const float_type beta,
                            const float_type theta_in, const float_type phi_in,
                            const float_type theta_out, const float_type phi_out,
+                           const InteractionVariables &interaction_variables,
                            const TMatrixResource &Tmatrix,
                            const uint_fast32_t nmax)
       : _alpha(alpha), _beta(beta), _theta_in(theta_in), _phi_in(phi_in),
-        _theta_out(theta_out), _phi_out(phi_out), _Tmatrix(Tmatrix), _Z(4, 4),
-        _B(3, 3), _AL_in(3, 2), _AP_in(2, 3), _AL_out(3, 2), _AP_out(2, 3),
-        _C(3, 2), _R_in(2, 2), _R_out(2, 2), _c(nmax, nmax), _S(2, 2),
-        _pi_in(nmax), _tau_in(nmax), _pi_out(nmax), _tau_out(nmax) {}
+        _theta_out(theta_out), _phi_out(phi_out),
+        _interaction_variables(interaction_variables), _Tmatrix(Tmatrix),
+        _Z(4, 4), _B(3, 3), _AL_in(3, 2), _AP_in(2, 3), _AL_out(3, 2),
+        _AP_out(2, 3), _C(3, 2), _R_in(2, 2), _R_out(2, 2), _c(nmax, nmax),
+        _S(2, 2), _pi_in(nmax), _tau_in(nmax), _pi_out(nmax), _tau_out(nmax) {}
 
   virtual ~ScatteringMatrixResource() {}
 
@@ -399,7 +405,7 @@ public:
       }
     }
     // now divide all expressions by the wavenumber
-    const float_type kinv = 1. / _Tmatrix.get_wavenumber();
+    const float_type kinv = 1. / _interaction_variables.get_wavenumber();
     _S(0, 0) *= kinv;
     _S(0, 1) *= kinv;
     _S(1, 0) *= kinv;

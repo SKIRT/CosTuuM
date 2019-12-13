@@ -88,10 +88,10 @@ int main(int argc, char **argv) {
                 Utilities::human_readable_bytes(
                     GaussBasedResources::get_memory_size(ndgs * maximum_order))
                     .c_str());
-    ctm_warning("WignerDm0Resources: %s",
+    ctm_warning("WignerDResources: %s",
                 Utilities::human_readable_bytes(
-                    WignerDm0Resources::get_memory_size(maximum_order,
-                                                        ndgs * maximum_order))
+                    WignerDResources::get_memory_size(maximum_order,
+                                                      ndgs * maximum_order))
                     .c_str());
     ctm_warning(
         "ParticleGeometryResource: %s",
@@ -106,11 +106,6 @@ int main(int argc, char **argv) {
     ctm_warning("TMatrixResource: %s",
                 Utilities::human_readable_bytes(
                     TMatrixResource::get_memory_size(maximum_order))
-                    .c_str());
-    ctm_warning("WignerDmn0Resources: %s",
-                Utilities::human_readable_bytes(
-                    WignerDmn0Resources::get_memory_size(maximum_order,
-                                                         ndgs * maximum_order))
                     .c_str());
     ctm_warning("ScatteringMatrixResource: %s",
                 Utilities::human_readable_bytes(
@@ -194,13 +189,13 @@ int main(int argc, char **argv) {
         quadrature_points[i]->execute();
       }
 
-      std::vector<WignerDm0Resources *> wignerdm0(maximum_order - minimum_order,
-                                                  nullptr);
+      std::vector<WignerDResources *> wignerd(maximum_order - minimum_order,
+                                              nullptr);
       for (uint_fast32_t i = 0; i < maximum_order - minimum_order; ++i) {
-        wignerdm0[i] = new WignerDm0Resources(minimum_order + i,
-                                              ndgs * (minimum_order + i),
-                                              *quadrature_points[i]);
-        wignerdm0[i]->execute();
+        wignerd[i] =
+            new WignerDResources(minimum_order + i, ndgs * (minimum_order + i),
+                                 *quadrature_points[i]);
+        wignerd[i]->execute();
       }
 
       std::vector<ParticleGeometryResource *> geometries(
@@ -236,8 +231,8 @@ int main(int argc, char **argv) {
         m0tasks[i] = new TMatrixM0Task(
             tolerance, minimum_order + i, ndgs * (minimum_order + i), nfactors,
             *quadrature_points[i], *geometries[i], interaction_variables,
-            *interactions[i], *wignerdm0[i], aux_manager, Tmatrix,
-            converged_size, Tmatrix.get_m_resource(0));
+            *interactions[i], *wignerd[i], aux_manager, Tmatrix, converged_size,
+            Tmatrix.get_m_resource(0));
         m0tasks[i]->execute(0);
       }
 
@@ -248,19 +243,11 @@ int main(int argc, char **argv) {
       ctm_warning("Qext: %g (%g)", double(Tmatrix.get_extinction_coefficient()),
                   double(refqext));
 
-      std::vector<WignerDmn0Resources *> more_wigner(maximum_order, nullptr);
-      for (uint_fast32_t i = 0; i < maximum_order; ++i) {
-        more_wigner[i] = new WignerDmn0Resources(
-            1 + i, maximum_order, ndgs * maximum_order, converged_size);
-        more_wigner[i]->execute();
-      }
-
       std::vector<TMatrixMAllTask *> malltask(maximum_order, nullptr);
       for (uint_fast32_t i = 0; i < maximum_order; ++i) {
-        malltask[i] = new TMatrixMAllTask(1 + i, nfactors, *more_wigner[i],
-                                          converged_size, interaction_variables,
-                                          aux_manager, Tmatrix,
-                                          Tmatrix.get_m_resource(1 + i));
+        malltask[i] = new TMatrixMAllTask(
+            1 + i, nfactors, converged_size, interaction_variables, aux_manager,
+            Tmatrix, Tmatrix.get_m_resource(1 + i));
         malltask[i]->execute(0);
       }
 
@@ -278,7 +265,8 @@ int main(int argc, char **argv) {
       assert_values_equal_rel(double(walb), double(refwalb), 1.e-5);
 
       ScatteringMatrixResource Zmatrix(alpha, beta, thet0, phi0, thet, phi,
-                                       Tmatrix, maximum_order);
+                                       interaction_variables, Tmatrix,
+                                       maximum_order);
       Zmatrix.execute();
 
       ctm_warning("Z[0,:]: %g %g %g %g", double(Zmatrix(0, 0)),
@@ -311,12 +299,11 @@ int main(int argc, char **argv) {
       }
 
       clear_vector(quadrature_points);
-      clear_vector(wignerdm0);
+      clear_vector(wignerd);
       clear_vector(geometries);
       clear_vector(interactions);
       clear_vector(interaction_tasks);
       clear_vector(m0tasks);
-      clear_vector(more_wigner);
       clear_vector(malltask);
     }
 
@@ -353,16 +340,16 @@ int main(int argc, char **argv) {
         quicksched.register_task(*quadrature_points[i]);
       }
 
-      std::vector<WignerDm0Resources *> wignerdm0(maximum_order - minimum_order,
-                                                  nullptr);
+      std::vector<WignerDResources *> wignerd(maximum_order - minimum_order,
+                                              nullptr);
       for (uint_fast32_t i = 0; i < maximum_order - minimum_order; ++i) {
-        wignerdm0[i] = new WignerDm0Resources(minimum_order + i,
-                                              ndgs * (minimum_order + i),
-                                              *quadrature_points[i]);
-        quicksched.register_resource(*wignerdm0[i]);
-        quicksched.register_task(*wignerdm0[i]);
-        wignerdm0[i]->link_resources(quicksched);
-        quicksched.link_tasks(*quadrature_points[i], *wignerdm0[i]);
+        wignerd[i] =
+            new WignerDResources(minimum_order + i, ndgs * (minimum_order + i),
+                                 *quadrature_points[i]);
+        quicksched.register_resource(*wignerd[i]);
+        quicksched.register_task(*wignerd[i]);
+        wignerd[i]->link_resources(quicksched);
+        quicksched.link_tasks(*quadrature_points[i], *wignerd[i]);
       }
 
       std::vector<ParticleGeometryResource *> geometries(
@@ -393,12 +380,12 @@ int main(int argc, char **argv) {
         m0tasks[i] = new TMatrixM0Task(
             tolerance, minimum_order + i, ndgs * (minimum_order + i), nfactors,
             *quadrature_points[i], *geometries[i], interaction_variables,
-            interaction, *wignerdm0[i], aux_manager, Tmatrix, converged_size,
+            interaction, *wignerd[i], aux_manager, Tmatrix, converged_size,
             Tmatrix.get_m_resource(0));
         quicksched.register_task(*m0tasks[i]);
         m0tasks[i]->link_resources(quicksched);
         quicksched.link_tasks(nfactors, *m0tasks[i]);
-        quicksched.link_tasks(*wignerdm0[i], *m0tasks[i]);
+        quicksched.link_tasks(*wignerd[i], *m0tasks[i]);
         quicksched.link_tasks(*interaction_tasks[i], *m0tasks[i]);
         if (i > 0) {
           quicksched.link_tasks(*m0tasks[i - 1], *interaction_tasks[i]);
@@ -406,38 +393,28 @@ int main(int argc, char **argv) {
         }
       }
 
-      std::vector<WignerDmn0Resources *> more_wigner(maximum_order, nullptr);
-      for (uint_fast32_t i = 0; i < maximum_order; ++i) {
-        more_wigner[i] = new WignerDmn0Resources(
-            1 + i, maximum_order, ndgs * maximum_order, converged_size);
-        quicksched.register_resource(*more_wigner[i]);
-        quicksched.register_task(*more_wigner[i]);
-        more_wigner[i]->link_resources(quicksched);
-        quicksched.link_tasks(*m0tasks.back(), *more_wigner[i]);
-      }
-
       TMatrixQTask qtask(Tmatrix, Tmatrix.get_m_resource(0));
       quicksched.register_task(qtask);
       qtask.link_resources(quicksched);
-      ExtinctionMatrixResource Kmatrix(0.3 * M_PI, 0., Tmatrix);
+      ExtinctionMatrixResource Kmatrix(0.3 * M_PI, 0., interaction_variables,
+                                       Tmatrix);
       quicksched.register_resource(Kmatrix);
       quicksched.register_task(Kmatrix);
       Kmatrix.link_resources(quicksched);
       ScatteringMatrixResource Zmatrix(alpha, beta, thet0, phi0, thet, phi,
-                                       Tmatrix, maximum_order);
+                                       interaction_variables, Tmatrix,
+                                       maximum_order);
       quicksched.register_resource(Zmatrix);
       quicksched.register_task(Zmatrix);
       Zmatrix.link_resources(quicksched);
 
       std::vector<TMatrixMAllTask *> malltask(maximum_order, nullptr);
       for (uint_fast32_t i = 0; i < maximum_order; ++i) {
-        malltask[i] = new TMatrixMAllTask(1 + i, nfactors, *more_wigner[i],
-                                          converged_size, interaction_variables,
-                                          aux_manager, Tmatrix,
-                                          Tmatrix.get_m_resource(1 + i));
+        malltask[i] = new TMatrixMAllTask(
+            1 + i, nfactors, converged_size, interaction_variables, aux_manager,
+            Tmatrix, Tmatrix.get_m_resource(1 + i));
         quicksched.register_task(*malltask[i]);
         malltask[i]->link_resources(quicksched);
-        quicksched.link_tasks(*more_wigner[i], *malltask[i]);
 
         quicksched.link_tasks(*malltask[i], qtask);
         quicksched.link_tasks(*malltask[i], Kmatrix);
@@ -509,13 +486,12 @@ int main(int argc, char **argv) {
       quicksched.print_task(nfactors, taskfile);
       for (uint_fast32_t i = 0; i < maximum_order - minimum_order; ++i) {
         quicksched.print_task(*quadrature_points[i], taskfile);
-        quicksched.print_task(*wignerdm0[i], taskfile);
+        quicksched.print_task(*wignerd[i], taskfile);
         quicksched.print_task(*geometries[i], taskfile);
         quicksched.print_task(*interaction_tasks[i], taskfile);
         quicksched.print_task(*m0tasks[i], taskfile);
       }
       for (uint_fast32_t i = 0; i < maximum_order; ++i) {
-        quicksched.print_task(*more_wigner[i], taskfile);
         quicksched.print_task(*malltask[i], taskfile);
       }
       quicksched.print_task(qtask, taskfile);
@@ -527,11 +503,10 @@ int main(int argc, char **argv) {
 
       // as so nicely stated throughout SWIFT: be clean
       clear_vector(quadrature_points);
-      clear_vector(wignerdm0);
+      clear_vector(wignerd);
       clear_vector(geometries);
       clear_vector(interaction_tasks);
       clear_vector(m0tasks);
-      clear_vector(more_wigner);
       clear_vector(malltask);
     }
   }
@@ -561,14 +536,14 @@ int main(int argc, char **argv) {
       quicksched.register_task(*quadrature_points[i]);
     }
 
-    std::vector<WignerDm0Resources *> wignerdm0(maximum_order - 1, nullptr);
+    std::vector<WignerDResources *> wignerd(maximum_order - 1, nullptr);
     for (uint_fast32_t i = 0; i < maximum_order - 1; ++i) {
-      wignerdm0[i] =
-          new WignerDm0Resources(1 + i, ndgs * (1 + i), *quadrature_points[i]);
-      quicksched.register_resource(*wignerdm0[i]);
-      quicksched.register_task(*wignerdm0[i]);
-      wignerdm0[i]->link_resources(quicksched);
-      quicksched.link_tasks(*quadrature_points[i], *wignerdm0[i]);
+      wignerd[i] =
+          new WignerDResources(1 + i, ndgs * (1 + i), *quadrature_points[i]);
+      quicksched.register_resource(*wignerd[i]);
+      quicksched.register_task(*wignerd[i]);
+      wignerd[i]->link_resources(quicksched);
+      quicksched.link_tasks(*quadrature_points[i], *wignerd[i]);
     }
 
     std::vector<ConvergedSizeResources *> converged_sizes;
@@ -580,7 +555,6 @@ int main(int argc, char **argv) {
     std::vector<InteractionResource *> interactions;
     std::vector<InteractionTask *> interaction_tasks;
     std::vector<TMatrixM0Task *> m0tasks;
-    std::vector<WignerDmn0Resources *> wignerdmalls;
     std::vector<TMatrixMAllTask *> malltasks;
     std::vector<float_type> refQscavec;
     std::vector<float_type> refQextvec;
@@ -677,13 +651,12 @@ int main(int argc, char **argv) {
             tolerance, minimum_order + i, ndgs * (minimum_order + i), nfactors,
             *quadrature_points[minimum_order + i - 1], *geometries.back(),
             *interaction_variables.back(), *interactions.back(),
-            *wignerdm0[minimum_order + i - 1], aux_manager, *Tmatrices.back(),
+            *wignerd[minimum_order + i - 1], aux_manager, *Tmatrices.back(),
             *converged_sizes.back(), Tmatrices.back()->get_m_resource(0)));
         quicksched.register_task(*m0tasks.back());
         m0tasks.back()->link_resources(quicksched);
         quicksched.link_tasks(nfactors, *m0tasks.back());
-        quicksched.link_tasks(*wignerdm0[minimum_order + i - 1],
-                              *m0tasks.back());
+        quicksched.link_tasks(*wignerd[minimum_order + i - 1], *m0tasks.back());
         quicksched.link_tasks(*interaction_tasks.back(), *m0tasks.back());
         if (i > 0) {
           quicksched.link_tasks(*m0tasks[m0tasks.size() - 2],
@@ -696,29 +669,21 @@ int main(int argc, char **argv) {
                                         Tmatrices.back()->get_m_resource(0)));
       quicksched.register_task(*Qtasks.back());
       Qtasks.back()->link_resources(quicksched);
-      Zmatrices.push_back(
-          new ScatteringMatrixResource(alpha, beta, thet0, phi0, thet, phi,
-                                       *Tmatrices.back(), maximum_order));
+      Zmatrices.push_back(new ScatteringMatrixResource(
+          alpha, beta, thet0, phi0, thet, phi, *interaction_variables.back(),
+          *Tmatrices.back(), maximum_order));
       quicksched.register_resource(*Zmatrices.back());
       quicksched.register_task(*Zmatrices.back());
       Zmatrices.back()->link_resources(quicksched);
 
       for (uint_fast32_t i = 0; i < maximum_order; ++i) {
-        wignerdmalls.push_back(
-            new WignerDmn0Resources(1 + i, maximum_order, ndgs * maximum_order,
-                                    *converged_sizes.back()));
-        quicksched.register_resource(*wignerdmalls.back());
-        quicksched.register_task(*wignerdmalls.back());
-        wignerdmalls.back()->link_resources(quicksched);
-        quicksched.link_tasks(*m0tasks.back(), *wignerdmalls.back());
-
         malltasks.push_back(new TMatrixMAllTask(
-            1 + i, nfactors, *wignerdmalls.back(), *converged_sizes.back(),
+            1 + i, nfactors, *converged_sizes.back(),
             *interaction_variables.back(), aux_manager, *Tmatrices.back(),
             Tmatrices.back()->get_m_resource(1 + i)));
         quicksched.register_task(*malltasks.back());
         malltasks.back()->link_resources(quicksched);
-        quicksched.link_tasks(*wignerdmalls.back(), *malltasks.back());
+        quicksched.link_tasks(*m0tasks.back(), *malltasks.back());
 
         quicksched.link_tasks(*malltasks.back(), *Qtasks.back());
         quicksched.link_tasks(*malltasks.back(), *Zmatrices.back());
@@ -733,11 +698,10 @@ int main(int argc, char **argv) {
     taskfile << "# thread\tstart\tend\ttype\ttask id\n";
     quicksched.print_task(nfactors, taskfile);
     print_vector(quadrature_points, quicksched, taskfile);
-    print_vector(wignerdm0, quicksched, taskfile);
+    print_vector(wignerd, quicksched, taskfile);
     print_vector(geometries, quicksched, taskfile);
     print_vector(interaction_tasks, quicksched, taskfile);
     print_vector(m0tasks, quicksched, taskfile);
-    print_vector(wignerdmalls, quicksched, taskfile);
     print_vector(malltasks, quicksched, taskfile);
     print_vector(Qtasks, quicksched, taskfile);
     print_vector(Zmatrices, quicksched, taskfile);
@@ -770,7 +734,7 @@ int main(int argc, char **argv) {
     }
 
     clear_vector(quadrature_points);
-    clear_vector(wignerdm0);
+    clear_vector(wignerd);
     clear_vector(converged_sizes);
     clear_vector(Tmatrices);
     clear_vector(Qtasks);
@@ -780,7 +744,6 @@ int main(int argc, char **argv) {
     clear_vector(interactions);
     clear_vector(interaction_tasks);
     clear_vector(m0tasks);
-    clear_vector(wignerdmalls);
     clear_vector(malltasks);
   }
 
