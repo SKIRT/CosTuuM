@@ -194,10 +194,12 @@ public:
     // But for now, we simply use a hard coded value...
     const uint_fast32_t number_of_shapes = 100u;
 
-    // grand total
+    // grand total of T-matrices we need to compute
     const uint_fast32_t total_number_of_Tmatrices =
         number_of_compositions * number_of_sizes * number_of_wavelengths *
         number_of_shapes;
+    ctm_warning("Number of T-matrices that needs to be computed: %" PRIuFAST32,
+                total_number_of_Tmatrices);
 
     // we need to keep track of memory to make sure we respect the user
     // defined limit
@@ -246,7 +248,7 @@ public:
       tasks[quadrature_points_offset + i] = this_quadrature_points;
     }
 
-    //  - Wigner D values
+    //  - Wigner D functions
     std::vector<WignerDResources *> wignerdm0(number_of_quadrature_tasks,
                                               nullptr);
     const uint_fast32_t wignerdm0_offset = tasks.size();
@@ -293,6 +295,9 @@ public:
         quicksched.register_task(*this_geometry);
         this_geometry->link_resources(quicksched);
         quicksched.link_tasks(*quadrature_points[ig], *this_geometry);
+        // note that we store the particle geometries as follows:
+        // rows (first index) correspond to different shapes
+        // columns (second index) correspond to different quadrature points
         const uint_fast32_t index = is * number_of_quadrature_tasks + ig;
         geometries[index] = this_geometry;
         tasks[shape_offset + index] = this_geometry;
@@ -302,21 +307,30 @@ public:
     const DraineDustProperties dust_properties;
     // step 4: loop over all parameter values and set up parameter specific
     // tasks
-    // ... need to figure out how to determine a good size for these...
+    // first: figure out how much space is left for interaction and T-matrix
+    // resources
     const uint_fast32_t memory_left = _maximum_memory_usage - memory_used;
     const uint_fast32_t tmatrix_memory_requirement =
         InteractionResource::get_memory_size(_maximum_order, maximum_ngauss) +
         TMatrixResource::get_memory_size(_maximum_order);
+    // compute the number of T-matrices that we can store simultaneously
+    // if this number is larger than what we need, we only allocate what
+    // we need
     const uint_fast32_t number_of_tmatrices = std::min(
         memory_left / tmatrix_memory_requirement, total_number_of_Tmatrices);
+    // make sure the number we can allocate is larger than the number of
+    // shapes (not strictly necessary, but we do this for now)
     ctm_assert(number_of_tmatrices >= number_of_shapes);
 
     // for now: enforce enough space to store all T-matrices
     ctm_assert(number_of_tmatrices == total_number_of_Tmatrices);
 
+    // we are done using memory: output the total
     memory_used += number_of_tmatrices * tmatrix_memory_requirement;
     ctm_warning("Total memory usage: %s",
                 Utilities::human_readable_bytes(memory_used).c_str());
+
+    // now actually allocate the resources
     std::vector<InteractionResource *> interaction_resources(
         number_of_tmatrices, nullptr);
     tmatrices.resize(number_of_tmatrices, nullptr);
@@ -334,41 +348,62 @@ public:
       }
     }
 
+    // big loop over all parameter values
+    // for each parameter value we allocate interaction variables and a
+    // control resource
     interaction_variables.resize(total_number_of_Tmatrices, nullptr);
     std::vector<ConvergedSizeResources *> converged_size_resources(
         total_number_of_Tmatrices, nullptr);
     const uint_fast32_t resource_offset = resources.size();
     resources.resize(resource_offset + total_number_of_Tmatrices, nullptr);
     const uint_fast32_t task_offset = tasks.size();
+    // for each T-matrix,
+    // we need to add interaction and m=0 tasks for each quadrature point
+    // we need to add m=/=0 tasks for each order
     tasks.resize(task_offset +
                      total_number_of_Tmatrices *
                          (2 * number_of_quadrature_tasks + _maximum_order),
                  nullptr);
+    // loop over compositions
     for (uint_fast32_t icomp = 0; icomp < number_of_compositions; ++icomp) {
+      // get the grain type that corresponds to this composition
       const int_fast32_t grain_type = _compositions[icomp];
+      // make sure the grain type exists
       ctm_assert(grain_type >= 0 && grain_type < NUMBER_OF_DUSTGRAINTYPES);
+      // loop over all sizes
       for (uint_fast32_t isize = 0; isize < number_of_sizes; ++isize) {
+        // cache the size
         const float_type particle_size = _sizes[isize];
+        // loop over all wavelengths
         for (uint_fast32_t ilambda = 0; ilambda < number_of_wavelengths;
              ++ilambda) {
+          // cache the wavelength
           const float_type wavelength = _wavelengths[ilambda];
+          // get the refractive index for this grain type, particle size and
+          // interaction wavelength
           const std::complex<float_type> refractive_index =
               dust_properties.get_refractive_index(wavelength, particle_size,
                                                    grain_type);
+          // loop over all shapes
           for (uint_fast32_t ishape = 0; ishape < number_of_shapes; ++ishape) {
+            // compute the index of the corresponding T-matrix
             const uint_fast32_t index =
                 icomp * number_of_sizes * number_of_wavelengths *
                     number_of_shapes +
                 isize * number_of_wavelengths * number_of_shapes +
                 ilambda * number_of_shapes + ishape;
 
+            // allocate the corresponding interaction variables and control
+            // object
             interaction_variables[index] = new InteractionVariables(
                 particle_size, wavelength, refractive_index);
             converged_size_resources[index] = new ConvergedSizeResources();
             quicksched.register_resource(*converged_size_resources[index]);
             resources[resource_offset + index] =
                 converged_size_resources[index];
+            // we need to store the previous m=0 task to set up a dependency
             TMatrixM0Task *previous_m0task = nullptr;
+            // loop over all orders
             for (uint_fast32_t i = 0; i < number_of_quadrature_tasks; ++i) {
               const uint_fast32_t this_order = _minimum_order + i;
               const uint_fast32_t this_ngauss =
@@ -378,6 +413,7 @@ public:
               const WignerDResources &this_wigner = *wignerdm0[i];
               const ParticleGeometryResource &this_geometry =
                   *geometries[ishape * number_of_quadrature_tasks + i];
+              // set up the interaction task
               InteractionTask *this_interaction = new InteractionTask(
                   this_order, this_ngauss, this_geometry,
                   *converged_size_resources[index],
@@ -389,6 +425,7 @@ public:
                     index * (2 * number_of_quadrature_tasks + _maximum_order) +
                     2 * i] = this_interaction;
 
+              // set up the m=0 task
               TMatrixM0Task *this_m0task = new TMatrixM0Task(
                   _tolerance, this_order, this_ngauss, *nbased_resources,
                   this_quadrature_points, this_geometry,
@@ -401,6 +438,7 @@ public:
               quicksched.link_tasks(*nbased_resources, *this_m0task);
               quicksched.link_tasks(this_wigner, *this_m0task);
               quicksched.link_tasks(*this_interaction, *this_m0task);
+              // link the previous task as dependency, if it exists
               if (previous_m0task != nullptr) {
                 quicksched.link_tasks(*previous_m0task, *this_interaction);
                 quicksched.link_tasks(*previous_m0task, *this_m0task);
@@ -411,6 +449,7 @@ public:
               previous_m0task = this_m0task;
             }
 
+            // loop over all m values to set up m=/=0 tasks
             for (uint_fast32_t i = 0; i < _maximum_order; ++i) {
               TMatrixMAllTask *this_malltask = new TMatrixMAllTask(
                   i + 1, *nbased_resources, *converged_size_resources[index],
@@ -418,6 +457,7 @@ public:
                   *tmatrices[index], tmatrices[index]->get_m_resource(i + 1));
               quicksched.register_task(*this_malltask);
               this_malltask->link_resources(quicksched);
+              // link to the last m=0 task
               quicksched.link_tasks(*previous_m0task, *this_malltask);
               tasks[task_offset +
                     index * (2 * number_of_quadrature_tasks + _maximum_order) +
