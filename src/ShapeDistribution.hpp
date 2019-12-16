@@ -9,8 +9,11 @@
 #define SHAPEDISTRIBUTION_HPP
 
 #include "Configuration.hpp"
+#include "Error.hpp"
+#include "SpecialFunctions.hpp"
 
 #include <cmath>
+#include <vector>
 
 /**
  * @brief Interface for shape distributions.
@@ -54,6 +57,61 @@ public:
    * @return Maximum value for the distribution.
    */
   virtual float_type get_maximum_axis_ratio() const { return 1.5; }
+
+protected:
+  /*! @brief Points where the shape distribution is evaluated. */
+  std::vector<float_type> _shapes;
+
+  /*! @brief Weights for the evaluation points. */
+  std::vector<float_type> _weights;
+
+public:
+  virtual ~ShapeDistribution() {}
+
+  /**
+   * @brief Evaluate the shape distribution at a given number of Gauss-Legendre
+   * quadrature poitns.
+   *
+   * @param npoints Number of points to use.
+   */
+  inline void evaluate(const uint_fast32_t npoints) {
+    _shapes.resize(npoints);
+    _weights.resize(npoints);
+    SpecialFunctions::get_gauss_legendre_points_and_weights_ab<float_type>(
+        npoints, get_minimum_axis_ratio(), get_maximum_axis_ratio(), _shapes,
+        _weights);
+  }
+
+  /**
+   * @brief Get the number of evaluation points for the shape distribution.
+   *
+   * @return Number of shapes.
+   */
+  inline uint_fast32_t get_number_of_points() const { return _shapes.size(); }
+
+  /**
+   * @brief Get the shape corresponding to the evaluation point with the given
+   * index.
+   *
+   * @param index Index, needs to be smaller than get_number_of_points().
+   * @return Corresponding shape value.
+   */
+  inline float_type get_shape(const uint_fast32_t index) const {
+    ctm_assert(index < _shapes.size());
+    return _shapes[index];
+  }
+
+  /**
+   * @brief Get the weight corresponding to the evaluation point with the given
+   * index.
+   *
+   * @param index Index, needs to be smaller than get_number_of_points().
+   * @return Corresponding weight value.
+   */
+  inline float_type get_weight(const uint_fast32_t index) const {
+    ctm_assert(index < _weights.size());
+    return _weights[index];
+  }
 };
 
 #endif // SHAPEDISTRIBUTION_HPP

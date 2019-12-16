@@ -34,9 +34,6 @@ private:
   /*! @brief Equal volume sphere radius, @f$R_V@f$ (in m). */
   const float_type _R_V;
 
-  /*! @brief Wavelenght, @f$\lambda{}@f$ (in m). */
-  const float_type _wavelength;
-
   /*! @brief Wavenumber, @f$k = \frac{2\pi{}}{\lambda{}}@f$. */
   const float_type _k;
 
@@ -59,9 +56,8 @@ public:
    */
   inline InteractionVariables(const float_type R_V, const float_type wavelength,
                               const std::complex<float_type> refractive_index)
-      : _R_V(R_V), _wavelength(wavelength), _k(2. * M_PI / wavelength),
-        _k2(_k * _k), _kmr(refractive_index * _k),
-        _k2mr(refractive_index * _k2) {}
+      : _R_V(R_V), _k(2. * M_PI / wavelength), _k2(_k * _k),
+        _kmr(refractive_index * _k), _k2mr(refractive_index * _k2) {}
 
   /**
    * @brief Get the equal volume radius, @f$R_V@f$.

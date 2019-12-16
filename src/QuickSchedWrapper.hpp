@@ -9,6 +9,7 @@
 #define QUICKSCHEDWRAPPER_HPP
 
 #include "CPUCycle.hpp"
+#include "Error.hpp"
 #include "quicksched.h"
 
 #include <cinttypes>

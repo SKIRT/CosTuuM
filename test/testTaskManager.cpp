@@ -49,13 +49,22 @@ inline void print_vector(std::vector<T *> &vec, QuickSched &quicksched,
  */
 int main(int argc, char **argv) {
 
-  TaskManager task_manager(10, 100, 2, 1.e-4, 1e10, 0);
+  TaskManager task_manager(10, 100, 2, 1.e-4, 1e10, 2);
 
-  task_manager.add_composition(1);
-  task_manager.add_size(1.e-6);
+  task_manager.add_composition(DUSTGRAINTYPE_SILICON);
+  task_manager.add_size(1.e-7);
+  //  task_manager.add_size(1.e-5);
   task_manager.add_wavelength(1.e-4);
+  //  task_manager.add_wavelength(1.e-3);
 
   QuickSched quicksched(4, true, "test_TaskManager.log");
+
+  const uint_fast32_t ntheta = 10;
+  std::vector<float_type> thetas(ntheta);
+  for (uint_fast32_t i = 0; i < ntheta; ++i) {
+    thetas[i] = (i + 0.5) * M_PI / ntheta;
+  }
+  AbsorptionCoefficientGrid grid(ntheta, &thetas[0]);
 
   std::vector<Task *> tasks;
   std::vector<Resource *> resources;
@@ -63,7 +72,7 @@ int main(int argc, char **argv) {
   TMatrixAuxiliarySpaceManager *space_manager = nullptr;
   std::vector<TMatrixResource *> tmatrices;
   std::vector<InteractionVariables *> interaction_variables;
-  task_manager.generate_tasks(quicksched, tasks, resources, results,
+  task_manager.generate_tasks(grid, quicksched, tasks, resources, results,
                               space_manager, tmatrices, interaction_variables);
 
   quicksched.execute_tasks();
@@ -74,6 +83,13 @@ int main(int argc, char **argv) {
   std::ofstream typefile("test_taskmanager_types.txt");
   typefile << "# type\tlabel\n";
   quicksched.print_type_dict(typefile);
+
+  const AbsorptionCoefficientResult &result =
+      *static_cast<AbsorptionCoefficientResult *>(results[0]);
+  for (uint_fast32_t i = 0; i < ntheta; ++i) {
+    ctm_warning("%g %g %g", thetas[i], result.get_Qabs(i),
+                result.get_Qabspol(i));
+  }
 
   clear_vector(tasks);
   clear_vector(resources);

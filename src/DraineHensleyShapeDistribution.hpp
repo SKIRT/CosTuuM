@@ -168,6 +168,17 @@ private:
 
 public:
   /**
+   * @brief Constructor.
+   *
+   * @param npoints Number of evaluation points.
+   */
+  inline DraineHensleyShapeDistribution(const uint_fast32_t npoints) {
+    evaluate(npoints);
+  }
+
+  virtual ~DraineHensleyShapeDistribution() {}
+
+  /**
    * @brief Get the minimum axis ratio @f$d@f$ for this distribution.
    *
    * We choose the upper and lower limits as the values of @f$d@f$ for which the

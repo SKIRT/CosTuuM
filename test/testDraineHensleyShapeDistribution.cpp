@@ -26,7 +26,7 @@ using namespace std;
  */
 int main(int argc, char **argv) {
 
-  DraineHensleyShapeDistribution distribution;
+  DraineHensleyShapeDistribution distribution(100);
   const float_type dmin = distribution.get_minimum_axis_ratio();
   const float_type dint = distribution.get_maximum_axis_ratio() - dmin;
   std::ofstream ofile("test_draine_hensley_shape_distribution.txt");

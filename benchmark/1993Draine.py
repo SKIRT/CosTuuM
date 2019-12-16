@@ -110,7 +110,7 @@ Tmatrix = CosTuuM.TMatrix(
     axis_ratio=1.00001,
     wavelength=wi,
     refractive_index=mri,
-    cos2beta=1.0,
+    cos2beta=1.0 / 3.0,
 )
 Qabsd1 = Tmatrix.get_average_absorption_cross_section() / (np.pi * ai ** 2)
 Qabsd1theta = Tmatrix.get_absorption_cross_sections(theta=thetas) / (
@@ -122,7 +122,7 @@ Tmatrix = CosTuuM.TMatrix(
     wavelength=wi,
     refractive_index=mri,
     cos2beta=1.0,
-    is_equal_volume_radius=False,
+    is_equal_volume_radius=True,
 )
 Qabsd2 = Tmatrix.get_average_absorption_cross_section() / get_active_surface_area(
     ai, 2.0
@@ -136,7 +136,7 @@ Tmatrix = CosTuuM.TMatrix(
     wavelength=wi,
     refractive_index=mri,
     cos2beta=3.0 / 5.0,
-    is_equal_volume_radius=False,
+    is_equal_volume_radius=True,
 )
 Qabsd2ia = Tmatrix.get_average_absorption_cross_section() / get_active_surface_area(
     ai, 2.0
@@ -150,7 +150,7 @@ Tmatrix = CosTuuM.TMatrix(
     wavelength=wi,
     refractive_index=mri,
     cos2beta=1.0,
-    is_equal_volume_radius=False,
+    is_equal_volume_radius=True,
 )
 Qabsd05 = Tmatrix.get_average_absorption_cross_section() / get_active_surface_area(
     ai, 0.5
@@ -164,7 +164,7 @@ Tmatrix = CosTuuM.TMatrix(
     wavelength=wi,
     refractive_index=mri,
     cos2beta=1.0 / 5.0,
-    is_equal_volume_radius=False,
+    is_equal_volume_radius=True,
 )
 Qabsd05ia = Tmatrix.get_average_absorption_cross_section() / get_active_surface_area(
     ai, 0.5
@@ -265,7 +265,7 @@ for iw in range(maxl):
         wavelength=wi,
         refractive_index=mri,
         cos2beta=1.0 / 3.0,
-        is_equal_volume_radius=False,
+        is_equal_volume_radius=True,
     )
     Qabsd2[
         iw
@@ -278,7 +278,7 @@ for iw in range(maxl):
         wavelength=wi,
         refractive_index=mri,
         cos2beta=1.0 / 3.0,
-        is_equal_volume_radius=False,
+        is_equal_volume_radius=True,
     )
     Qabsd05[
         iw

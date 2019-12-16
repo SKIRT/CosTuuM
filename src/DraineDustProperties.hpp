@@ -18,7 +18,7 @@
  */
 enum DustGrainTypes {
   /*! @brief Carbon grains. */
-  DUSTGRAINTYPE_CARBON = 1,
+  DUSTGRAINTYPE_CARBON = 0,
   /*! @brief Silicon grains. */
   DUSTGRAINTYPE_SILICON,
   /*! @brief Number of dust grain types. */

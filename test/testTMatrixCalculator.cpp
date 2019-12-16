@@ -289,22 +289,19 @@ int main(int argc, char **argv) {
   /// test the procedure to average over a shape distribution
   if (do_shape_test) {
 
-    DraineHensleyShapeDistribution shape_distribution;
+    DraineHensleyShapeDistribution shape_distribution(100);
 
-    const uint_fast32_t ngauss = 100;
-    std::vector<float_type> axis_ratio(ngauss), weights(ngauss);
-    SpecialFunctions::get_gauss_legendre_points_and_weights_ab<float_type>(
-        ngauss, shape_distribution.get_minimum_axis_ratio(),
-        shape_distribution.get_maximum_axis_ratio(), axis_ratio, weights);
+    const uint_fast32_t ngauss = shape_distribution.get_number_of_points();
     float_type norm = 0.;
     Matrix<float_type> Kshape(4, 4);
     for (uint_fast32_t ig = 0; ig < ngauss; ++ig) {
       const float_type intfac =
-          weights[ig] * shape_distribution(axis_ratio[ig]);
+          shape_distribution.get_weight(ig) *
+          shape_distribution(shape_distribution.get_shape(ig));
       norm += intfac;
 
       const TMatrix *Tmatrix = TMatrixCalculator::calculate_TMatrix(
-          1., axis_ratio[ig], 2.e-7, 1.e-4, 200, 1.e-4, 2,
+          1., shape_distribution.get_shape(ig), 2.e-7, 1.e-4, 200, 1.e-4, 2,
           std::complex<float_type>(4., 0.1), 500);
       const Matrix<float_type> Ksingle =
           Tmatrix->get_extinction_matrix(0., 0., 0.3 * M_PI, 0.);

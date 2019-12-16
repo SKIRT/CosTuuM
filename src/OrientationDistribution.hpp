@@ -207,6 +207,7 @@ public:
    * @return Corresponding coefficient.
    */
   inline float_type get_coefficient(const uint_fast32_t n) const {
+    ctm_assert(n < _coefficients.size());
     return _coefficients[n];
   }
 
