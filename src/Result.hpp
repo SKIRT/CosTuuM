@@ -55,6 +55,34 @@ public:
     (void)_wavelength;
     (void)_type;
   }
+
+  /**
+   * @brief Get the composition for which this result was computed.
+   *
+   * @return Composition.
+   */
+  inline int_fast32_t get_composition() const { return _composition; }
+
+  /**
+   * @brief Get the size for which this result was computed.
+   *
+   * @return Size (in m).
+   */
+  inline float_type get_size() const { return _size; }
+
+  /**
+   * @brief Get the wavelength for which this result was computed.
+   *
+   * @return Wavelength (in m).
+   */
+  inline float_type get_wavelength() const { return _wavelength; }
+
+  /**
+   * @brief Get the type of result stored in this object.
+   *
+   * @return Result type.
+   */
+  inline int_fast32_t get_type() const { return _type; }
 };
 
 #endif // RESULT_HPP

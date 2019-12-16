@@ -69,26 +69,36 @@ public:
                                    "callindex.out_silD03");
     // convert wavelength from micron to m
     _table_silicon.multiply_column<0>(1.e-6);
+    _table_silicon.add_column<1>(1.);
+    _table_silicon.add_column<3>(1.);
 
     _table_carbon_parallel_small.from_ascii_file(
         DRAINEDUSTPROPERTIESDATALOCATION "callindex.out_CpaD03_0.01");
     // convert wavelength from micron to m
     _table_carbon_parallel_small.multiply_column<0>(1.e-6);
+    _table_carbon_parallel_small.add_column<1>(1.);
+    _table_carbon_parallel_small.add_column<3>(1.);
 
     _table_carbon_parallel_large.from_ascii_file(
         DRAINEDUSTPROPERTIESDATALOCATION "callindex.out_CpaD03_0.10");
     // convert wavelength from micron to m
     _table_carbon_parallel_large.multiply_column<0>(1.e-6);
+    _table_carbon_parallel_large.add_column<1>(1.);
+    _table_carbon_parallel_large.add_column<3>(1.);
 
     _table_carbon_perpendicular_small.from_ascii_file(
         DRAINEDUSTPROPERTIESDATALOCATION "callindex.out_CpeD03_0.01");
     // convert wavelength from micron to m
     _table_carbon_perpendicular_small.multiply_column<0>(1.e-6);
+    _table_carbon_perpendicular_small.add_column<1>(1.);
+    _table_carbon_perpendicular_small.add_column<3>(1.);
 
     _table_carbon_perpendicular_large.from_ascii_file(
         DRAINEDUSTPROPERTIESDATALOCATION "callindex.out_CpeD03_0.10");
     // convert wavelength from micron to m
     _table_carbon_perpendicular_large.multiply_column<0>(1.e-6);
+    _table_carbon_perpendicular_large.add_column<1>(1.);
+    _table_carbon_perpendicular_large.add_column<3>(1.);
   }
 
   /**

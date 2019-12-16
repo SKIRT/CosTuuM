@@ -29,9 +29,9 @@ int main(int argc, char **argv) {
   DraineDustProperties dust_properties;
   std::ofstream dfile("test_draine_dustproperties.txt");
   for (uint_fast32_t i = 0; i < 100; ++i) {
-    const float_type wavelength = 100. + 2. * (i + 0.5);
+    const float_type wavelength = 10. + 2. * (i + 0.5);
     const std::complex<float_type> m_r = dust_properties.get_refractive_index(
-        wavelength * 1.e-6, 4.e-8, DUSTGRAINTYPE_CARBON);
+        wavelength * 1.e-6, 4.e-8, DUSTGRAINTYPE_SILICON);
     dfile << wavelength << "\t" << m_r.real() << "\t" << m_r.imag() << "\n";
   }
 

@@ -50,6 +50,7 @@ public:
   virtual void execute(const int_fast32_t thread_id) {
 
     const uint_fast32_t nmax = _input_Tmatrix.get_nmax();
+    // first make sure the _nmax value for the new T-matrix is set
     _output_Tmatrix._nmax = nmax;
 
     // check that we precomputed enough expansion coefficients in the expansion

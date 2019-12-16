@@ -287,7 +287,7 @@ public:
         AbsorptionCoefficientResult::get_memory_size(number_of_angles);
 
     const DraineDustProperties dust_properties;
-    OrientationDistribution orientation_distribution(_maximum_order);
+    OrientationDistribution orientation_distribution(2 * _maximum_order);
     orientation_distribution.initialise();
     // step 4: loop over all parameter values and set up parameter specific
     // tasks
@@ -373,6 +373,8 @@ public:
           const std::complex<float_type> refractive_index =
               dust_properties.get_refractive_index(wavelength, particle_size,
                                                    grain_type);
+          ctm_warning("mr: %g + i%g", double(refractive_index.real()),
+                      double(refractive_index.imag()));
           const uint_fast32_t interaction_index =
               icomp * number_of_sizes * number_of_wavelengths +
               isize * number_of_wavelengths + ilambda;

@@ -84,11 +84,17 @@ int main(int argc, char **argv) {
   typefile << "# type\tlabel\n";
   quicksched.print_type_dict(typefile);
 
+  ctm_warning("nmax: %" PRIuFAST32, tmatrices[0]->get_nmax());
+
   const AbsorptionCoefficientResult &result =
       *static_cast<AbsorptionCoefficientResult *>(results[0]);
+  ctm_warning("composition: %" PRIiFAST32, result.get_composition());
+  ctm_warning("size: %g", double(result.get_size()));
+  ctm_warning("wavelength: %g", double(result.get_wavelength()));
+  ctm_warning("type: %" PRIiFAST32, result.get_type());
   for (uint_fast32_t i = 0; i < ntheta; ++i) {
-    ctm_warning("%g %g %g", thetas[i], result.get_Qabs(i),
-                result.get_Qabspol(i));
+    ctm_warning("%g %g %g", double(thetas[i]), double(result.get_Qabs(i)),
+                double(result.get_Qabspol(i)));
   }
 
   clear_vector(tasks);
