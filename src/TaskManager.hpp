@@ -180,7 +180,9 @@ public:
    * @brief Generate and link all the tasks required to compute the configured
    * grid of parameters.
    *
-   * @param grid Grid of absorption coefficient angles.
+   * @param theta Grid of absorption coefficient angles (in radians).
+   * @param ngauss Number of Gauss-Legendre quadrature points to use to
+   * compute directional averages.
    * @param quicksched QuickSched library wrapper.
    * @param tasks List of tasks. Tasks need to be deleted by caller after the
    * computation finishes. This list also contains resources that act as a task.
@@ -194,7 +196,8 @@ public:
    * caller after the computation finishes.
    */
   inline void
-  generate_tasks(const AbsorptionCoefficientGrid &grid, QuickSched &quicksched,
+  generate_tasks(const std::vector<float_type> &theta,
+                 const uint_fast32_t ngauss, QuickSched &quicksched,
                  std::vector<Task *> &tasks, std::vector<Resource *> &resources,
                  std::vector<Result *> &results,
                  TMatrixAuxiliarySpaceManager *&space_manager) const {
@@ -206,7 +209,7 @@ public:
     const uint_fast32_t number_of_shapes =
         _shape_distribution->get_number_of_points();
     // number of angles to use to compute absorption coefficient grid
-    const uint_fast32_t number_of_angles = grid.get_number_of_angles();
+    const uint_fast32_t number_of_angles = theta.size();
 
     // grand total of T-matrices we need to compute
     const uint_fast32_t total_number_of_interactions =
@@ -282,6 +285,29 @@ public:
       quadrature_points[i] = this_quadrature_points;
       tasks[quadrature_points_offset + i] = this_quadrature_points;
     }
+
+    //  - absorption coefficient grid
+    memory_used +=
+        AbsorptionCoefficientGrid::get_memory_size(number_of_angles, ngauss);
+    ctm_assert(memory_used <= _maximum_memory_usage);
+    AbsorptionCoefficientGrid *grid =
+        new AbsorptionCoefficientGrid(number_of_angles, &theta[0], ngauss);
+    quicksched.register_resource(*grid);
+    quicksched.register_task(*grid);
+    grid->link_resources(quicksched);
+    tasks.push_back(grid);
+
+    //  - special Wigner D functions
+    memory_used +=
+        SpecialWignerDResources::get_memory_size(_maximum_order, *grid);
+    ctm_assert(memory_used <= _maximum_memory_usage);
+    SpecialWignerDResources *special_wigner =
+        new SpecialWignerDResources(_maximum_order, *grid);
+    quicksched.register_resource(*special_wigner);
+    quicksched.register_task(*special_wigner);
+    special_wigner->link_resources(quicksched);
+    quicksched.link_tasks(*grid, *special_wigner);
+    tasks.push_back(special_wigner);
 
     //  - Wigner D functions
     std::vector<WignerDResources *> wignerdm0(number_of_quadrature_tasks,
@@ -530,13 +556,15 @@ public:
 
             AbsorptionCoefficientTask *absorption_task =
                 new AbsorptionCoefficientTask(
-                    grid, *interaction_variables[interaction_index],
+                    *grid, *interaction_variables[interaction_index],
                     *tmatrices[total_number_of_Tmatrices + index],
+                    *nbased_resources, *special_wigner,
                     *static_cast<AbsorptionCoefficientResult *>(
                         results[index]));
             quicksched.register_task(*absorption_task);
             absorption_task->link_resources(quicksched);
             quicksched.link_tasks(*alignment_task, *absorption_task);
+            quicksched.link_tasks(*special_wigner, *absorption_task);
             tasks[task_offset + index * tasks_per_Tmatrix +
                   2 * number_of_quadrature_tasks + _maximum_order + 1] =
                 absorption_task;

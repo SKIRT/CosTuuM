@@ -634,7 +634,7 @@ public:
             this_RgJ21 += f1 * c4 + f3 * c5;
           }
           // prefactor sqrt{(2n1+1)*(2n2+1)/[n1*(n1+1)*n2*(n2+1)]}
-          const float_type an12 = 2. * _nfactors.get_ann(n1, n2);
+          const float_type an12 = _nfactors.get_ann(n1, n2);
           aux._J12(n1 - 1, n2 - 1) = an12 * this_J12;
           aux._J21(n1 - 1, n2 - 1) = an12 * this_J21;
           aux._RgJ12(n1 - 1, n2 - 1) = an12 * this_RgJ12;
@@ -990,7 +990,7 @@ public:
           }
         }
         // prefactor sqrt{(2n1+1)*(2n2+1)/[n1*(n1+1)*n2*(n2+1)]}
-        const float_type an12 = 2. * _nfactors.get_ann(n1, n2);
+        const float_type an12 = _nfactors.get_ann(n1, n2);
         aux._J11(n1 - 1, n2 - 1) = this_J11 * an12;
         aux._J12(n1 - 1, n2 - 1) = this_J12 * an12;
         aux._J21(n1 - 1, n2 - 1) = this_J21 * an12;

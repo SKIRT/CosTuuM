@@ -65,13 +65,12 @@ int main(int argc, char **argv) {
   for (uint_fast32_t i = 0; i < ntheta; ++i) {
     thetas[i] = (i + 0.5) * M_PI / ntheta;
   }
-  AbsorptionCoefficientGrid grid(ntheta, &thetas[0], 10);
 
   std::vector<Task *> tasks;
   std::vector<Resource *> resources;
   std::vector<Result *> results;
   TMatrixAuxiliarySpaceManager *space_manager = nullptr;
-  task_manager.generate_tasks(grid, quicksched, tasks, resources, results,
+  task_manager.generate_tasks(thetas, 20, quicksched, tasks, resources, results,
                               space_manager);
 
   quicksched.execute_tasks();

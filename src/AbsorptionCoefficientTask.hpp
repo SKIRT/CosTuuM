@@ -91,10 +91,15 @@ public:
 /**
  * @brief Angular grid used to compute absorption cross sections.
  */
-class AbsorptionCoefficientGrid {
+class AbsorptionCoefficientGrid : public Resource,
+                                  public Task,
+                                  public Computable {
 
   /*! @brief Give access to the computation task. */
   friend class AbsorptionCoefficientTask;
+
+  /*! @brief Give access to special Wigner D resources. */
+  friend class SpecialWignerDResources;
 
 private:
   /*! @brief Input zenith angles (in radians). */
@@ -142,8 +147,8 @@ public:
   inline AbsorptionCoefficientGrid(const uint_fast32_t ntheta,
                                    const float_type *theta,
                                    const uint_fast32_t ngauss)
-      : _theta_in(ntheta), _cos_theta_in(ngauss), _sin_theta_in(ngauss),
-        _sin_theta_in_inverse(ngauss), _cos_theta_out(ngauss),
+      : _theta_in(ntheta), _cos_theta_in(ntheta), _sin_theta_in(ntheta),
+        _sin_theta_in_inverse(ntheta), _cos_theta_out(ngauss),
         _sin_theta_out(ngauss), _sin_theta_out_inverse(ngauss),
         _cos_theta_out_weights(ngauss), _cos_phi_out(ngauss),
         _sin_phi_out(ngauss), _phi_out_weights(ngauss) {
@@ -151,6 +156,57 @@ public:
     for (uint_fast32_t i = 0; i < ntheta; ++i) {
       _theta_in[i] = theta[i];
     }
+  }
+
+  virtual ~AbsorptionCoefficientGrid() {}
+
+  /**
+   * @brief Get the size in memory of a hypothetical AbsorptionCoefficientGrid
+   * object with the given parameters.
+   *
+   * @param ntheta Number of zenith angles.
+   * @param ngauss Number of Gauss-Legendre quadrature points for directional
+   * averaging.
+   * @return Size in bytes that the object would occupy.
+   */
+  static inline size_t get_memory_size(const uint_fast32_t ntheta,
+                                       const uint_fast32_t ngauss) {
+    size_t size = sizeof(AbsorptionCoefficientGrid);
+    size += 4 * ntheta * sizeof(float_type);
+    size += 6 * ngauss * sizeof(float_type);
+    return size;
+  }
+
+  /**
+   * @brief Link the resources for this task.
+   *
+   * @param quicksched QuickSched library.
+   */
+  inline void link_resources(QuickSched &quicksched) {
+    // write access
+    quicksched.link_task_and_resource(*this, *this, true);
+  }
+
+  /**
+   * @brief Execute the task.
+   *
+   * @param thread_id ID of the thread that executes the task.
+   */
+  virtual void execute(const int_fast32_t thread_id) {
+
+    const uint_fast32_t ntheta = _cos_theta_in.size();
+    for (uint_fast32_t igauss = 0; igauss < ntheta; ++igauss) {
+      _cos_theta_in[igauss] = cos(_theta_in[igauss]);
+      _sin_theta_in[igauss] =
+          sqrt((1. - _cos_theta_in[igauss]) * (1. + _cos_theta_in[igauss]));
+      if (_sin_theta_in[igauss] != 0.) {
+        _sin_theta_in_inverse[igauss] = 1. / _sin_theta_in[igauss];
+      } else {
+        _sin_theta_in_inverse[igauss] = 9000.;
+      }
+    }
+
+    const uint_fast32_t ngauss = _cos_theta_out.size();
     SpecialFunctions::get_gauss_legendre_points_and_weights<float_type>(
         ngauss, _cos_theta_out, _cos_theta_out_weights);
     // note that we temporarily store the phi angles in cos_phi
@@ -158,15 +214,13 @@ public:
         ngauss, 0., 2. * M_PI, _cos_phi_out, _phi_out_weights);
 
     for (uint_fast32_t igauss = 0; igauss < ngauss; ++igauss) {
-
-      _cos_theta_in[igauss] = cos(_theta_in[igauss]);
-      _sin_theta_in[igauss] =
-          sqrt((1. - _cos_theta_in[igauss]) * (1. + _cos_theta_in[igauss]));
-      _sin_theta_in_inverse[igauss] = 1. / _sin_theta_in[igauss];
-
       _sin_theta_out[igauss] =
           sqrt((1. - _cos_theta_out[igauss]) * (1. + _cos_theta_out[igauss]));
-      _sin_theta_out_inverse[igauss] = 1. / _sin_theta_out[igauss];
+      if (_sin_theta_out[igauss] != 0.) {
+        _sin_theta_out_inverse[igauss] = 1. / _sin_theta_out[igauss];
+      } else {
+        _sin_theta_out_inverse[igauss] = 9000.;
+      }
 
       // convert the phi angles to cos_phi
       _cos_phi_out[igauss] = cos(_cos_phi_out[igauss]);
@@ -184,6 +238,174 @@ public:
 };
 
 /**
+ * @brief Precomputed special Wigner D functions that depend on a specific value
+ * of @f$n_{max}@f$ and @f$n_{GL}@f$.
+ */
+class SpecialWignerDResources : public Resource,
+                                public Task,
+                                public Computable {
+private:
+  /*! @brief Maximum order, @f$n_{max}@f$. */
+  const uint_fast32_t _nmax;
+
+  /*! @brief Absorption coefficient grid to use. */
+  const AbsorptionCoefficientGrid &_grid;
+
+  /*! @brief Wigner D functions divided by sine for input angles. */
+  std::vector<Matrix<float_type>> _wigner_d_sinx[2];
+
+  /*! @brief Derivatives of the Wigner D functions for input angles. */
+  std::vector<Matrix<float_type>> _dwigner_d[2];
+
+public:
+  /**
+   * @brief Constructor.
+   *
+   * @param nmax Maximum order, @f$n_{max}@f$.
+   * @param grid Absorption coefficient grid.
+   */
+  inline SpecialWignerDResources(const uint_fast32_t nmax,
+                                 const AbsorptionCoefficientGrid &grid)
+      : _nmax(nmax), _grid(grid) {
+
+    const uint_fast32_t np1 = nmax + 1;
+
+    _wigner_d_sinx[0].reserve(np1);
+    for (uint_fast32_t i = 0; i < np1; ++i) {
+      _wigner_d_sinx[0].push_back(
+          Matrix<float_type>(grid._cos_theta_in.size(), nmax));
+    }
+    _dwigner_d[0].reserve(np1);
+    for (uint_fast32_t i = 0; i < np1; ++i) {
+      _dwigner_d[0].push_back(
+          Matrix<float_type>(grid._cos_theta_in.size(), nmax));
+    }
+
+    _wigner_d_sinx[1].reserve(np1);
+    for (uint_fast32_t i = 0; i < np1; ++i) {
+      _wigner_d_sinx[1].push_back(
+          Matrix<float_type>(grid._cos_theta_out.size(), nmax));
+    }
+    _dwigner_d[1].reserve(np1);
+    for (uint_fast32_t i = 0; i < np1; ++i) {
+      _dwigner_d[1].push_back(
+          Matrix<float_type>(grid._cos_theta_out.size(), nmax));
+    }
+  }
+
+  virtual ~SpecialWignerDResources() {}
+
+  /**
+   * @brief Get the size in memory of a hypothetical SpecialWignerDResources
+   * object with the given parameters.
+   *
+   * @param nmax Maximum order, @f$n_{max}@f$.
+   * @param grid Absorption coefficient grid.
+   * @return Size in bytes of the hypothetical object.
+   */
+  static inline size_t get_memory_size(const uint_fast32_t nmax,
+                                       const AbsorptionCoefficientGrid &grid) {
+    size_t size = sizeof(SpecialWignerDResources);
+    // input angles
+    size +=
+        2 * (nmax + 1) * grid._cos_theta_in.size() * nmax * sizeof(float_type);
+    // output angles
+    size +=
+        2 * (nmax + 1) * grid._cos_theta_out.size() * nmax * sizeof(float_type);
+    return size;
+  }
+
+  /**
+   * @brief Link the resources for this task.
+   *
+   * @param quicksched QuickSched library.
+   */
+  inline void link_resources(QuickSched &quicksched) {
+    // write access
+    quicksched.link_task_and_resource(*this, *this, true);
+
+    // read access
+    quicksched.link_task_and_resource(*this, _grid, false);
+  }
+
+  /**
+   * @brief Compute the factors.
+   *
+   * @param thread_id ID of the thread that executes the task.
+   */
+  virtual void execute(const int_fast32_t thread_id = 0) {
+
+    for (uint_fast32_t m = 0; m < _nmax + 1; ++m) {
+      const uint_fast32_t ntheta_in = _grid._cos_theta_in.size();
+      for (uint_fast32_t itheta_in = 0; itheta_in < ntheta_in; ++itheta_in) {
+        SpecialFunctions::wigner_dn_0m_sinx(
+            _grid._cos_theta_in[itheta_in], _grid._sin_theta_in[itheta_in],
+            _grid._sin_theta_in_inverse[itheta_in], _nmax, m,
+            &_wigner_d_sinx[0][m].get_row(itheta_in)[0],
+            &_dwigner_d[0][m].get_row(itheta_in)[0]);
+      }
+      const uint_fast32_t ntheta_out = _grid._cos_theta_out.size();
+      for (uint_fast32_t itheta_out = 0; itheta_out < ntheta_out;
+           ++itheta_out) {
+        SpecialFunctions::wigner_dn_0m_sinx(
+            _grid._cos_theta_out[itheta_out], _grid._sin_theta_out[itheta_out],
+            _grid._sin_theta_out_inverse[itheta_out], _nmax, m,
+            &_wigner_d_sinx[1][m].get_row(itheta_out)[0],
+            &_dwigner_d[1][m].get_row(itheta_out)[0]);
+      }
+    }
+    make_available();
+  }
+
+  /**
+   * @brief Get the special Wigner D function for the given input angle.
+   *
+   * @param igrid Internal grid to sample.
+   * @param m @f$m@f$ value.
+   * @param itheta_in Index of the input angle.
+   * @param n Order, @f$n@f$.
+   * @return Corresponding special Wigner D function value.
+   */
+  inline float_type get_wigner_d_sinx(const uint_fast8_t igrid,
+                                      const uint_fast32_t m,
+                                      const uint_fast32_t itheta_in,
+                                      const uint_fast32_t n) const {
+
+    ctm_assert(m < _wigner_d_sinx[igrid].size());
+    ctm_assert(itheta_in < _wigner_d_sinx[igrid][m].get_number_of_rows());
+    ctm_assert(n > 0);
+    ctm_assert(n - 1 < _wigner_d_sinx[igrid][m].get_number_of_columns());
+    // check that the resource was actually computed
+    check_use();
+    return _wigner_d_sinx[igrid][m](itheta_in, n - 1);
+  }
+
+  /**
+   * @brief Get the derivative of the Wigner D function for the given input
+   * angle.
+   *
+   * @param igrid Internal grid to sample.
+   * @param m @f$m@f$ value.
+   * @param itheta_in Index of the input angle.
+   * @param n Order, @f$n@f$.
+   * @return Corresponding derivative value.
+   */
+  inline float_type get_dwigner_d(const uint_fast8_t igrid,
+                                  const uint_fast32_t m,
+                                  const uint_fast32_t itheta_in,
+                                  const uint_fast32_t n) const {
+
+    ctm_assert(m < _dwigner_d[igrid].size());
+    ctm_assert(itheta_in < _dwigner_d[igrid][m].get_number_of_rows());
+    ctm_assert(n > 0);
+    ctm_assert(n - 1 < _dwigner_d[igrid][m].get_number_of_columns());
+    // check that the resource was actually computed
+    check_use();
+    return _dwigner_d[igrid][m](itheta_in, n - 1);
+  }
+};
+
+/**
  * @brief Task that computes AbsorptionCoefficients.
  */
 class AbsorptionCoefficientTask : public Task {
@@ -197,8 +419,17 @@ private:
   /*! @brief T-matrix to use (read only). */
   const TMatrixResource &_Tmatrix;
 
+  /*! @brief N based resources to use (read only). */
+  const NBasedResources &_nfactors;
+
+  /*! @brief Special Wigner D resources to use (read only). */
+  const SpecialWignerDResources &_wigner_d;
+
   /*! @brief Resource in which the result is stored. */
   AbsorptionCoefficientResult &_result;
+
+  /*! @brief Subtract the directionally averaged scattering cross sections? */
+  const bool _account_for_scattering;
 
 public:
   /**
@@ -207,14 +438,22 @@ public:
    * @param grid Zenith angle grid to use.
    * @param interaction_variables Interaction variables.
    * @param Tmatrix T-matrix to use.
+   * @param nfactors N based resources to use.
+   * @param wigner_d Special Wigner D resources to use.
    * @param result Resource in which the result is stored.
+   * @param account_for_scattering Subtract the directionally averaged
+   * scattering cross sections?
    */
   inline AbsorptionCoefficientTask(
       const AbsorptionCoefficientGrid &grid,
       const InteractionVariables &interaction_variables,
-      const TMatrixResource &Tmatrix, AbsorptionCoefficientResult &result)
+      const TMatrixResource &Tmatrix, const NBasedResources &nfactors,
+      const SpecialWignerDResources &wigner_d,
+      AbsorptionCoefficientResult &result,
+      const bool account_for_scattering = false)
       : _grid(grid), _interaction_variables(interaction_variables),
-        _Tmatrix(Tmatrix), _result(result) {}
+        _Tmatrix(Tmatrix), _nfactors(nfactors), _wigner_d(wigner_d),
+        _result(result), _account_for_scattering(account_for_scattering) {}
 
   virtual ~AbsorptionCoefficientTask() {}
 
@@ -230,6 +469,9 @@ public:
     // read access
     quicksched.link_task_and_resource(*this, _interaction_variables, false);
     quicksched.link_task_and_resource(*this, _Tmatrix, false);
+    quicksched.link_task_and_resource(*this, _nfactors, false);
+    quicksched.link_task_and_resource(*this, _grid, false);
+    quicksched.link_task_and_resource(*this, _wigner_d, false);
   }
 
   /**
@@ -237,22 +479,10 @@ public:
    * from the given input angles to the given output angles at a particle with
    * its symmetry axis fixed to the @f$z@f$-axis of the reference frame.
    *
-   * @param costheta_in Cosine of the input zenith angle,
-   * @f$\cos(\theta{}_i)@f$.
-   * @param sintheta_in Sine of the input zenith angle,
-   * @f$\sin(\theta{}_i)@f$.
-   * @param sintheta_in_inv Inverse sine of the input zenith angle,
-   * @f$\frac{1}{\sin(\theta{}_i)}@f$.
-   * @param cosphi_in Cosine of the input azimuth angle,
-   * @f$\cos(\phi{}_i)@f$.
-   * @param sinphi_in Sine of the input azimuth angle,
-   * @f$\sin(\phi{}_i)@f$.
-   * @param costheta_out Cosine of the output zenith angle,
-   * @f$\cos(\theta{}_s)@f$.
-   * @param sintheta_out Sine of the output zenith angle,
-   * @f$\sin(\theta{}_s)@f$.
-   * @param sintheta_out_inv Inverse sine of the output zenith angle,
-   * @f$\frac{1}{\sin(\theta{}_s)}@f$.
+   * @param grid_in Internal input grid to sample.
+   * @param itheta_in Index of the input zenith angle.
+   * @param grid_out Internal output grid to sample.
+   * @param itheta_out Index of the output zenith angle.
    * @param cosphi_out Cosine of the output azimuth angle,
    * @f$\cos(\phi{}_s)@f$.
    * @param sinphi_out Sine of the output azimuth angle,
@@ -260,34 +490,15 @@ public:
    * @return Scattering matrix for this scattering event.
    */
   inline Matrix<std::complex<float_type>> get_forward_scattering_matrix(
-      const float_type costheta_in, const float_type sintheta_in,
-      const float_type sintheta_in_inv, const float_type cosphi_in,
-      const float_type sinphi_in, const float_type costheta_out,
-      const float_type sintheta_out, const float_type sintheta_out_inv,
+      const uint_fast8_t grid_in, const uint_fast32_t itheta_in,
+      const uint_fast8_t grid_out, const uint_fast32_t itheta_out,
       const float_type cosphi_out, const float_type sinphi_out) const {
 
     const uint_fast32_t nmax = _Tmatrix.get_nmax();
-    // precompute the c factors
-    const std::complex<float_type> icompl(0., 1.);
-    Matrix<std::complex<float_type>> c(nmax, nmax);
-    std::complex<float_type> icomp_pow_nn = icompl;
-    for (uint_fast32_t nn = 1; nn < nmax + 1; ++nn) {
-      std::complex<float_type> icomp_pow_m_n_m_1(-1.);
-      for (uint_fast32_t n = 1; n < nmax + 1; ++n) {
-        // icomp_pow_nn*icomp_pow_m_n_m_1 now equals i^(nn - n - 1)
-        c(n - 1, nn - 1) = icomp_pow_m_n_m_1 * icomp_pow_nn *
-                           float_type(sqrt((2. * n + 1.) * (2. * nn + 1.) /
-                                           (n * nn * (n + 1.) * (nn + 1.))));
-        icomp_pow_m_n_m_1 /= icompl;
-      }
-      icomp_pow_nn *= icompl;
-    }
 
     // now compute the matrix S^P
     // we precompute e^{i(phi_out-phi_in)}
-    const std::complex<float_type> expiphi_p_out_m_in(
-        cosphi_out * cosphi_in + sinphi_out * sinphi_in,
-        sinphi_out * cosphi_in - cosphi_out * sinphi_in);
+    const std::complex<float_type> expiphi_p_out_m_in(cosphi_out, sinphi_out);
     // e^{im(phi_out-phi_in)} is computed recursively, starting with the value
     // for m=0: 1
     std::complex<float_type> expimphi_p_out_m_in(1., 0.);
@@ -298,16 +509,6 @@ public:
       // only n and n' values larger than or equal to m have non-trivial
       // contributions to the S matrix
       const uint_fast32_t nmin = std::max(m, static_cast<uint_fast32_t>(1));
-
-      // precompute the pi and tau functions for this value of m
-      std::vector<float_type> pi_in(nmax), tau_in(nmax);
-      SpecialFunctions::wigner_dn_0m_sinx(costheta_in, sintheta_in,
-                                          sintheta_in_inv, nmax, m, &pi_in[0],
-                                          &tau_in[0]);
-      std::vector<float_type> pi_out(nmax), tau_out(nmax);
-      SpecialFunctions::wigner_dn_0m_sinx(costheta_out, sintheta_out,
-                                          sintheta_out_inv, nmax, m, &pi_out[0],
-                                          &tau_out[0]);
 
       // we get the real and imaginary part of e^{im\phi{}} and multiply with
       // 2 to account for both m and -m
@@ -320,17 +521,21 @@ public:
       for (uint_fast32_t nn = nmin; nn < nmax + 1; ++nn) {
 
         // get the specific pi and tau for this n'
-        const float_type pi_nn = m * pi_in[nn - 1];
-        const float_type tau_nn = tau_in[nn - 1];
+        const float_type pi_nn =
+            m * _wigner_d.get_wigner_d_sinx(grid_in, m, itheta_in, nn);
+        const float_type tau_nn =
+            _wigner_d.get_dwigner_d(grid_in, m, itheta_in, nn);
 
         for (uint_fast32_t n = nmin; n < nmax + 1; ++n) {
 
           // get the specific pi and tau for this n
-          const float_type pi_n = m * pi_out[n - 1];
-          const float_type tau_n = tau_out[n - 1];
+          const float_type pi_n =
+              m * _wigner_d.get_wigner_d_sinx(grid_out, m, itheta_out, n);
+          const float_type tau_n =
+              _wigner_d.get_dwigner_d(grid_out, m, itheta_out, n);
 
           // get the c factor for these values of n and n'
-          const std::complex<float_type> c_nnn = c(n - 1, nn - 1);
+          const std::complex<float_type> c_nnn = _nfactors.get_cnn(n, nn);
 
           // get the T11 and T22 elements for this m, n and n' (we need these
           // in all cases)
@@ -384,62 +589,6 @@ public:
   }
 
   /**
-   * @brief Get the forward scattering matrix @f$S@f$ for a scattering event
-   * from the given input angles to the given output angles at a particle with
-   * its symmetry axis fixed to the @f$z@f$-axis of the reference frame.
-   *
-   * @param theta_in_radians Zenith angle of the incoming photon,
-   * @f$\theta{}_i@f$ (in radians).
-   * @param phi_in_radians Azimuth angle of the incoming photon, @f$\phi{}_i@f$
-   * (in radians).
-   * @param theta_out_radians Zenith angle of the scattered photon,
-   * @f$\theta{}_s@f$ (in radians).
-   * @param phi_out_radians Azimuth angle fo the scattered photon,
-   * @f$\phi{}_s@f$ (in radians).
-   * @return Scattering matrix for this scattering event.
-   */
-  inline Matrix<std::complex<float_type>>
-  get_forward_scattering_matrix(const float_type theta_in_radians,
-                                const float_type phi_in_radians,
-                                const float_type theta_out_radians,
-                                const float_type phi_out_radians) const {
-
-    // Mishchenko includes some (buggy) corrections for small angles
-    // might be worth looking into this in a later stage...
-
-    // compute all sines and cosines in one go; we need all of them anyway
-    const float_type costheta_l_in = cos(theta_in_radians);
-    const float_type sintheta_l_in = sin(theta_in_radians);
-    const float_type costheta_l_out = cos(theta_out_radians);
-    const float_type sintheta_l_out = sin(theta_out_radians);
-    const float_type cosphi_l_in = cos(phi_in_radians);
-    const float_type sinphi_l_in = sin(phi_in_radians);
-    const float_type cosphi_l_out = cos(phi_out_radians);
-    const float_type sinphi_l_out = sin(phi_out_radians);
-
-    float_type sintheta_l_in_inv;
-    if (sintheta_l_in != 0.) {
-      sintheta_l_in_inv = 1. / sintheta_l_in;
-    } else {
-      // this value will not be used, but we set it to something anyway
-      sintheta_l_in_inv = 9000.;
-    }
-
-    float_type sintheta_l_out_inv;
-    if (sintheta_l_out != 0.) {
-      sintheta_l_out_inv = 1. / sintheta_l_out;
-    } else {
-      // this value will not be used, but we set it to something anyway
-      sintheta_l_out_inv = 9000.;
-    }
-
-    return get_forward_scattering_matrix(
-        costheta_l_in, sintheta_l_in, sintheta_l_in_inv, cosphi_l_in,
-        sinphi_l_in, costheta_l_out, sintheta_l_out, sintheta_l_out_inv,
-        cosphi_l_out, sinphi_l_out);
-  }
-
-  /**
    * @brief Execute the task.
    *
    * @param thread_id ID of the thread that executes the task.
@@ -451,49 +600,41 @@ public:
 
     for (uint_fast32_t itheta_in = 0; itheta_in < ntheta; ++itheta_in) {
 
-      const float_type cos_theta_in = _grid._cos_theta_in[itheta_in];
-      const float_type sin_theta_in = _grid._sin_theta_in[itheta_in];
-      const float_type inv_sin_theta_in =
-          _grid._sin_theta_in_inverse[itheta_in];
-      Matrix<std::complex<float_type>> S = get_forward_scattering_matrix(
-          cos_theta_in, sin_theta_in, inv_sin_theta_in, 1., 0., cos_theta_in,
-          sin_theta_in, inv_sin_theta_in, 1., 0.);
+      Matrix<std::complex<float_type>> S =
+          get_forward_scattering_matrix(0, itheta_in, 0, itheta_in, 1., 0.);
 
       const float_type prefactor =
           2. * M_PI / _interaction_variables.get_wavenumber();
       _result._Qabs[itheta_in] = prefactor * (S(0, 0) + S(1, 1)).imag();
       _result._Qabspol[itheta_in] = prefactor * (S(0, 0) - S(1, 1)).imag();
 
-      const float_type half(0.5);
-      for (uint_fast32_t itheta_out = 0; itheta_out < ngauss; ++itheta_out) {
-        const float_type cos_theta_out = _grid._cos_theta_out[itheta_out];
-        const float_type sin_theta_out = _grid._sin_theta_out[itheta_out];
-        const float_type inv_sin_theta_out =
-            _grid._sin_theta_out_inverse[itheta_out];
-        for (uint_fast32_t iphi_out = 0; iphi_out < ngauss; ++iphi_out) {
-          const float_type cos_phi_out = _grid._cos_phi_out[iphi_out];
-          const float_type sin_phi_out = _grid._sin_phi_out[iphi_out];
+      if (_account_for_scattering) {
+        const float_type half(0.5);
+        for (uint_fast32_t itheta_out = 0; itheta_out < ngauss; ++itheta_out) {
+          for (uint_fast32_t iphi_out = 0; iphi_out < ngauss; ++iphi_out) {
+            const float_type cos_phi_out = _grid._cos_phi_out[iphi_out];
+            const float_type sin_phi_out = _grid._sin_phi_out[iphi_out];
 
-          Matrix<std::complex<float_type>> Stp = get_forward_scattering_matrix(
-              cos_theta_in, sin_theta_in, inv_sin_theta_in, 1., 0.,
-              cos_theta_out, sin_theta_out, inv_sin_theta_out, cos_phi_out,
-              sin_phi_out);
+            Matrix<std::complex<float_type>> Stp =
+                get_forward_scattering_matrix(0, itheta_in, 1, itheta_out,
+                                              cos_phi_out, sin_phi_out);
 
-          const float_type weight = _grid._cos_theta_out_weights[itheta_out] *
-                                    _grid._phi_out_weights[iphi_out];
-          const float_type Z00 =
-              (half *
-               (Stp(0, 0) * conj(Stp(0, 0)) + Stp(0, 1) * conj(Stp(0, 1)) +
-                Stp(1, 0) * conj(Stp(1, 0)) + Stp(1, 1) * conj(Stp(1, 1))))
-                  .real();
-          _result._Qabs[itheta_in] -= Z00 * weight;
+            const float_type weight = _grid._cos_theta_out_weights[itheta_out] *
+                                      _grid._phi_out_weights[iphi_out];
+            const float_type Z00 =
+                (half *
+                 (Stp(0, 0) * conj(Stp(0, 0)) + Stp(0, 1) * conj(Stp(0, 1)) +
+                  Stp(1, 0) * conj(Stp(1, 0)) + Stp(1, 1) * conj(Stp(1, 1))))
+                    .real();
+            _result._Qabs[itheta_in] -= Z00 * weight;
 
-          const float_type Z10 =
-              (half *
-               (Stp(0, 0) * conj(Stp(0, 0)) + Stp(0, 1) * conj(Stp(0, 1)) -
-                Stp(1, 0) * conj(Stp(1, 0)) - Stp(1, 1) * conj(Stp(1, 1))))
-                  .real();
-          _result._Qabspol[itheta_in] -= Z10 * weight;
+            const float_type Z10 =
+                (half *
+                 (Stp(0, 0) * conj(Stp(0, 0)) + Stp(0, 1) * conj(Stp(0, 1)) -
+                  Stp(1, 0) * conj(Stp(1, 0)) - Stp(1, 1) * conj(Stp(1, 1))))
+                    .real();
+            _result._Qabspol[itheta_in] -= Z10 * weight;
+          }
         }
       }
 
