@@ -529,6 +529,7 @@ public:
     quicksched.link_task_and_resource(*this, _nfactors, false);
     quicksched.link_task_and_resource(*this, _quadrature_points, false);
     quicksched.link_task_and_resource(*this, _geometry, false);
+    quicksched.link_task_and_resource(*this, _interaction_variables, false);
     quicksched.link_task_and_resource(*this, _interaction, false);
     quicksched.link_task_and_resource(*this, _wigner, false);
   }
@@ -822,6 +823,7 @@ public:
     // read access
     quicksched.link_task_and_resource(*this, _nfactors, false);
     quicksched.link_task_and_resource(*this, _converged_size, false);
+    quicksched.link_task_and_resource(*this, _interaction_variables, false);
   }
 
   /**
@@ -1101,19 +1103,13 @@ private:
   /*! @brief TMatrix space containing the result. */
   TMatrixResource &_Tmatrix;
 
-  /*! @brief Resource that guarantees unique access to the @f$m>0@f$ T-matrix
-   *  elements. */
-  const Resource &_m_resource;
-
 public:
   /**
    * @brief Constructor.
    *
    * @param Tmatrix TMatrix resource containing the full T-matrix.
-   * @param m_resource Resource that guards the coefficients in the T-matrix.
    */
-  inline TMatrixQTask(TMatrixResource &Tmatrix, const Resource &m_resource)
-      : _Tmatrix(Tmatrix), _m_resource(m_resource) {}
+  inline TMatrixQTask(TMatrixResource &Tmatrix) : _Tmatrix(Tmatrix) {}
 
   virtual ~TMatrixQTask() {}
 
@@ -1124,7 +1120,7 @@ public:
    */
   inline void link_resources(QuickSched &quicksched) {
     // write access
-    quicksched.link_task_and_resource(*this, _m_resource, true);
+    quicksched.link_task_and_resource(*this, _Tmatrix, true);
   }
 
   /**

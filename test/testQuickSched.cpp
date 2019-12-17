@@ -219,6 +219,7 @@ int main(int argc, char **argv) {
     TMatrixAuxiliarySpaceManager aux_manager(4, maximum_order);
     InteractionVariables interaction_variables(
         10., 100., std::complex<float_type>(1., 0.02));
+    quicksched.register_resource(interaction_variables);
 
     std::vector<GaussBasedResources *> gaussfactors(maxgauss, nullptr);
     std::vector<WignerDResources *> wignerm0factors(maxgauss, nullptr);
@@ -257,6 +258,7 @@ int main(int argc, char **argv) {
       quicksched.link_tasks(*geometryfactors[ig], *interaction_tasks[ig]);
 
       tmatrices[ig] = new TMatrixResource(maximum_order);
+      quicksched.register_resource(*tmatrices[ig]);
       quicksched.register_resource(tmatrices[ig]->get_m_resource(0));
 
       tmatrixm0tasks[ig] = new TMatrixM0Task(

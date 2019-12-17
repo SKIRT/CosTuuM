@@ -29,7 +29,7 @@ using namespace std;
 /**
  * @brief Scalar variables involved in a particle - photon interaction.
  */
-class InteractionVariables {
+class InteractionVariables : public Resource {
 private:
   /*! @brief Equal volume sphere radius, @f$R_V@f$ (in m). */
   const float_type _R_V;
@@ -410,6 +410,7 @@ public:
     // read access
     quicksched.link_task_and_resource(*this, _geometry, false);
     quicksched.link_task_and_resource(*this, _converged_size, false);
+    quicksched.link_task_and_resource(*this, _interaction_variables, false);
   }
 
   /**

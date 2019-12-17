@@ -49,7 +49,7 @@ inline void print_vector(std::vector<T *> &vec, QuickSched &quicksched,
  */
 int main(int argc, char **argv) {
 
-  TaskManager task_manager(10, 100, 2, 1.e-4, 1e10, 2);
+  TaskManager task_manager(10, 100, 2, 1.e-4, 1e10, 2, 0);
 
   task_manager.add_composition(DUSTGRAINTYPE_SILICON);
   task_manager.add_size(1.e-7);
@@ -66,18 +66,12 @@ int main(int argc, char **argv) {
   }
   AbsorptionCoefficientGrid grid(ntheta, &thetas[0]);
 
-  OrientationDistribution orientation_distribution(200);
-  orientation_distribution.initialise();
-
   std::vector<Task *> tasks;
   std::vector<Resource *> resources;
   std::vector<Result *> results;
   TMatrixAuxiliarySpaceManager *space_manager = nullptr;
-  std::vector<TMatrixResource *> tmatrices;
-  std::vector<InteractionVariables *> interaction_variables;
-  task_manager.generate_tasks(grid, orientation_distribution, quicksched, tasks,
-                              resources, results, space_manager, tmatrices,
-                              interaction_variables);
+  task_manager.generate_tasks(grid, quicksched, tasks, resources, results,
+                              space_manager);
 
   quicksched.execute_tasks();
 
@@ -87,8 +81,6 @@ int main(int argc, char **argv) {
   std::ofstream typefile("test_taskmanager_types.txt");
   typefile << "# type\tlabel\n";
   quicksched.print_type_dict(typefile);
-
-  ctm_warning("nmax: %" PRIuFAST32, tmatrices[0]->get_nmax());
 
   const AbsorptionCoefficientResult &result =
       *static_cast<AbsorptionCoefficientResult *>(results[0]);
@@ -105,8 +97,6 @@ int main(int argc, char **argv) {
   clear_vector(resources);
   clear_vector(results);
   delete space_manager;
-  clear_vector(tmatrices);
-  clear_vector(interaction_variables);
 
   return 0;
 }

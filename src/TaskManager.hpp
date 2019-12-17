@@ -12,10 +12,13 @@
 #include "AbsorptionCoefficientTask.hpp"
 #include "AlignmentAverageTask.hpp"
 #include "Configuration.hpp"
+#include "DavisGreensteinOrientationDistribution.hpp"
 #include "DraineDustProperties.hpp"
 #include "DraineHensleyShapeDistribution.hpp"
 #include "GaussBasedResources.hpp"
+#include "MishchenkoOrientationDistribution.hpp"
 #include "NBasedResources.hpp"
+#include "OrientationDistributionResource.hpp"
 #include "ParticleGeometryResource.hpp"
 #include "QuickSchedWrapper.hpp"
 #include "ShapeDistribution.hpp"
@@ -57,6 +60,15 @@ private:
   /*! @brief Shape distribution for the particle shapes. */
   ShapeDistribution *_shape_distribution;
 
+  /*! @brief Orientation distribution for non-aligned particles. */
+  OrientationDistribution *_non_aligned_orientation_distribution;
+
+  /*! @brief Orientation distribution for oblate aligned particles. */
+  OrientationDistribution *_oblate_aligned_orientation_distribution;
+
+  /*! @brief Orientation distribution for prolate aligned particles. */
+  OrientationDistribution *_prolate_aligned_orientation_distribution;
+
   /*! @brief Requested particle compositions. */
   std::vector<int_fast32_t> _compositions;
 
@@ -83,13 +95,16 @@ public:
    * algorithm.
    * @param shape_distribution_type Type of shape distribution. Needs to be
    * documented properly.
+   * @param aligned_orientation_distribution_type Type of orientation
+   * distribution for aligned particles. Needs to be documented properly.
    */
   inline TaskManager(const uint_fast32_t minimum_order,
                      const uint_fast32_t maximum_order,
                      const uint_fast32_t gauss_legendre_factor,
                      const float_type tolerance,
                      const size_t maximum_memory_usage,
-                     int_fast32_t shape_distribution_type)
+                     const int_fast32_t shape_distribution_type,
+                     const int_fast32_t aligned_orientation_distribution_type)
       : _minimum_order(minimum_order), _maximum_order(maximum_order),
         _gauss_legendre_factor(gauss_legendre_factor), _tolerance(tolerance),
         _maximum_memory_usage(maximum_memory_usage),
@@ -103,12 +118,35 @@ public:
     } else if (shape_distribution_type == 2) {
       _shape_distribution = new SingleShapeShapeDistribution(1.00001);
     }
+
+    _non_aligned_orientation_distribution =
+        new OrientationDistribution(2 * _maximum_order);
+    _non_aligned_orientation_distribution->initialise();
+    if (aligned_orientation_distribution_type == 0) {
+      _oblate_aligned_orientation_distribution =
+          new DavisGreensteinOrientationDistribution(2 * _maximum_order, 2.);
+      _prolate_aligned_orientation_distribution =
+          new DavisGreensteinOrientationDistribution(2 * _maximum_order, 0.5);
+    } else if (aligned_orientation_distribution_type == 1) {
+      // note that we hardcode the cos2beta values for now:
+      //  - oblate: 3/5
+      //  - prolate: 1/5
+      _oblate_aligned_orientation_distribution =
+          new MishchenkoOrientationDistribution(2 * _maximum_order, 0.6);
+      _prolate_aligned_orientation_distribution =
+          new MishchenkoOrientationDistribution(2 * _maximum_order, 0.2);
+    }
   }
 
   /**
    * @brief Destructor.
    */
-  inline ~TaskManager() { delete _shape_distribution; }
+  inline ~TaskManager() {
+    delete _shape_distribution;
+    delete _non_aligned_orientation_distribution;
+    delete _oblate_aligned_orientation_distribution;
+    delete _prolate_aligned_orientation_distribution;
+  }
 
   /**
    * @brief Add the given particle composition to the list of compositions that
@@ -143,7 +181,6 @@ public:
    * grid of parameters.
    *
    * @param grid Grid of absorption coefficient angles.
-   * @param orientation_distribution Orientation distribution.
    * @param quicksched QuickSched library wrapper.
    * @param tasks List of tasks. Tasks need to be deleted by caller after the
    * computation finishes. This list also contains resources that act as a task.
@@ -155,18 +192,12 @@ public:
    * @param space_manager TMatrixAuxiliarySpaceManager that manages per thread
    * additional space for the T-matrix calculation. Needs to be deleted by
    * caller after the computation finishes.
-   * @param tmatrices T-matrix resources. Need to be deleted by caller.
-   * @param interaction_variables InteractionVariables. Need to be deleted by
-   * caller.
    */
-  inline void generate_tasks(
-      const AbsorptionCoefficientGrid &grid,
-      const OrientationDistribution &orientation_distribution,
-      QuickSched &quicksched, std::vector<Task *> &tasks,
-      std::vector<Resource *> &resources, std::vector<Result *> &results,
-      TMatrixAuxiliarySpaceManager *&space_manager,
-      std::vector<TMatrixResource *> &tmatrices,
-      std::vector<InteractionVariables *> &interaction_variables) const {
+  inline void
+  generate_tasks(const AbsorptionCoefficientGrid &grid, QuickSched &quicksched,
+                 std::vector<Task *> &tasks, std::vector<Resource *> &resources,
+                 std::vector<Result *> &results,
+                 TMatrixAuxiliarySpaceManager *&space_manager) const {
 
     // get the dimensions of the computational grid
     const uint_fast32_t number_of_compositions = _compositions.size();
@@ -207,6 +238,24 @@ public:
     quicksched.register_resource(*nbased_resources);
     quicksched.register_task(*nbased_resources);
     nbased_resources->link_resources(quicksched);
+
+    //  - orientation distribution resources
+    OrientationDistributionResource *random_orientation =
+        new OrientationDistributionResource(
+            _non_aligned_orientation_distribution);
+    OrientationDistributionResource *oblate_orientation =
+        new OrientationDistributionResource(
+            _oblate_aligned_orientation_distribution);
+    OrientationDistributionResource *prolate_orientation =
+        new OrientationDistributionResource(
+            _prolate_aligned_orientation_distribution);
+    quicksched.register_resource(*random_orientation);
+    quicksched.register_resource(*oblate_orientation);
+    quicksched.register_resource(*prolate_orientation);
+    resources.resize(3, nullptr);
+    resources[0] = random_orientation;
+    resources[1] = oblate_orientation;
+    resources[2] = prolate_orientation;
 
     //  - quadrature points
     const uint_fast32_t minimum_ngauss =
@@ -319,22 +368,24 @@ public:
     // now actually allocate the resources
     std::vector<InteractionResource *> interaction_resources(
         number_of_tmatrices, nullptr);
-    tmatrices.resize(2 * number_of_tmatrices, nullptr);
+    std::vector<TMatrixResource *> tmatrices(2 * number_of_tmatrices, nullptr);
     const uint_fast32_t tmatrix_offset = resources.size();
-    resources.resize(tmatrix_offset + number_of_tmatrices, nullptr);
+    resources.resize(tmatrix_offset + 3 * number_of_tmatrices, nullptr);
     for (uint_fast32_t i = 0; i < number_of_tmatrices; ++i) {
       interaction_resources[i] =
           new InteractionResource(_maximum_order, maximum_ngauss);
       quicksched.register_resource(*interaction_resources[i]);
-      resources[tmatrix_offset + i] = interaction_resources[i];
+      resources[tmatrix_offset + 3 * i] = interaction_resources[i];
 
       tmatrices[2 * i] = new TMatrixResource(_maximum_order);
+      resources[tmatrix_offset + 3 * i + 1] = tmatrices[2 * i];
       quicksched.register_resource(*tmatrices[2 * i]);
       for (uint_fast32_t m = 0; m < _maximum_order + 1; ++m) {
         quicksched.register_resource(tmatrices[2 * i]->get_m_resource(m),
                                      tmatrices[2 * i]);
       }
       tmatrices[2 * i + 1] = new TMatrixResource(_maximum_order);
+      resources[tmatrix_offset + 3 * i + 2] = tmatrices[2 * i + 1];
       quicksched.register_resource(*tmatrices[2 * i + 1]);
       for (uint_fast32_t m = 0; m < _maximum_order + 1; ++m) {
         quicksched.register_resource(tmatrices[2 * i + 1]->get_m_resource(m),
@@ -345,11 +396,14 @@ public:
     // big loop over all parameter values
     // for each parameter value we allocate interaction variables and a
     // control resource
-    interaction_variables.resize(total_number_of_interactions, nullptr);
+    std::vector<InteractionVariables *> interaction_variables(
+        total_number_of_interactions, nullptr);
     std::vector<ConvergedSizeResources *> converged_size_resources(
         total_number_of_Tmatrices, nullptr);
     const uint_fast32_t resource_offset = resources.size();
-    resources.resize(resource_offset + total_number_of_Tmatrices, nullptr);
+    resources.resize(resource_offset + total_number_of_interactions +
+                         total_number_of_Tmatrices,
+                     nullptr);
     results.resize(total_number_of_Tmatrices, nullptr);
     const uint_fast32_t task_offset = tasks.size();
     // for each T-matrix,
@@ -386,6 +440,10 @@ public:
               isize * number_of_wavelengths + ilambda;
           interaction_variables[interaction_index] = new InteractionVariables(
               particle_size, wavelength, refractive_index);
+          quicksched.register_resource(
+              *interaction_variables[interaction_index]);
+          resources[resource_offset + interaction_index] =
+              interaction_variables[interaction_index];
 
           // loop over all shapes
           for (uint_fast32_t ishape = 0; ishape < number_of_shapes; ++ishape) {
@@ -397,11 +455,22 @@ public:
                 grain_type, particle_size, wavelength, number_of_angles);
             quicksched.register_resource(*results[index]);
 
+            OrientationDistributionResource *this_orientation;
+            if (particle_size > 1.e-5) {
+              if (_shape_distribution->get_shape(ishape) > 1.) {
+                this_orientation = oblate_orientation;
+              } else {
+                this_orientation = prolate_orientation;
+              }
+            } else {
+              this_orientation = random_orientation;
+            }
+
             // allocate the corresponding interaction variables and control
             // object
             converged_size_resources[index] = new ConvergedSizeResources();
             quicksched.register_resource(*converged_size_resources[index]);
-            resources[resource_offset + index] =
+            resources[resource_offset + total_number_of_interactions + index] =
                 converged_size_resources[index];
             // we need to store the previous m=0 task to set up a dependency
             TMatrixM0Task *previous_m0task = nullptr;
@@ -451,7 +520,7 @@ public:
             }
 
             AlignmentAverageTask *alignment_task = new AlignmentAverageTask(
-                orientation_distribution, *tmatrices[index],
+                *this_orientation, *tmatrices[index],
                 *tmatrices[total_number_of_Tmatrices + index]);
             quicksched.register_task(*alignment_task);
             alignment_task->link_resources(quicksched);

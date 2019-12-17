@@ -8,7 +8,7 @@
 #ifndef ALIGNMENTAVERAGETASK_HPP
 #define ALIGNMENTAVERAGETASK_HPP
 
-#include "OrientationDistribution.hpp"
+#include "OrientationDistributionResource.hpp"
 #include "QuickSchedWrapper.hpp"
 #include "TMatrixResource.hpp"
 
@@ -18,7 +18,7 @@
 class AlignmentAverageTask : public Task {
 private:
   /*! @brief Orientation distribution. */
-  const OrientationDistribution &_orientation_distribution;
+  const OrientationDistributionResource &_orientation_distribution;
 
   /*! @brief Input T-matrix. */
   const TMatrixResource &_input_Tmatrix;
@@ -35,7 +35,7 @@ public:
    * @param output_Tmatrix Output T-matrix.
    */
   inline AlignmentAverageTask(
-      const OrientationDistribution &orientation_distribution,
+      const OrientationDistributionResource &orientation_distribution,
       const TMatrixResource &input_Tmatrix, TMatrixResource &output_Tmatrix)
       : _orientation_distribution(orientation_distribution),
         _input_Tmatrix(input_Tmatrix), _output_Tmatrix(output_Tmatrix) {}
@@ -52,6 +52,7 @@ public:
     quicksched.link_task_and_resource(*this, _input_Tmatrix, true);
 
     // read access
+    quicksched.link_task_and_resource(*this, _orientation_distribution, false);
     quicksched.link_task_and_resource(*this, _output_Tmatrix, false);
   }
 

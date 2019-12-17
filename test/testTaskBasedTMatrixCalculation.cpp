@@ -251,7 +251,7 @@ int main(int argc, char **argv) {
         malltask[i]->execute(0);
       }
 
-      TMatrixQTask qtask(Tmatrix, Tmatrix.get_m_resource(0));
+      TMatrixQTask qtask(Tmatrix);
       qtask.execute();
 
       const float_type qext = Tmatrix.get_extinction_coefficient();
@@ -323,12 +323,14 @@ int main(int argc, char **argv) {
 
       InteractionVariables interaction_variables(R_V, wavelength,
                                                  refractive_index);
+      quicksched.register_resource(interaction_variables);
       InteractionResource interaction(maximum_order, ndgs * maximum_order);
       quicksched.register_resource(interaction);
 
       TMatrixResource Tmatrix(maximum_order);
+      quicksched.register_resource(Tmatrix);
       for (uint_fast32_t m = 0; m < maximum_order + 1; ++m) {
-        quicksched.register_resource(Tmatrix.get_m_resource(m));
+        quicksched.register_resource(Tmatrix.get_m_resource(m), &Tmatrix);
       }
 
       std::vector<GaussBasedResources *> quadrature_points(
@@ -393,7 +395,7 @@ int main(int argc, char **argv) {
         }
       }
 
-      TMatrixQTask qtask(Tmatrix, Tmatrix.get_m_resource(0));
+      TMatrixQTask qtask(Tmatrix);
       quicksched.register_task(qtask);
       qtask.link_resources(quicksched);
       ExtinctionMatrixResource Kmatrix(0.3 * M_PI, 0., interaction_variables,
@@ -618,11 +620,14 @@ int main(int argc, char **argv) {
       converged_sizes.push_back(new ConvergedSizeResources());
       quicksched.register_resource(*converged_sizes.back());
       Tmatrices.push_back(new TMatrixResource(maximum_order));
+      quicksched.register_resource(*Tmatrices.back());
       for (uint_fast32_t m = 0; m < maximum_order + 1; ++m) {
-        quicksched.register_resource(Tmatrices.back()->get_m_resource(m));
+        quicksched.register_resource(Tmatrices.back()->get_m_resource(m),
+                                     Tmatrices.back());
       }
       interaction_variables.push_back(
           new InteractionVariables(R_V, wavelength, refractive_index));
+      quicksched.register_resource(*interaction_variables.back());
       interactions.push_back(
           new InteractionResource(maximum_order, ndgs * maximum_order));
       quicksched.register_resource(*interactions.back());
@@ -663,8 +668,7 @@ int main(int argc, char **argv) {
         }
       }
 
-      Qtasks.push_back(new TMatrixQTask(*Tmatrices.back(),
-                                        Tmatrices.back()->get_m_resource(0)));
+      Qtasks.push_back(new TMatrixQTask(*Tmatrices.back()));
       quicksched.register_task(*Qtasks.back());
       Qtasks.back()->link_resources(quicksched);
       Zmatrices.push_back(new ScatteringMatrixResource(

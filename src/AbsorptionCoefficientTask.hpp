@@ -175,6 +175,7 @@ public:
     quicksched.link_task_and_resource(*this, _result, true);
 
     // read access
+    quicksched.link_task_and_resource(*this, _interaction_variables, false);
     quicksched.link_task_and_resource(*this, _Tmatrix, false);
   }
 
