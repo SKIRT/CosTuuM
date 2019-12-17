@@ -49,7 +49,7 @@ inline void print_vector(std::vector<T *> &vec, QuickSched &quicksched,
  */
 int main(int argc, char **argv) {
 
-  TaskManager task_manager(10, 100, 2, 1.e-4, 1e10, 2, 0);
+  TaskManager task_manager(10, 100, 2, 1.e-4, 1e10, 0, 0);
 
   task_manager.add_composition(DUSTGRAINTYPE_SILICON);
   task_manager.add_size(1.e-7);

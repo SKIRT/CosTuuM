@@ -383,9 +383,6 @@ public:
     // shapes (not strictly necessary, but we do this for now)
     ctm_assert(number_of_tmatrices >= number_of_shapes);
 
-    // for now: enforce enough space to store all T-matrices
-    ctm_assert(number_of_tmatrices == total_number_of_Tmatrices);
-
     // we are done using memory: output the total
     memory_used += number_of_tmatrices * tmatrix_memory_requirement;
     ctm_warning("Total memory usage: %s",
@@ -418,6 +415,20 @@ public:
                                      tmatrices[2 * i + 1]);
       }
     }
+
+    // memory management:
+    // we only have N = number_of_tmatrices available interaction resources
+    // and T-matrix resources (2 of the latter, but that doesn't really matter
+    // here). This means that we need to reuse these resources if we need more.
+    // This is of course only allowed if we no longer need these resources, i.e.
+    // if the AbsorptionCoefficientTask for that specific T-matrix has
+    // finished.
+    // We keep a running index of the last used T-matrix resources, and if that
+    // overflows, we start reusing values. We also store all the tasks that
+    // last used the resource and create a task dependency between the old
+    // task that used the resource and the new task.
+    std::vector<Task *> unlock_tasks(number_of_tmatrices, nullptr);
+    uint_fast32_t running_resource_index = 0;
 
     // big loop over all parameter values
     // for each parameter value we allocate interaction variables and a
@@ -511,14 +522,18 @@ public:
               const ParticleGeometryResource &this_geometry =
                   *geometries[ishape * number_of_quadrature_tasks + i];
               // set up the interaction task
-              InteractionTask *this_interaction =
-                  new InteractionTask(this_order, this_ngauss, this_geometry,
-                                      *converged_size_resources[index],
-                                      *interaction_variables[interaction_index],
-                                      *interaction_resources[index]);
+              InteractionTask *this_interaction = new InteractionTask(
+                  this_order, this_ngauss, this_geometry,
+                  *converged_size_resources[index],
+                  *interaction_variables[interaction_index],
+                  *interaction_resources[running_resource_index]);
               quicksched.register_task(*this_interaction);
               this_interaction->link_resources(quicksched);
               quicksched.link_tasks(this_geometry, *this_interaction);
+              if (unlock_tasks[running_resource_index] != nullptr) {
+                quicksched.link_tasks(*unlock_tasks[running_resource_index],
+                                      *this_interaction);
+              }
               tasks[task_offset + index * tasks_per_Tmatrix + 2 * i] =
                   this_interaction;
 
@@ -527,9 +542,10 @@ public:
                   _tolerance, this_order, this_ngauss, *nbased_resources,
                   this_quadrature_points, this_geometry,
                   *interaction_variables[interaction_index],
-                  *interaction_resources[index], this_wigner, *space_manager,
-                  *tmatrices[index], *converged_size_resources[index],
-                  tmatrices[index]->get_m_resource(0));
+                  *interaction_resources[running_resource_index], this_wigner,
+                  *space_manager, *tmatrices[2 * running_resource_index],
+                  *converged_size_resources[index],
+                  tmatrices[2 * running_resource_index]->get_m_resource(0));
               quicksched.register_task(*this_m0task);
               this_m0task->link_resources(quicksched);
               quicksched.link_tasks(*nbased_resources, *this_m0task);
@@ -539,6 +555,11 @@ public:
               if (previous_m0task != nullptr) {
                 quicksched.link_tasks(*previous_m0task, *this_interaction);
                 quicksched.link_tasks(*previous_m0task, *this_m0task);
+              } else {
+                if (unlock_tasks[running_resource_index] != nullptr) {
+                  quicksched.link_tasks(*unlock_tasks[running_resource_index],
+                                        *this_m0task);
+                }
               }
               tasks[task_offset + index * tasks_per_Tmatrix + 2 * i + 1] =
                   this_m0task;
@@ -546,8 +567,8 @@ public:
             }
 
             AlignmentAverageTask *alignment_task = new AlignmentAverageTask(
-                *this_orientation, *tmatrices[index],
-                *tmatrices[total_number_of_Tmatrices + index]);
+                *this_orientation, *tmatrices[2 * running_resource_index],
+                *tmatrices[2 * running_resource_index + 1]);
             quicksched.register_task(*alignment_task);
             alignment_task->link_resources(quicksched);
             tasks[task_offset + index * tasks_per_Tmatrix +
@@ -557,7 +578,7 @@ public:
             AbsorptionCoefficientTask *absorption_task =
                 new AbsorptionCoefficientTask(
                     *grid, *interaction_variables[interaction_index],
-                    *tmatrices[total_number_of_Tmatrices + index],
+                    *tmatrices[2 * running_resource_index + 1],
                     *nbased_resources, *special_wigner,
                     *static_cast<AbsorptionCoefficientResult *>(
                         results[index]));
@@ -574,7 +595,8 @@ public:
               TMatrixMAllTask *this_malltask = new TMatrixMAllTask(
                   i + 1, *nbased_resources, *converged_size_resources[index],
                   *interaction_variables[interaction_index], *space_manager,
-                  *tmatrices[index], tmatrices[index]->get_m_resource(i + 1));
+                  *tmatrices[running_resource_index],
+                  tmatrices[running_resource_index]->get_m_resource(i + 1));
               quicksched.register_task(*this_malltask);
               this_malltask->link_resources(quicksched);
               // link to the last m=0 task
@@ -583,6 +605,10 @@ public:
               tasks[task_offset + index * tasks_per_Tmatrix +
                     2 * number_of_quadrature_tasks + i] = this_malltask;
             }
+
+            unlock_tasks[running_resource_index] = absorption_task;
+            ++running_resource_index;
+            running_resource_index %= number_of_tmatrices;
           }
         }
       }
