@@ -43,6 +43,19 @@ public:
   virtual ~AlignmentAverageTask() {}
 
   /**
+   * @brief Link the resources for this task.
+   *
+   * @param quicksched QuickSched library.
+   */
+  inline void link_resources(QuickSched &quicksched) {
+    // write access
+    quicksched.link_task_and_resource(*this, _input_Tmatrix, true);
+
+    // read access
+    quicksched.link_task_and_resource(*this, _output_Tmatrix, false);
+  }
+
+  /**
    * @brief Execute the task.
    *
    * @param thread_id ID of the thread that executes the task.
@@ -50,6 +63,7 @@ public:
   virtual void execute(const int_fast32_t thread_id) {
 
     const uint_fast32_t nmax = _input_Tmatrix.get_nmax();
+
     // first make sure the _nmax value for the new T-matrix is set
     _output_Tmatrix._nmax = nmax;
 

@@ -270,15 +270,23 @@ public:
    * @brief Register the given resource with the QuickSched library.
    *
    * @param resource Resource to register.
+   * @param parent Parent resource (if any).
    */
-  inline void register_resource(Resource &resource) {
-    const qsched_res_t rid =
-        qsched_addres(&_s, qsched_owner_none, qsched_res_none);
+  inline void register_resource(Resource &resource,
+                                Resource *parent = nullptr) {
+    qsched_res_t pid = qsched_res_none;
+    if (parent != nullptr) {
+      pid = parent->get_id();
+    }
+    const qsched_res_t rid = qsched_addres(&_s, qsched_owner_none, pid);
     resource.set_id(rid);
 
     if (_write_log) {
       _output_file << "resource\t" << rid << "\t" << typeid(resource).name()
                    << "\n";
+      if (parent != nullptr) {
+        _output_file << "child\t" << rid << "\t" << pid << "\n";
+      }
     }
   }
 

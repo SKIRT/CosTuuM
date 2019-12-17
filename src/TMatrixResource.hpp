@@ -39,7 +39,7 @@ using namespace std;
  * @f$n_{GL}@f$ counters and the variables used to check for convergence of
  * the T-matrix calculation procedure.
  */
-class TMatrixResource {
+class TMatrixResource : public Resource {
 
   /*! @brief Grant access to @f$m=0@f$ computation task. */
   friend class TMatrixM0Task;
@@ -101,6 +101,7 @@ public:
   inline TMatrixResource(const uint_fast32_t maximum_order)
       : _nmax(0), _ngauss(0), _m_resources(maximum_order + 1), _Qscattering(0.),
         _Qextinction(0.), _dQscattering(-2.), _dQextinction(-2.) {
+
     _T.reserve(maximum_order + 1);
     for (uint_fast32_t m = 0; m < maximum_order + 1; ++m) {
       const uint_fast32_t nm = maximum_order + 1 - m;

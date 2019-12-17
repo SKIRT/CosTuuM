@@ -66,14 +66,18 @@ int main(int argc, char **argv) {
   }
   AbsorptionCoefficientGrid grid(ntheta, &thetas[0]);
 
+  OrientationDistribution orientation_distribution(200);
+  orientation_distribution.initialise();
+
   std::vector<Task *> tasks;
   std::vector<Resource *> resources;
   std::vector<Result *> results;
   TMatrixAuxiliarySpaceManager *space_manager = nullptr;
   std::vector<TMatrixResource *> tmatrices;
   std::vector<InteractionVariables *> interaction_variables;
-  task_manager.generate_tasks(grid, quicksched, tasks, resources, results,
-                              space_manager, tmatrices, interaction_variables);
+  task_manager.generate_tasks(grid, orientation_distribution, quicksched, tasks,
+                              resources, results, space_manager, tmatrices,
+                              interaction_variables);
 
   quicksched.execute_tasks();
 

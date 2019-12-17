@@ -143,6 +143,7 @@ public:
    * grid of parameters.
    *
    * @param grid Grid of absorption coefficient angles.
+   * @param orientation_distribution Orientation distribution.
    * @param quicksched QuickSched library wrapper.
    * @param tasks List of tasks. Tasks need to be deleted by caller after the
    * computation finishes. This list also contains resources that act as a task.
@@ -159,9 +160,10 @@ public:
    * caller.
    */
   inline void generate_tasks(
-      const AbsorptionCoefficientGrid &grid, QuickSched &quicksched,
-      std::vector<Task *> &tasks, std::vector<Resource *> &resources,
-      std::vector<Result *> &results,
+      const AbsorptionCoefficientGrid &grid,
+      const OrientationDistribution &orientation_distribution,
+      QuickSched &quicksched, std::vector<Task *> &tasks,
+      std::vector<Resource *> &resources, std::vector<Result *> &results,
       TMatrixAuxiliarySpaceManager *&space_manager,
       std::vector<TMatrixResource *> &tmatrices,
       std::vector<InteractionVariables *> &interaction_variables) const {
@@ -204,6 +206,7 @@ public:
     tasks.push_back(nbased_resources);
     quicksched.register_resource(*nbased_resources);
     quicksched.register_task(*nbased_resources);
+    nbased_resources->link_resources(quicksched);
 
     //  - quadrature points
     const uint_fast32_t minimum_ngauss =
@@ -226,6 +229,7 @@ public:
           new GaussBasedResources(this_ngauss);
       quicksched.register_resource(*this_quadrature_points);
       quicksched.register_task(*this_quadrature_points);
+      this_quadrature_points->link_resources(quicksched);
       quadrature_points[i] = this_quadrature_points;
       tasks[quadrature_points_offset + i] = this_quadrature_points;
     }
@@ -287,8 +291,6 @@ public:
         AbsorptionCoefficientResult::get_memory_size(number_of_angles);
 
     const DraineDustProperties dust_properties;
-    OrientationDistribution orientation_distribution(2 * _maximum_order);
-    orientation_distribution.initialise();
     // step 4: loop over all parameter values and set up parameter specific
     // tasks
     // first: figure out how much space is left for interaction and T-matrix
@@ -327,12 +329,16 @@ public:
       resources[tmatrix_offset + i] = interaction_resources[i];
 
       tmatrices[2 * i] = new TMatrixResource(_maximum_order);
+      quicksched.register_resource(*tmatrices[2 * i]);
       for (uint_fast32_t m = 0; m < _maximum_order + 1; ++m) {
-        quicksched.register_resource(tmatrices[2 * i]->get_m_resource(m));
+        quicksched.register_resource(tmatrices[2 * i]->get_m_resource(m),
+                                     tmatrices[2 * i]);
       }
       tmatrices[2 * i + 1] = new TMatrixResource(_maximum_order);
+      quicksched.register_resource(*tmatrices[2 * i + 1]);
       for (uint_fast32_t m = 0; m < _maximum_order + 1; ++m) {
-        quicksched.register_resource(tmatrices[2 * i + 1]->get_m_resource(m));
+        quicksched.register_resource(tmatrices[2 * i + 1]->get_m_resource(m),
+                                     tmatrices[2 * i + 1]);
       }
     }
 
@@ -448,6 +454,7 @@ public:
                 orientation_distribution, *tmatrices[index],
                 *tmatrices[total_number_of_Tmatrices + index]);
             quicksched.register_task(*alignment_task);
+            alignment_task->link_resources(quicksched);
             tasks[task_offset + index * tasks_per_Tmatrix +
                   2 * number_of_quadrature_tasks + _maximum_order] =
                 alignment_task;

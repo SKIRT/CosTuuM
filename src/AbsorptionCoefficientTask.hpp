@@ -173,6 +173,9 @@ public:
   inline void link_resources(QuickSched &quicksched) {
     // write access
     quicksched.link_task_and_resource(*this, _result, true);
+
+    // read access
+    quicksched.link_task_and_resource(*this, _Tmatrix, false);
   }
 
   /**
