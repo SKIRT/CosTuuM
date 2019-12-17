@@ -24,6 +24,9 @@ class AbsorptionCoefficientResult : public Result {
   /*! @brief Give access to the computation task. */
   friend class AbsorptionCoefficientTask;
 
+  /*! @brief Give access to the averaging task. */
+  friend class ShapeAveragingTask;
+
 private:
   /*! @brief Absorption coefficients. */
   std::vector<float_type> _Qabs;

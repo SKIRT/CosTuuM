@@ -21,6 +21,7 @@
 #include "OrientationDistributionResource.hpp"
 #include "ParticleGeometryResource.hpp"
 #include "QuickSchedWrapper.hpp"
+#include "ShapeAveragingTask.hpp"
 #include "ShapeDistribution.hpp"
 #include "SingleShapeShapeDistribution.hpp"
 #include "TMatrixResource.hpp"
