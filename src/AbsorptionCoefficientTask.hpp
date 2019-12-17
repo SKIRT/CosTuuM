@@ -8,6 +8,7 @@
 #ifndef ABSORPTIONCOEFFICIENTTASK_HPP
 #define ABSORPTIONCOEFFICIENTTASK_HPP
 
+#include "Configuration.hpp"
 #include "InteractionResource.hpp"
 #include "QuickSchedWrapper.hpp"
 #include "Result.hpp"
@@ -96,8 +97,38 @@ class AbsorptionCoefficientGrid {
   friend class AbsorptionCoefficientTask;
 
 private:
-  /*! @brief Zenith angles (in radians). */
-  std::vector<float_type> _theta;
+  /*! @brief Input zenith angles (in radians). */
+  std::vector<float_type> _theta_in;
+
+  /*! @brief Cosines of the input zenith angles. */
+  std::vector<float_type> _cos_theta_in;
+
+  /*! @brief Sines of the input zenith angles. */
+  std::vector<float_type> _sin_theta_in;
+
+  /*! @brief Inverse sines of the input zenith angles. */
+  std::vector<float_type> _sin_theta_in_inverse;
+
+  /*! @brief Cosines of the output zenith angles. */
+  std::vector<float_type> _cos_theta_out;
+
+  /*! @brief Sines of the output zenith angles. */
+  std::vector<float_type> _sin_theta_out;
+
+  /*! @brief Inverse sines of the output zenith angles. */
+  std::vector<float_type> _sin_theta_out_inverse;
+
+  /*! @brief Gauss-Legendre weights for cosines of the output zenith angles. */
+  std::vector<float_type> _cos_theta_out_weights;
+
+  /*! @brief Cosines of the output azimuth angles. */
+  std::vector<float_type> _cos_phi_out;
+
+  /*! @brief Sines of the output azimuth angles. */
+  std::vector<float_type> _sin_phi_out;
+
+  /*! @brief Gauss-Legendre weights for the output azimuth angles. */
+  std::vector<float_type> _phi_out_weights;
 
 public:
   /**
@@ -105,13 +136,42 @@ public:
    *
    * @param ntheta Number of zenith angles.
    * @param theta Grid of zenith angles (in radians, of size ntheta or more).
+   * @param ngauss Number of Gauss-Legendre quadrature points for directional
+   * averaging.
    */
   inline AbsorptionCoefficientGrid(const uint_fast32_t ntheta,
-                                   const float_type *theta)
-      : _theta(ntheta) {
+                                   const float_type *theta,
+                                   const uint_fast32_t ngauss)
+      : _theta_in(ntheta), _cos_theta_in(ngauss), _sin_theta_in(ngauss),
+        _sin_theta_in_inverse(ngauss), _cos_theta_out(ngauss),
+        _sin_theta_out(ngauss), _sin_theta_out_inverse(ngauss),
+        _cos_theta_out_weights(ngauss), _cos_phi_out(ngauss),
+        _sin_phi_out(ngauss), _phi_out_weights(ngauss) {
 
     for (uint_fast32_t i = 0; i < ntheta; ++i) {
-      _theta[i] = theta[i];
+      _theta_in[i] = theta[i];
+    }
+    SpecialFunctions::get_gauss_legendre_points_and_weights<float_type>(
+        ngauss, _cos_theta_out, _cos_theta_out_weights);
+    // note that we temporarily store the phi angles in cos_phi
+    SpecialFunctions::get_gauss_legendre_points_and_weights_ab<float_type>(
+        ngauss, 0., 2. * M_PI, _cos_phi_out, _phi_out_weights);
+
+    for (uint_fast32_t igauss = 0; igauss < ngauss; ++igauss) {
+
+      _cos_theta_in[igauss] = cos(_theta_in[igauss]);
+      _sin_theta_in[igauss] =
+          sqrt((1. - _cos_theta_in[igauss]) * (1. + _cos_theta_in[igauss]));
+      _sin_theta_in_inverse[igauss] = 1. / _sin_theta_in[igauss];
+
+      _sin_theta_out[igauss] =
+          sqrt((1. - _cos_theta_out[igauss]) * (1. + _cos_theta_out[igauss]));
+      _sin_theta_out_inverse[igauss] = 1. / _sin_theta_out[igauss];
+
+      // convert the phi angles to cos_phi
+      _cos_phi_out[igauss] = cos(_cos_phi_out[igauss]);
+      _sin_phi_out[igauss] =
+          sqrt((1. - _cos_phi_out[igauss]) * (1. + _cos_phi_out[igauss]));
     }
   }
 
@@ -120,7 +180,7 @@ public:
    *
    * @return Number of angles.
    */
-  inline uint_fast32_t get_number_of_angles() const { return _theta.size(); }
+  inline uint_fast32_t get_number_of_angles() const { return _theta_in.size(); }
 };
 
 /**
@@ -128,10 +188,6 @@ public:
  */
 class AbsorptionCoefficientTask : public Task {
 private:
-  /*! @brief Number of Gauss-Legendre quadrature points used to compute angular
-   *  averages. */
-  const uint_fast32_t _ngauss;
-
   /*! @brief Zenith angle grid to use. */
   const AbsorptionCoefficientGrid &_grid;
 
@@ -148,20 +204,17 @@ public:
   /**
    * @brief Constructor.
    *
-   * @param ngauss Number of Gauss-Legendre quadrature points used to compute
-   * angular averages.
    * @param grid Zenith angle grid to use.
    * @param interaction_variables Interaction variables.
    * @param Tmatrix T-matrix to use.
    * @param result Resource in which the result is stored.
    */
   inline AbsorptionCoefficientTask(
-      const uint_fast32_t ngauss, const AbsorptionCoefficientGrid &grid,
+      const AbsorptionCoefficientGrid &grid,
       const InteractionVariables &interaction_variables,
       const TMatrixResource &Tmatrix, AbsorptionCoefficientResult &result)
-      : _ngauss(ngauss), _grid(grid),
-        _interaction_variables(interaction_variables), _Tmatrix(Tmatrix),
-        _result(result) {}
+      : _grid(grid), _interaction_variables(interaction_variables),
+        _Tmatrix(Tmatrix), _result(result) {}
 
   virtual ~AbsorptionCoefficientTask() {}
 
@@ -393,24 +446,18 @@ public:
    */
   virtual void execute(const int_fast32_t thread_id) {
 
-    std::vector<float_type> thetaGL(_ngauss), costhetaGL(_ngauss),
-        costhetaweightsGL(_ngauss);
-    SpecialFunctions::get_gauss_legendre_points_and_weights<float_type>(
-        _ngauss, costhetaGL, costhetaweightsGL);
-    std::vector<float_type> phiGL(_ngauss), phiweightsGL(_ngauss);
-    SpecialFunctions::get_gauss_legendre_points_and_weights_ab<float_type>(
-        _ngauss, 0., 2. * M_PI, phiGL, phiweightsGL);
+    const uint_fast32_t ntheta = _grid._theta_in.size();
+    const uint_fast32_t ngauss = _grid._cos_theta_out.size();
 
-    for (uint_fast32_t igauss = 0; igauss < _ngauss; ++igauss) {
-      thetaGL[igauss] = acos(costhetaGL[igauss]);
-    }
-
-    const uint_fast32_t ntheta = _grid._theta.size();
     for (uint_fast32_t itheta_in = 0; itheta_in < ntheta; ++itheta_in) {
 
-      const float_type theta = _grid._theta[itheta_in];
-      Matrix<std::complex<float_type>> S =
-          get_forward_scattering_matrix(theta, 0., theta, 0.);
+      const float_type cos_theta_in = _grid._cos_theta_in[itheta_in];
+      const float_type sin_theta_in = _grid._sin_theta_in[itheta_in];
+      const float_type inv_sin_theta_in =
+          _grid._sin_theta_in_inverse[itheta_in];
+      Matrix<std::complex<float_type>> S = get_forward_scattering_matrix(
+          cos_theta_in, sin_theta_in, inv_sin_theta_in, 1., 0., cos_theta_in,
+          sin_theta_in, inv_sin_theta_in, 1., 0.);
 
       const float_type prefactor =
           2. * M_PI / _interaction_variables.get_wavenumber();
@@ -418,16 +465,22 @@ public:
       _result._Qabspol[itheta_in] = prefactor * (S(0, 0) - S(1, 1)).imag();
 
       const float_type half(0.5);
-      for (uint_fast32_t itheta = 0; itheta < _ngauss; ++itheta) {
-        const float_type theta_out = thetaGL[itheta];
-        for (uint_fast32_t iphi = 0; iphi < _ngauss; ++iphi) {
-          const float_type phi_out = phiGL[iphi];
+      for (uint_fast32_t itheta_out = 0; itheta_out < ngauss; ++itheta_out) {
+        const float_type cos_theta_out = _grid._cos_theta_out[itheta_out];
+        const float_type sin_theta_out = _grid._sin_theta_out[itheta_out];
+        const float_type inv_sin_theta_out =
+            _grid._sin_theta_out_inverse[itheta_out];
+        for (uint_fast32_t iphi_out = 0; iphi_out < ngauss; ++iphi_out) {
+          const float_type cos_phi_out = _grid._cos_phi_out[iphi_out];
+          const float_type sin_phi_out = _grid._sin_phi_out[iphi_out];
 
-          Matrix<std::complex<float_type>> Stp =
-              get_forward_scattering_matrix(theta, 0., theta_out, phi_out);
+          Matrix<std::complex<float_type>> Stp = get_forward_scattering_matrix(
+              cos_theta_in, sin_theta_in, inv_sin_theta_in, 1., 0.,
+              cos_theta_out, sin_theta_out, inv_sin_theta_out, cos_phi_out,
+              sin_phi_out);
 
-          const float_type weight =
-              costhetaweightsGL[itheta] * phiweightsGL[iphi];
+          const float_type weight = _grid._cos_theta_out_weights[itheta_out] *
+                                    _grid._phi_out_weights[iphi_out];
           const float_type Z00 =
               (half *
                (Stp(0, 0) * conj(Stp(0, 0)) + Stp(0, 1) * conj(Stp(0, 1)) +

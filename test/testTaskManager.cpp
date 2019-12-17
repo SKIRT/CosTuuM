@@ -53,9 +53,10 @@ int main(int argc, char **argv) {
 
   task_manager.add_composition(DUSTGRAINTYPE_SILICON);
   task_manager.add_size(1.e-7);
-  //  task_manager.add_size(1.e-5);
+  task_manager.add_size(1.e-5);
   task_manager.add_wavelength(1.e-4);
-  //  task_manager.add_wavelength(1.e-3);
+  task_manager.add_wavelength(1.e-3);
+  task_manager.add_wavelength(1.e-2);
 
   QuickSched quicksched(4, true, "test_TaskManager.log");
 
@@ -64,7 +65,7 @@ int main(int argc, char **argv) {
   for (uint_fast32_t i = 0; i < ntheta; ++i) {
     thetas[i] = (i + 0.5) * M_PI / ntheta;
   }
-  AbsorptionCoefficientGrid grid(ntheta, &thetas[0]);
+  AbsorptionCoefficientGrid grid(ntheta, &thetas[0], 10);
 
   std::vector<Task *> tasks;
   std::vector<Resource *> resources;

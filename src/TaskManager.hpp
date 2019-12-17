@@ -530,8 +530,7 @@ public:
 
             AbsorptionCoefficientTask *absorption_task =
                 new AbsorptionCoefficientTask(
-                    number_of_angles, grid,
-                    *interaction_variables[interaction_index],
+                    grid, *interaction_variables[interaction_index],
                     *tmatrices[total_number_of_Tmatrices + index],
                     *static_cast<AbsorptionCoefficientResult *>(
                         results[index]));
