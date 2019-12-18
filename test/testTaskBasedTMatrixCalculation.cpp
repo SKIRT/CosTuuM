@@ -243,11 +243,17 @@ int main(int argc, char **argv) {
       ctm_warning("Qext: %g (%g)", double(Tmatrix.get_extinction_coefficient()),
                   double(refqext));
 
+      // the MAll tasks only require one interaction resource: the one for
+      // the converged order of the T-matrix
+      // we compute this index here
+      const uint_fast32_t interaction_index =
+          Tmatrix.get_nmax() - minimum_order;
       std::vector<TMatrixMAllTask *> malltask(maximum_order, nullptr);
       for (uint_fast32_t i = 0; i < maximum_order; ++i) {
         malltask[i] = new TMatrixMAllTask(
-            1 + i, nfactors, converged_size, interaction_variables, aux_manager,
-            Tmatrix, Tmatrix.get_m_resource(1 + i));
+            1 + i, nfactors, converged_size, interaction_variables,
+            *interactions[interaction_index], aux_manager, Tmatrix,
+            Tmatrix.get_m_resource(1 + i));
         malltask[i]->execute(0);
       }
 
@@ -413,8 +419,8 @@ int main(int argc, char **argv) {
       std::vector<TMatrixMAllTask *> malltask(maximum_order, nullptr);
       for (uint_fast32_t i = 0; i < maximum_order; ++i) {
         malltask[i] = new TMatrixMAllTask(
-            1 + i, nfactors, converged_size, interaction_variables, aux_manager,
-            Tmatrix, Tmatrix.get_m_resource(1 + i));
+            1 + i, nfactors, converged_size, interaction_variables, interaction,
+            aux_manager, Tmatrix, Tmatrix.get_m_resource(1 + i));
         quicksched.register_task(*malltask[i]);
         malltask[i]->link_resources(quicksched);
 
@@ -681,8 +687,8 @@ int main(int argc, char **argv) {
       for (uint_fast32_t i = 0; i < maximum_order; ++i) {
         malltasks.push_back(new TMatrixMAllTask(
             1 + i, nfactors, *converged_sizes.back(),
-            *interaction_variables.back(), aux_manager, *Tmatrices.back(),
-            Tmatrices.back()->get_m_resource(1 + i)));
+            *interaction_variables.back(), *interactions.back(), aux_manager,
+            *Tmatrices.back(), Tmatrices.back()->get_m_resource(1 + i)));
         quicksched.register_task(*malltasks.back());
         malltasks.back()->link_resources(quicksched);
         quicksched.link_tasks(*m0tasks.back(), *malltasks.back());

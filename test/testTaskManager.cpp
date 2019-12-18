@@ -21,6 +21,8 @@ using namespace std;
  */
 template <typename T> inline void clear_vector(std::vector<T *> &vec) {
   for (uint_fast32_t i = 0; i < vec.size(); ++i) {
+    // make sure we used all elements in the vectors
+    ctm_assert(vec[i] != nullptr);
     delete vec[i];
   }
 }

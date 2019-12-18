@@ -53,6 +53,9 @@ class TMatrixResource : public Resource {
   /*! @brief Grant access to the alignment averaging task. */
   friend class AlignmentAverageTask;
 
+  /*! @brief Grant access to the reset task. */
+  friend class ResetTMatrixResourceTask;
+
 private:
   /*! @brief Actual size of the matrix stored in this resource. */
   uint_fast32_t _nmax;
@@ -355,6 +358,10 @@ public:
     _RgJ22.reset();
     _Q.reset();
     _RgQ.reset();
+    for (uint_fast32_t i = 0; i < _pivot_array.size(); ++i) {
+      _pivot_array[i] = 0;
+      _work[i] = std::complex<float_type>(0.);
+    }
   }
 };
 
@@ -541,6 +548,9 @@ public:
    */
   virtual void execute(const int_fast32_t thread_id) {
 
+    // check that the T-matrix resource was actually reset properly
+    ctm_assert(_converged_size._iteration > 0 || _Tmatrix._nmax == 0);
+
     // check if we need to do something
     if (_converged_size.is_converged()) {
       // tolerance was already reached; abort task
@@ -712,8 +722,8 @@ public:
     _converged_size._ngauss = _ngauss;
     _converged_size._quadrature_points = &_quadrature_points;
     _converged_size._geometry = &_geometry;
-    _converged_size._interaction = &_interaction;
     _converged_size._wigner_d = &_wigner;
+    ++_converged_size._iteration;
 
     // update Q coefficients
     const float_type old_Qscattering = _Tmatrix._Qscattering;
@@ -775,6 +785,9 @@ private:
   /*! @brief Interaction variables. */
   const InteractionVariables &_interaction_variables;
 
+  /*! @brief Interaction resources. */
+  const InteractionResource &_interaction;
+
   /*! @brief Auxiliary space manager used to obtain space to store intermediate
    *  calculations. */
   TMatrixAuxiliarySpaceManager &_aux_manager;
@@ -794,6 +807,7 @@ public:
    * @param nfactors Precomputed @f$n@f$ factors (read only).
    * @param converged_size Converged T-matrix variables (read only).
    * @param interaction_variables Interaction variables (read only).
+   * @param interaction Interaction resources (read only).
    * @param aux_manager Auxiliary space manager used to obtain space to store
    * intermediate calculations.
    * @param Tmatrix TMatrix space containing the result.
@@ -803,11 +817,13 @@ public:
   inline TMatrixMAllTask(const uint_fast32_t m, const NBasedResources &nfactors,
                          const ConvergedSizeResources &converged_size,
                          const InteractionVariables &interaction_variables,
+                         const InteractionResource &interaction,
                          TMatrixAuxiliarySpaceManager &aux_manager,
                          TMatrixResource &Tmatrix, const Resource &m_resource)
       : _m(m), _nfactors(nfactors), _converged_size(converged_size),
         _interaction_variables(interaction_variables),
-        _aux_manager(aux_manager), _Tmatrix(Tmatrix), _m_resource(m_resource) {}
+        _interaction(interaction), _aux_manager(aux_manager), _Tmatrix(Tmatrix),
+        _m_resource(m_resource) {}
 
   virtual ~TMatrixMAllTask() {}
 
@@ -824,6 +840,7 @@ public:
     quicksched.link_task_and_resource(*this, _nfactors, false);
     quicksched.link_task_and_resource(*this, _converged_size, false);
     quicksched.link_task_and_resource(*this, _interaction_variables, false);
+    quicksched.link_task_and_resource(*this, _interaction, false);
   }
 
   /**
@@ -849,7 +866,6 @@ public:
     const GaussBasedResources &quadrature_points =
         *_converged_size.get_quadrature_points();
     const ParticleGeometryResource &geometry = *_converged_size.get_geometry();
-    const InteractionResource &interaction = *_converged_size.get_interaction();
     const WignerDResources &wigner_d = *_converged_size.get_wigner_d();
 
     const float_type m2 = _m * _m;
@@ -876,17 +892,17 @@ public:
           const float_type wn1dwn2 = wigner_n1 * dwigner_n2;
           const float_type dwn1wn2 = dwigner_n1 * wigner_n2;
 
-          const float_type jkrn1 = interaction.get_jkr(ig, n1);
-          const float_type ykrn1 = interaction.get_ykr(ig, n1);
+          const float_type jkrn1 = _interaction.get_jkr(ig, n1);
+          const float_type ykrn1 = _interaction.get_ykr(ig, n1);
           // spherical Hankel function of the first kind
           const std::complex<float_type> hkrn1(jkrn1, ykrn1);
-          const float_type djkrn1 = interaction.get_djkr(ig, n1);
-          const float_type dykrn1 = interaction.get_dykr(ig, n1);
+          const float_type djkrn1 = _interaction.get_djkr(ig, n1);
+          const float_type dykrn1 = _interaction.get_dykr(ig, n1);
           const std::complex<float_type> dhkrn1(djkrn1, dykrn1);
           const std::complex<float_type> jkrmrn2 =
-              interaction.get_jkrmr(ig, n2);
+              _interaction.get_jkrmr(ig, n2);
           const std::complex<float_type> djkrmrn2 =
-              interaction.get_djkrmr(ig, n2);
+              _interaction.get_djkrmr(ig, n2);
 
           const std::complex<float_type> c1 = jkrmrn2 * jkrn1;
           const std::complex<float_type> b1 = jkrmrn2 * hkrn1;
@@ -894,12 +910,13 @@ public:
           const std::complex<float_type> c2 = jkrmrn2 * djkrn1;
           const std::complex<float_type> b2 = jkrmrn2 * dhkrn1;
 
-          const float_type krinvi = interaction.get_krinv(ig);
+          const float_type krinvi = _interaction.get_krinv(ig);
 
           const std::complex<float_type> c4 = djkrmrn2 * jkrn1;
           const std::complex<float_type> b4 = djkrmrn2 * hkrn1;
 
-          const std::complex<float_type> krmrinvi = interaction.get_krmrinv(ig);
+          const std::complex<float_type> krmrinvi =
+              _interaction.get_krmrinv(ig);
 
           const float_type dr_over_ri = geometry.get_dr_over_r(ig);
 
@@ -1170,6 +1187,54 @@ public:
         _Tmatrix._Qextinction += factor * _Tmatrix(1, n1, m1, 0, n1, m1).real();
         _Tmatrix._Qextinction += factor * _Tmatrix(1, n1, m1, 1, n1, m1).real();
       }
+    }
+  }
+};
+
+/**
+ * @brief Reset a TMatrixResource so that it is ready to be reused.
+ */
+class ResetTMatrixResourceTask : public Task {
+private:
+  /*! @brief TMatrixResource to reset. */
+  TMatrixResource &_Tmatrix;
+
+public:
+  /**
+   * @brief Constructor.
+   *
+   * @param Tmatrix TMatrixResource to reset.
+   */
+  inline ResetTMatrixResourceTask(TMatrixResource &Tmatrix)
+      : _Tmatrix(Tmatrix) {}
+
+  virtual ~ResetTMatrixResourceTask() {}
+
+  /**
+   * @brief Link the resources for this task.
+   *
+   * @param quicksched QuickSched library.
+   */
+  inline void link_resources(QuickSched &quicksched) {
+    // write access
+    quicksched.link_task_and_resource(*this, _Tmatrix, true);
+  }
+
+  /**
+   * @brief Execute the task.
+   *
+   * @param thread_id ID of the thread that executes the task.
+   */
+  virtual void execute(const int_fast32_t thread_id) {
+
+    _Tmatrix._nmax = 0;
+    _Tmatrix._ngauss = 0;
+    _Tmatrix._Qscattering = 0.;
+    _Tmatrix._Qextinction = 0.;
+    _Tmatrix._dQscattering = -2.;
+    _Tmatrix._dQextinction = -2.;
+    for (uint_fast32_t m = 0; m < _Tmatrix._m_resources.size(); ++m) {
+      _Tmatrix._T[m].reset();
     }
   }
 };

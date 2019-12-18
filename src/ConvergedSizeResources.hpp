@@ -37,6 +37,9 @@ class ConvergedSizeResources : public Resource {
   friend class TMatrixM0Task;
 
 private:
+  /*! @brief Iteration number. */
+  uint_fast32_t _iteration;
+
   /*! @brief Maximum order, @f$n_{max}@f$. */
   uint_fast32_t _nmax;
 
@@ -48,9 +51,6 @@ private:
 
   /*! @brief Geometrical variables for the converged T-matrix. */
   const ParticleGeometryResource *_geometry;
-
-  /*! @brief Interaction variables for the converged T-matrix. */
-  const InteractionResource *_interaction;
 
   /*! @brief Wigner D functions for the converged T-matrix. */
   const WignerDResources *_wigner_d;
@@ -64,8 +64,8 @@ public:
    * @brief Empty constructor.
    */
   inline ConvergedSizeResources()
-      : _nmax(0), _ngauss(0), _quadrature_points(nullptr), _geometry(nullptr),
-        _interaction(nullptr), _wigner_d(nullptr), _is_converged(false) {}
+      : _iteration(0), _nmax(0), _ngauss(0), _quadrature_points(nullptr),
+        _geometry(nullptr), _wigner_d(nullptr), _is_converged(false) {}
 
   /**
    * @brief Get the maximum order.
@@ -97,15 +97,6 @@ public:
    */
   inline const ParticleGeometryResource *get_geometry() const {
     return _geometry;
-  }
-
-  /**
-   * @brief Get the interaction variables for the converged T-matrix.
-   *
-   * @return Interaction variables.
-   */
-  inline const InteractionResource *get_interaction() const {
-    return _interaction;
   }
 
   /**

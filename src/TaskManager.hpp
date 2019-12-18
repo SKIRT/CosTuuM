@@ -388,6 +388,8 @@ public:
     memory_used += number_of_tmatrices * tmatrix_memory_requirement;
     ctm_warning("Total memory usage: %s",
                 Utilities::human_readable_bytes(memory_used).c_str());
+    ctm_warning("Space to store %" PRIuFAST32 " T-matrices.",
+                number_of_tmatrices);
 
     // now actually allocate the resources
     std::vector<InteractionResource *> interaction_resources(
@@ -436,24 +438,30 @@ public:
     // control resource
     std::vector<InteractionVariables *> interaction_variables(
         total_number_of_interactions, nullptr);
+    uint_fast32_t interaction_index_new = 0;
     std::vector<ConvergedSizeResources *> converged_size_resources(
         total_number_of_Tmatrices, nullptr);
+    uint_fast32_t converged_size_index = 0;
     std::vector<AbsorptionCoefficientResult *> unaveraged_results(
         total_number_of_Tmatrices, nullptr);
+    uint_fast32_t unaveraged_result_index = 0;
     const uint_fast32_t resource_offset = resources.size();
     resources.resize(resource_offset + total_number_of_interactions +
                          2 * total_number_of_Tmatrices,
                      nullptr);
+    uint_fast32_t resource_index = resource_offset;
     results.resize(total_number_of_interactions, nullptr);
+    uint_fast32_t result_index = 0;
     const uint_fast32_t task_offset = tasks.size();
     // for each T-matrix,
     // we need to add interaction and m=0 tasks for each quadrature point
     // we need to add m=/=0 tasks for each order
     const uint_fast32_t tasks_per_Tmatrix =
-        2 * number_of_quadrature_tasks + _maximum_order + 2;
+        2 * number_of_quadrature_tasks + _maximum_order + 5;
     tasks.resize(task_offset + total_number_of_interactions +
                      total_number_of_Tmatrices * tasks_per_Tmatrix,
                  nullptr);
+    uint_fast32_t task_index = task_offset;
     // loop over compositions
     for (uint_fast32_t icomp = 0; icomp < number_of_compositions; ++icomp) {
       // get the grain type that corresponds to this composition
@@ -467,47 +475,52 @@ public:
         // loop over all wavelengths
         for (uint_fast32_t ilambda = 0; ilambda < number_of_wavelengths;
              ++ilambda) {
+
           // cache the wavelength
           const float_type wavelength = _wavelengths[ilambda];
+
           // get the refractive index for this grain type, particle size and
           // interaction wavelength
           const std::complex<float_type> refractive_index =
               dust_properties.get_refractive_index(wavelength, particle_size,
                                                    grain_type);
-          ctm_warning("mr: %g + i%g", double(refractive_index.real()),
-                      double(refractive_index.imag()));
-          const uint_fast32_t interaction_index =
-              icomp * number_of_sizes * number_of_wavelengths +
-              isize * number_of_wavelengths + ilambda;
-          interaction_variables[interaction_index] = new InteractionVariables(
-              particle_size, wavelength, refractive_index);
-          quicksched.register_resource(
-              *interaction_variables[interaction_index]);
-          resources[resource_offset + interaction_index] =
-              interaction_variables[interaction_index];
 
-          results[interaction_index] = new AbsorptionCoefficientResult(
-              grain_type, particle_size, wavelength, number_of_angles);
-          quicksched.register_resource(*results[interaction_index]);
+          InteractionVariables *this_interaction_variables =
+              new InteractionVariables(particle_size, wavelength,
+                                       refractive_index);
+          quicksched.register_resource(*this_interaction_variables);
+          interaction_variables[interaction_index_new] =
+              this_interaction_variables;
+          ++interaction_index_new;
+          resources[resource_index] = this_interaction_variables;
+          ++resource_index;
 
-          ShapeAveragingTask *averaging_task = new ShapeAveragingTask(
-              *_shape_distribution, *static_cast<AbsorptionCoefficientResult *>(
-                                        results[interaction_index]));
+          AbsorptionCoefficientResult *this_result =
+              new AbsorptionCoefficientResult(grain_type, particle_size,
+                                              wavelength, number_of_angles);
+          quicksched.register_resource(*this_result);
+          results[result_index] = this_result;
+          ++result_index;
+
+          ShapeAveragingTask *averaging_task =
+              new ShapeAveragingTask(*_shape_distribution, *this_result);
           quicksched.register_task(*averaging_task);
           averaging_task->link_resources(quicksched);
-          tasks[task_offset + interaction_index] = averaging_task;
+          tasks[task_index] = averaging_task;
+          ++task_index;
 
           // loop over all shapes
           for (uint_fast32_t ishape = 0; ishape < number_of_shapes; ++ishape) {
-            // compute the index of the corresponding T-matrix
-            const uint_fast32_t index =
-                interaction_index * number_of_shapes + ishape;
 
-            unaveraged_results[index] = new AbsorptionCoefficientResult(
-                grain_type, particle_size, wavelength, number_of_angles);
-            quicksched.register_resource(*unaveraged_results[index]);
-            resources[resource_offset + total_number_of_interactions +
-                      2 * index] = unaveraged_results[index];
+            AbsorptionCoefficientResult *this_unaveraged_result =
+                new AbsorptionCoefficientResult(grain_type, particle_size,
+                                                wavelength, number_of_angles);
+            quicksched.register_resource(*this_unaveraged_result);
+            unaveraged_results[unaveraged_result_index] =
+                this_unaveraged_result;
+            ++unaveraged_result_index;
+            resources[resource_index] = this_unaveraged_result;
+            ++resource_index;
 
             OrientationDistributionResource *this_orientation;
             if (particle_size > 1.e-5) {
@@ -522,28 +535,38 @@ public:
 
             // allocate the corresponding interaction variables and control
             // object
-            converged_size_resources[index] = new ConvergedSizeResources();
-            quicksched.register_resource(*converged_size_resources[index]);
-            resources[resource_offset + total_number_of_interactions +
-                      2 * index + 1] = converged_size_resources[index];
+            ConvergedSizeResources *this_converged_size =
+                new ConvergedSizeResources();
+            quicksched.register_resource(*this_converged_size);
+            converged_size_resources[converged_size_index] =
+                this_converged_size;
+            ++converged_size_index;
+            resources[resource_index] = this_converged_size;
+            ++resource_index;
+
+            InteractionResource *this_interaction_resource =
+                interaction_resources[running_resource_index];
+            TMatrixResource *this_single_Tmatrix =
+                tmatrices[2 * running_resource_index];
+            TMatrixResource *this_ensemble_Tmatrix =
+                tmatrices[2 * running_resource_index + 1];
+
             // we need to store the previous m=0 task to set up a dependency
             TMatrixM0Task *previous_m0task = nullptr;
             // loop over all orders
-            for (uint_fast32_t i = 0; i < number_of_quadrature_tasks; ++i) {
-              const uint_fast32_t this_order = _minimum_order + i;
+            for (uint_fast32_t ig = 0; ig < number_of_quadrature_tasks; ++ig) {
+              const uint_fast32_t this_order = _minimum_order + ig;
               const uint_fast32_t this_ngauss =
-                  minimum_ngauss + i * _gauss_legendre_factor;
+                  minimum_ngauss + ig * _gauss_legendre_factor;
               const GaussBasedResources &this_quadrature_points =
-                  *quadrature_points[i];
-              const WignerDResources &this_wigner = *wignerdm0[i];
+                  *quadrature_points[ig];
+              const WignerDResources &this_wigner = *wignerdm0[ig];
               const ParticleGeometryResource &this_geometry =
-                  *geometries[ishape * number_of_quadrature_tasks + i];
+                  *geometries[ishape * number_of_quadrature_tasks + ig];
               // set up the interaction task
               InteractionTask *this_interaction = new InteractionTask(
-                  this_order, this_ngauss, this_geometry,
-                  *converged_size_resources[index],
-                  *interaction_variables[interaction_index],
-                  *interaction_resources[running_resource_index]);
+                  this_order, this_ngauss, this_geometry, *this_converged_size,
+                  *this_interaction_variables, *this_interaction_resource);
               quicksched.register_task(*this_interaction);
               this_interaction->link_resources(quicksched);
               quicksched.link_tasks(this_geometry, *this_interaction);
@@ -551,18 +574,16 @@ public:
                 quicksched.link_tasks(*unlock_tasks[running_resource_index],
                                       *this_interaction);
               }
-              tasks[task_offset + total_number_of_interactions +
-                    index * tasks_per_Tmatrix + 2 * i] = this_interaction;
+              tasks[task_index] = this_interaction;
+              ++task_index;
 
               // set up the m=0 task
               TMatrixM0Task *this_m0task = new TMatrixM0Task(
                   _tolerance, this_order, this_ngauss, *nbased_resources,
                   this_quadrature_points, this_geometry,
-                  *interaction_variables[interaction_index],
-                  *interaction_resources[running_resource_index], this_wigner,
-                  *space_manager, *tmatrices[2 * running_resource_index],
-                  *converged_size_resources[index],
-                  tmatrices[2 * running_resource_index]->get_m_resource(0));
+                  *this_interaction_variables, *this_interaction_resource,
+                  this_wigner, *space_manager, *this_single_Tmatrix,
+                  *this_converged_size, this_single_Tmatrix->get_m_resource(0));
               quicksched.register_task(*this_m0task);
               this_m0task->link_resources(quicksched);
               quicksched.link_tasks(*nbased_resources, *this_m0task);
@@ -571,63 +592,87 @@ public:
               // link the previous task as dependency, if it exists
               if (previous_m0task != nullptr) {
                 quicksched.link_tasks(*previous_m0task, *this_interaction);
-                quicksched.link_tasks(*previous_m0task, *this_m0task);
               } else {
                 if (unlock_tasks[running_resource_index] != nullptr) {
                   quicksched.link_tasks(*unlock_tasks[running_resource_index],
                                         *this_m0task);
                 }
               }
-              tasks[task_offset + total_number_of_interactions +
-                    index * tasks_per_Tmatrix + 2 * i + 1] = this_m0task;
+              tasks[task_index] = this_m0task;
+              ++task_index;
               previous_m0task = this_m0task;
             }
 
             AlignmentAverageTask *alignment_task = new AlignmentAverageTask(
-                *this_orientation, *tmatrices[2 * running_resource_index],
-                *tmatrices[2 * running_resource_index + 1]);
+                *this_orientation, *this_single_Tmatrix,
+                *this_ensemble_Tmatrix);
             quicksched.register_task(*alignment_task);
             alignment_task->link_resources(quicksched);
-            tasks[task_offset + total_number_of_interactions +
-                  index * tasks_per_Tmatrix + 2 * number_of_quadrature_tasks +
-                  _maximum_order] = alignment_task;
+            tasks[task_index] = alignment_task;
+            ++task_index;
 
             AbsorptionCoefficientTask *absorption_task =
                 new AbsorptionCoefficientTask(
-                    *grid, *interaction_variables[interaction_index],
-                    *tmatrices[2 * running_resource_index + 1],
+                    *grid, *this_interaction_variables, *this_ensemble_Tmatrix,
                     *nbased_resources, *special_wigner,
-                    *unaveraged_results[index]);
+                    *this_unaveraged_result);
             quicksched.register_task(*absorption_task);
             absorption_task->link_resources(quicksched);
             quicksched.link_tasks(*alignment_task, *absorption_task);
             quicksched.link_tasks(*special_wigner, *absorption_task);
-            tasks[task_offset + total_number_of_interactions +
-                  index * tasks_per_Tmatrix + 2 * number_of_quadrature_tasks +
-                  _maximum_order + 1] = absorption_task;
+            tasks[task_index] = absorption_task;
+            ++task_index;
 
             averaging_task->add_input_coefficient(quicksched, ishape,
-                                                  unaveraged_results[index]);
+                                                  this_unaveraged_result);
             quicksched.link_tasks(*absorption_task, *averaging_task);
+
+            ResetTMatrixResourceTask *reset_task1 =
+                new ResetTMatrixResourceTask(*this_single_Tmatrix);
+            quicksched.register_task(*reset_task1);
+            reset_task1->link_resources(quicksched);
+            tasks[task_index] = reset_task1;
+            ++task_index;
+            quicksched.link_tasks(*alignment_task, *reset_task1);
+
+            ResetTMatrixResourceTask *reset_task2 =
+                new ResetTMatrixResourceTask(*this_ensemble_Tmatrix);
+            quicksched.register_task(*reset_task2);
+            reset_task2->link_resources(quicksched);
+            tasks[task_index] = reset_task2;
+            ++task_index;
+            // this one is not stricly necessary but makes it easier to keep
+            // track of unlock tasks
+            quicksched.link_tasks(*reset_task1, *reset_task2);
+            quicksched.link_tasks(*absorption_task, *reset_task2);
+
+            ResetInteractionResourceTask *reset_task3 =
+                new ResetInteractionResourceTask(*this_interaction_resource);
+            quicksched.register_task(*reset_task3);
+            reset_task3->link_resources(quicksched);
+            tasks[task_index] = reset_task3;
+            ++task_index;
+            // this one is not stricly necessary but makes it easier to keep
+            // track of unlock tasks
+            quicksched.link_tasks(*reset_task2, *reset_task3);
 
             // loop over all m values to set up m=/=0 tasks
             for (uint_fast32_t i = 0; i < _maximum_order; ++i) {
               TMatrixMAllTask *this_malltask = new TMatrixMAllTask(
-                  i + 1, *nbased_resources, *converged_size_resources[index],
-                  *interaction_variables[interaction_index], *space_manager,
-                  *tmatrices[running_resource_index],
-                  tmatrices[running_resource_index]->get_m_resource(i + 1));
+                  i + 1, *nbased_resources, *this_converged_size,
+                  *this_interaction_variables, *this_interaction_resource,
+                  *space_manager, *this_single_Tmatrix,
+                  this_single_Tmatrix->get_m_resource(i + 1));
               quicksched.register_task(*this_malltask);
               this_malltask->link_resources(quicksched);
               // link to the last m=0 task
               quicksched.link_tasks(*previous_m0task, *this_malltask);
               quicksched.link_tasks(*this_malltask, *alignment_task);
-              tasks[task_offset + total_number_of_interactions +
-                    index * tasks_per_Tmatrix + 2 * number_of_quadrature_tasks +
-                    i] = this_malltask;
+              tasks[task_index] = this_malltask;
+              ++task_index;
             }
 
-            unlock_tasks[running_resource_index] = absorption_task;
+            unlock_tasks[running_resource_index] = reset_task3;
             ++running_resource_index;
             running_resource_index %= number_of_tmatrices;
           }

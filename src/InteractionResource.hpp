@@ -112,6 +112,9 @@ class InteractionResource : public Resource {
   /*! @brief Grant access to computation tasks. */
   friend class InteractionTask;
 
+  /*! @brief Grant access to the reset task. */
+  friend class ResetInteractionResourceTask;
+
 private:
   /*! @brief Precomputed factors @f$kr@f$ (array of size @f$2n_{GL}@f$). */
   std::vector<float_type> _kr;
@@ -466,6 +469,60 @@ public:
                                  "_nmax: %" PRIuFAST32, _nmax);
       ctm_assert_message_no_nans(_interaction._djkrmr.get_row(ig), _nmax,
                                  "_nmax: %" PRIuFAST32, _nmax);
+    }
+  }
+};
+
+/**
+ * @brief Task used to reset an InteractionResource.
+ */
+class ResetInteractionResourceTask : public Task {
+private:
+  /*! @brief InteractionResource to reset. */
+  InteractionResource &_interaction;
+
+public:
+  /**
+   * @brief Constructor.
+   *
+   * @param interaction InteractionResource to reset.
+   */
+  inline ResetInteractionResourceTask(InteractionResource &interaction)
+      : _interaction(interaction) {}
+
+  virtual ~ResetInteractionResourceTask() {}
+
+  /**
+   * @brief Link the resources for this task.
+   *
+   * @param quicksched QuickSched library.
+   */
+  inline void link_resources(QuickSched &quicksched) {
+    // write access
+    quicksched.link_task_and_resource(*this, _interaction, true);
+  }
+
+  /**
+   * @brief Reset the resource.
+   *
+   * @param thread_id ID of the thread that executes the task.
+   */
+  virtual void execute(const int_fast32_t thread_id = 0) {
+
+    for (uint_fast32_t ig = 0; ig < _interaction._kr.size(); ++ig) {
+      _interaction._kr[ig] = 0.;
+      _interaction._krmr[ig] = std::complex<float_type>(0.);
+      _interaction._krinv[ig] = 0.;
+      _interaction._krmrinv[ig] = std::complex<float_type>(0.);
+      for (uint_fast32_t in = 0; in < _interaction._jkr.get_number_of_columns();
+           ++in) {
+        _interaction._jkr(ig, in) = 0.;
+        _interaction._ykr(ig, in) = 0.;
+        _interaction._djkr(ig, in) = 0.;
+        _interaction._dykr(ig, in) = 0.;
+        _interaction._jkrmr(ig, in) = std::complex<float_type>(0.);
+        _interaction._djkrmr(ig, in) = std::complex<float_type>(0.);
+      }
     }
   }
 };
