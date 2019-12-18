@@ -75,11 +75,16 @@ public:
    * @param npoints Number of points to use.
    */
   inline void evaluate(const uint_fast32_t npoints) {
+
     _shapes.resize(npoints);
     _weights.resize(npoints);
     SpecialFunctions::get_gauss_legendre_points_and_weights_ab<float_type>(
         npoints, get_minimum_axis_ratio(), get_maximum_axis_ratio(), _shapes,
         _weights);
+
+    for (uint_fast32_t i = 0; i < npoints; ++i) {
+      _weights[i] *= operator()(_shapes[i]);
+    }
   }
 
   /**

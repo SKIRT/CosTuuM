@@ -78,16 +78,40 @@ public:
 
     const uint_fast32_t ntheta = _output_coefficients._Qabs.size();
     const uint_fast32_t nshape = _shape_distribution.get_number_of_points();
+
+    // make sure the average values are set to 0
+    for (uint_fast32_t itheta = 0; itheta < ntheta; ++itheta) {
+      _output_coefficients._Qabs[itheta] = 0.;
+      _output_coefficients._Qabspol[itheta] = 0.;
+    }
+
+    // compute the nominator and denominator in the expression for the
+    // average
+    float_type norm = 0.;
     for (uint_fast32_t ishape = 0; ishape < nshape; ++ishape) {
+
+      // some sanity checks
       ctm_assert(_input_coefficients[ishape] != nullptr);
       ctm_assert(_input_coefficients[ishape]->_Qabs.size() == ntheta);
+
+      // get the value of the shape distribution at this evaluation point
       const float_type weight = _shape_distribution.get_weight(ishape);
+      // add it to the norm (denominator in expression)
+      norm += weight;
+      // add the contributions to the absorption coefficients from this shape
       for (uint_fast32_t itheta = 0; itheta < ntheta; ++itheta) {
         _output_coefficients._Qabs[itheta] +=
             weight * _input_coefficients[ishape]->_Qabs[itheta];
         _output_coefficients._Qabspol[itheta] +=
             weight * _input_coefficients[ishape]->_Qabspol[itheta];
       }
+    }
+
+    // normalise the average quantities
+    const float_type norm_inv = 1. / norm;
+    for (uint_fast32_t itheta = 0; itheta < ntheta; ++itheta) {
+      _output_coefficients._Qabs[itheta] *= norm_inv;
+      _output_coefficients._Qabspol[itheta] *= norm_inv;
     }
   }
 };
