@@ -107,16 +107,28 @@ inline void float_to_file(std::ofstream &ofile, const T &value) {
  */
 int main(int argc, char **argv) {
 
-  TaskManager task_manager(10, 100, 2, 1.e-4, 1e10, 1, 0);
+  TaskManager task_manager(10, 100, 2, 1.e-4, 1e10, 2, 0);
 
-  std::vector<float_type> sizes(2);
-  sizes[0] = 1.e-7;
-  sizes[1] = 1.e-5;
+  const float_type log_min_size = -9.;
+  const float_type log_max_size = -5.;
+  const uint_fast32_t num_sizes = 11;
+  std::vector<float_type> sizes(num_sizes);
+  for (uint_fast32_t isize = 0; isize < num_sizes; ++isize) {
+    sizes[isize] =
+        pow(10., log_min_size +
+                     isize * (log_max_size - log_min_size) / (num_sizes - 1.));
+  }
 
-  std::vector<float_type> wavelengths(3);
-  wavelengths[0] = 1.e-4;
-  wavelengths[1] = 1.e-3;
-  wavelengths[2] = 1.e-2;
+  const float_type log_min_wavelength = -5.;
+  const float_type log_max_wavelength = -3.;
+  const uint_fast32_t num_wavelengths = 11;
+  std::vector<float_type> wavelengths(num_wavelengths);
+  for (uint_fast32_t ilambda = 0; ilambda < num_wavelengths; ++ilambda) {
+    wavelengths[ilambda] =
+        pow(10., log_min_wavelength +
+                     ilambda * (log_max_wavelength - log_min_wavelength) /
+                         (num_wavelengths - 1.));
+  }
 
   task_manager.add_composition(DUSTGRAINTYPE_SILICON);
   for (uint_fast32_t i = 0; i < sizes.size(); ++i) {

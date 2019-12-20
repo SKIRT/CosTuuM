@@ -12,6 +12,7 @@
 #include "Error.hpp"
 #include "quicksched.h"
 
+#include <atomic>
 #include <cinttypes>
 #include <fstream>
 #include <map>
@@ -89,13 +90,26 @@ private:
   /*! @brief Pointer to the actual task. */
   Task *_task;
 
+  /*! @brief Reference to the finished task counter. */
+  std::atomic<uint_fast32_t> &_num_tasks_done;
+
+  /*! @brief Reference to the total number of tasks. */
+  const uint_fast32_t &_total_number_of_tasks;
+
 public:
   /**
    * @brief Constructor.
    *
    * @param task Pointer to the task that is wrapped.
+   * @param num_tasks_done Reference to the atomic task counter used for
+   * progress updates.
+   * @param total_number_of_tasks Reference to the total number of tasks
+   * counter used for progress updates.
    */
-  inline WrappedTask(Task *task) : _task(task) {}
+  inline WrappedTask(Task *task, std::atomic<uint_fast32_t> &num_tasks_done,
+                     const uint_fast32_t &total_number_of_tasks)
+      : _task(task), _num_tasks_done(num_tasks_done),
+        _total_number_of_tasks(total_number_of_tasks) {}
 
   /**
    * @brief Execute the wrapped task.
@@ -104,6 +118,12 @@ public:
    */
   inline void execute(const int_fast32_t thread_id) {
     _task->execute(thread_id);
+    ++_num_tasks_done;
+    const uint_fast32_t num_done_now = _num_tasks_done.load();
+    if (num_done_now % 1000 == 0) {
+      ctm_warning("Processed %" PRIuFAST32 "/%" PRIuFAST32 " tasks.",
+                  num_done_now, _total_number_of_tasks);
+    }
   }
 };
 
@@ -197,6 +217,12 @@ private:
   /*! @brief Log file (if present). */
   std::ofstream _output_file;
 
+  /*! @brief Atomic counter to keep track of tasks that have finished. */
+  std::atomic<uint_fast32_t> _num_tasks_done;
+
+  /*! @brief Total number of tasks that need to be executed. */
+  uint_fast32_t _total_number_of_tasks;
+
 public:
   /**
    * @brief Runner function passed on to the QuickSched library.
@@ -224,7 +250,7 @@ public:
                     const bool write_log = false,
                     const std::string log_name = "")
       : _number_of_threads(number_of_threads), _task_type(0),
-        _write_log(write_log) {
+        _write_log(write_log), _num_tasks_done(0), _total_number_of_tasks(0) {
     bzero(&_s, sizeof(struct qsched));
     qsched_init(&_s, number_of_threads, qsched_flag_none);
 
@@ -297,7 +323,8 @@ public:
    */
   inline void register_task(Task &task) {
 
-    WrappedTask wrapper(&task);
+    ++_total_number_of_tasks;
+    WrappedTask wrapper(&task, _num_tasks_done, _total_number_of_tasks);
     int_fast32_t task_type;
     const std::string task_type_name = typeid(task).name();
     auto it = _type_dict.find(task_type_name);

@@ -113,9 +113,9 @@ public:
 
     if (shape_distribution_type == 0) {
       _shape_distribution = new ShapeDistribution();
-      _shape_distribution->evaluate(100u);
+      _shape_distribution->evaluate(20u);
     } else if (shape_distribution_type == 1) {
-      _shape_distribution = new DraineHensleyShapeDistribution(100u);
+      _shape_distribution = new DraineHensleyShapeDistribution(20u);
     } else if (shape_distribution_type == 2) {
       _shape_distribution = new SingleShapeShapeDistribution(1.00001);
     }

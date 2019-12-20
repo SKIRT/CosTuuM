@@ -4,7 +4,7 @@
 import argparse
 
 argparser = argparse.ArgumentParser(
-    "Create a Grapviz graph representation of a task-based calculation."
+    "Create a Graphviz graph representation of a task-based calculation."
 )
 argparser.add_argument(
     "--file",
@@ -60,6 +60,9 @@ for link in tasklinks:
         line = tasks[link[0]] + "->" + tasks[link[1]] + ";"
         if not line in lines:
             lines.append(line)
+    else:
+        print("Wrong task link!")
+        exit()
 for link in readlinks:
     if link[0] in tasks and link[1] in resources:
         res = "res" + resources[link[1]]
@@ -68,6 +71,9 @@ for link in readlinks:
         line = tasks[link[0]] + "->" + res + '[color="blue"];'
         if not line in lines:
             lines.append(line)
+    else:
+        print("Wrong resource link!")
+        exit()
 for link in writelinks:
     if link[0] in tasks and link[1] in resources:
         res = "res" + resources[link[1]]
@@ -76,6 +82,9 @@ for link in writelinks:
         line = tasks[link[0]] + "->" + res + '[color="red"];'
         if not line in lines:
             lines.append(line)
+    else:
+        print("Wrong resource link!")
+        exit()
 for child in children:
     if child[0] in resources and child[1] in resources:
         res1 = "res" + resources[child[0]]
@@ -83,6 +92,9 @@ for child in children:
         line = res1 + "->" + res2 + '[color="green"];'
         if not line in lines:
             lines.append(line)
+    else:
+        print("Wrong resource link!")
+        exit()
 
 ofile = open(args.output, "w")
 ofile.write("digraph task_flow{\n")

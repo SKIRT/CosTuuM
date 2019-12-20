@@ -850,6 +850,9 @@ public:
    */
   virtual void execute(const int_fast32_t thread_id) {
 
+    // make sure the T-matrix was actually converged
+    ctm_assert(_converged_size.is_converged());
+
     // since we don't know how many elements the T matrix will have before
     // we create the tasks, we might have tasks for elements of the T matrix
     // that we don't need. We make sure they don't waste computing time.
