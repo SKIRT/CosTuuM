@@ -196,12 +196,16 @@ public:
    * additional space for the T-matrix calculation. Needs to be deleted by
    * caller after the computation finishes.
    */
-  inline void
-  generate_tasks(const std::vector<float_type> &theta,
-                 const uint_fast32_t ngauss, QuickSched &quicksched,
-                 std::vector<Task *> &tasks, std::vector<Resource *> &resources,
-                 std::vector<Result *> &results,
-                 TMatrixAuxiliarySpaceManager *&space_manager) const {
+  inline void generate_tasks(const std::vector<float_type> &theta,
+                             const uint_fast32_t ngauss, QuickSched &quicksched,
+                             std::vector<Task *> &tasks,
+                             std::vector<Resource *> &resources,
+                             std::vector<Result *> &results,
+                             TMatrixAuxiliarySpaceManager *&space_manager) {
+
+    // sort the input arrays
+    std::sort(_sizes.begin(), _sizes.end());
+    std::sort(_wavelengths.begin(), _wavelengths.end());
 
     // get the dimensions of the computational grid
     const uint_fast32_t number_of_compositions = _compositions.size();
