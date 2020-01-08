@@ -7,6 +7,7 @@
  */
 
 #include "Assert.hpp"
+#include "SizeBasedAlignmentDistribution.hpp"
 #include "TaskManager.hpp"
 
 #include <fstream>
@@ -107,7 +108,19 @@ inline void float_to_file(std::ofstream &ofile, const T &value) {
  */
 int main(int argc, char **argv) {
 
-  TaskManager task_manager(10, 100, 2, 1.e-4, 1e10, 2, 0);
+  uint_fast32_t shape_distribution_type = 2;
+  ShapeDistribution *shape_distribution;
+  if (shape_distribution_type == 0) {
+    shape_distribution = new ShapeDistribution();
+    shape_distribution->evaluate(20u);
+  } else if (shape_distribution_type == 1) {
+    shape_distribution = new DraineHensleyShapeDistribution(20u);
+  } else if (shape_distribution_type == 2) {
+    shape_distribution = new SingleShapeShapeDistribution(1.00001);
+  }
+  SizeBasedAlignmentDistribution alignment_distribution(1.e-5, 0, 100);
+  TaskManager task_manager(10, 100, 2, 1.e-4, 1e10, *shape_distribution,
+                           alignment_distribution);
 
   const float_type log_min_size = -9.;
   const float_type log_max_size = -5.;
@@ -148,10 +161,11 @@ int main(int argc, char **argv) {
 
   std::vector<Task *> tasks;
   std::vector<Resource *> resources;
+  ResultKey *result_key = nullptr;
   std::vector<Result *> results;
   TMatrixAuxiliarySpaceManager *space_manager = nullptr;
-  task_manager.generate_tasks(thetas, 20, quicksched, tasks, resources, results,
-                              space_manager);
+  task_manager.generate_tasks(thetas, 20, quicksched, tasks, resources,
+                              result_key, results, space_manager);
 
   quicksched.execute_tasks();
 
@@ -228,15 +242,28 @@ int main(int argc, char **argv) {
     string_to_file(ofile, "log");
     string_to_file(ofile, "lin");
     for (uint_fast32_t itheta = 0; itheta < thetas.size(); ++itheta) {
-      for (uint_fast32_t ilambda = 0; ilambda < wavelengths.size(); ++ilambda) {
-        for (uint_fast32_t isize = 0; isize < sizes.size(); ++isize) {
+
+      for (uint_fast32_t ilambda = 0; ilambda < result_key->wavelength_size();
+           ++ilambda) {
+
+        for (uint_fast32_t isize = 0; isize < result_key->size_size();
+             ++isize) {
+
           const uint_fast32_t result_index =
-              isize * wavelengths.size() + ilambda;
+              result_key->get_result_index(0, isize, ilambda);
           const AbsorptionCoefficientResult &result =
               *static_cast<AbsorptionCoefficientResult *>(
                   results[result_index]);
-          assert_condition(sizes[isize] == result.get_size());
-          assert_condition(wavelengths[ilambda] == result.get_wavelength());
+
+          ctm_warning("size: %g vs %g", double(result_key->get_size(isize)),
+                      double(result.get_size()));
+          ctm_warning("lambda: %g vs %g",
+                      double(result_key->get_wavelength(isize)),
+                      double(result.get_wavelength()));
+          assert_condition(result_key->get_size(isize) == result.get_size());
+          assert_condition(result_key->get_wavelength(ilambda) ==
+                           result.get_wavelength());
+
           float_to_file(ofile, result.get_Qabs(itheta));
           float_to_file(ofile, result.get_Qabspol(itheta));
         }
@@ -249,8 +276,11 @@ int main(int argc, char **argv) {
 
   clear_vector(tasks);
   clear_vector(resources);
+  delete result_key;
   clear_vector(results);
   delete space_manager;
+
+  delete shape_distribution;
 
   return 0;
 }

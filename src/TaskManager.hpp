@@ -11,6 +11,7 @@
 
 #include "AbsorptionCoefficientTask.hpp"
 #include "AlignmentAverageTask.hpp"
+#include "AlignmentDistribution.hpp"
 #include "Configuration.hpp"
 #include "DavisGreensteinOrientationDistribution.hpp"
 #include "DraineDustProperties.hpp"
@@ -18,9 +19,9 @@
 #include "GaussBasedResources.hpp"
 #include "MishchenkoOrientationDistribution.hpp"
 #include "NBasedResources.hpp"
-#include "OrientationDistributionResource.hpp"
 #include "ParticleGeometryResource.hpp"
 #include "QuickSchedWrapper.hpp"
+#include "ResultKey.hpp"
 #include "ShapeAveragingTask.hpp"
 #include "ShapeDistribution.hpp"
 #include "SingleShapeShapeDistribution.hpp"
@@ -59,16 +60,10 @@ private:
   const size_t _maximum_memory_usage;
 
   /*! @brief Shape distribution for the particle shapes. */
-  ShapeDistribution *_shape_distribution;
+  const ShapeDistribution &_shape_distribution;
 
-  /*! @brief Orientation distribution for non-aligned particles. */
-  OrientationDistribution *_non_aligned_orientation_distribution;
-
-  /*! @brief Orientation distribution for oblate aligned particles. */
-  OrientationDistribution *_oblate_aligned_orientation_distribution;
-
-  /*! @brief Orientation distribution for prolate aligned particles. */
-  OrientationDistribution *_prolate_aligned_orientation_distribution;
+  /*! @brief Alignment distribution for the dust grains. */
+  const AlignmentDistribution &_alignment_distribution;
 
   /*! @brief Requested particle compositions. */
   std::vector<int_fast32_t> _compositions;
@@ -94,60 +89,23 @@ public:
    * (in bytes). This value is only taken into account when allocating task-
    * based structures and might be exceeded a bit during some steps of the
    * algorithm.
-   * @param shape_distribution_type Type of shape distribution. Needs to be
-   * documented properly.
-   * @param aligned_orientation_distribution_type Type of orientation
-   * distribution for aligned particles. Needs to be documented properly.
+   * @param shape_distribution Shape distribution that specifies how the shapes
+   * of dust grains are distributed.
+   * @param alignment_distribution Alignment distribution that specifies how
+   * dust grains align with the magnetic field.
    */
   inline TaskManager(const uint_fast32_t minimum_order,
                      const uint_fast32_t maximum_order,
                      const uint_fast32_t gauss_legendre_factor,
                      const float_type tolerance,
                      const size_t maximum_memory_usage,
-                     const int_fast32_t shape_distribution_type,
-                     const int_fast32_t aligned_orientation_distribution_type)
+                     const ShapeDistribution &shape_distribution,
+                     const AlignmentDistribution &alignment_distribution)
       : _minimum_order(minimum_order), _maximum_order(maximum_order),
         _gauss_legendre_factor(gauss_legendre_factor), _tolerance(tolerance),
         _maximum_memory_usage(maximum_memory_usage),
-        _shape_distribution(nullptr) {
-
-    if (shape_distribution_type == 0) {
-      _shape_distribution = new ShapeDistribution();
-      _shape_distribution->evaluate(20u);
-    } else if (shape_distribution_type == 1) {
-      _shape_distribution = new DraineHensleyShapeDistribution(20u);
-    } else if (shape_distribution_type == 2) {
-      _shape_distribution = new SingleShapeShapeDistribution(1.00001);
-    }
-
-    _non_aligned_orientation_distribution =
-        new OrientationDistribution(2 * _maximum_order);
-    _non_aligned_orientation_distribution->initialise();
-    if (aligned_orientation_distribution_type == 0) {
-      _oblate_aligned_orientation_distribution =
-          new DavisGreensteinOrientationDistribution(2 * _maximum_order, 2.);
-      _prolate_aligned_orientation_distribution =
-          new DavisGreensteinOrientationDistribution(2 * _maximum_order, 0.5);
-    } else if (aligned_orientation_distribution_type == 1) {
-      // note that we hardcode the cos2beta values for now:
-      //  - oblate: 3/5
-      //  - prolate: 1/5
-      _oblate_aligned_orientation_distribution =
-          new MishchenkoOrientationDistribution(2 * _maximum_order, 0.6);
-      _prolate_aligned_orientation_distribution =
-          new MishchenkoOrientationDistribution(2 * _maximum_order, 0.2);
-    }
-  }
-
-  /**
-   * @brief Destructor.
-   */
-  inline ~TaskManager() {
-    delete _shape_distribution;
-    delete _non_aligned_orientation_distribution;
-    delete _oblate_aligned_orientation_distribution;
-    delete _prolate_aligned_orientation_distribution;
-  }
+        _shape_distribution(shape_distribution),
+        _alignment_distribution(alignment_distribution) {}
 
   /**
    * @brief Add the given particle composition to the list of compositions that
@@ -189,6 +147,10 @@ public:
    * computation finishes. This list also contains resources that act as a task.
    * @param resources List of resources. Resources need to be deleted by caller
    * after the computation finishes.
+   * @param result_key Object that helps obtain the index for a certain
+   * parameter result from the results array when looping over the input
+   * parameters in an ordered fashion. Needs to be deleted by caller after the
+   * results have been retrieved.
    * @param results Results of the computation. Note that these are also
    * resources. Results need to be deleted by caller after the computation
    * finishes (and after the results have been retrieved).
@@ -200,6 +162,7 @@ public:
                              const uint_fast32_t ngauss, QuickSched &quicksched,
                              std::vector<Task *> &tasks,
                              std::vector<Resource *> &resources,
+                             ResultKey *&result_key,
                              std::vector<Result *> &results,
                              TMatrixAuxiliarySpaceManager *&space_manager) {
 
@@ -207,12 +170,14 @@ public:
     std::sort(_sizes.begin(), _sizes.end());
     std::sort(_wavelengths.begin(), _wavelengths.end());
 
+    result_key = new ResultKey(_compositions, _sizes, _wavelengths);
+
     // get the dimensions of the computational grid
     const uint_fast32_t number_of_compositions = _compositions.size();
     const uint_fast32_t number_of_sizes = _sizes.size();
     const uint_fast32_t number_of_wavelengths = _wavelengths.size();
     const uint_fast32_t number_of_shapes =
-        _shape_distribution->get_number_of_points();
+        _shape_distribution.get_number_of_points();
     // number of angles to use to compute absorption coefficient grid
     const uint_fast32_t number_of_angles = theta.size();
 
@@ -246,24 +211,6 @@ public:
     quicksched.register_resource(*nbased_resources);
     quicksched.register_task(*nbased_resources);
     nbased_resources->link_resources(quicksched);
-
-    //  - orientation distribution resources
-    OrientationDistributionResource *random_orientation =
-        new OrientationDistributionResource(
-            _non_aligned_orientation_distribution);
-    OrientationDistributionResource *oblate_orientation =
-        new OrientationDistributionResource(
-            _oblate_aligned_orientation_distribution);
-    OrientationDistributionResource *prolate_orientation =
-        new OrientationDistributionResource(
-            _prolate_aligned_orientation_distribution);
-    quicksched.register_resource(*random_orientation);
-    quicksched.register_resource(*oblate_orientation);
-    quicksched.register_resource(*prolate_orientation);
-    resources.resize(3, nullptr);
-    resources[0] = random_orientation;
-    resources[1] = oblate_orientation;
-    resources[2] = prolate_orientation;
 
     //  - quadrature points
     const uint_fast32_t minimum_ngauss =
@@ -350,7 +297,7 @@ public:
         memory_used += ParticleGeometryResource::get_memory_size(this_ngauss);
         ctm_assert(memory_used <= _maximum_memory_usage);
         ParticleGeometryResource *this_geometry =
-            new ParticleGeometryResource(_shape_distribution->get_shape(is),
+            new ParticleGeometryResource(_shape_distribution.get_shape(is),
                                          this_ngauss, *quadrature_points[ig]);
         quicksched.register_resource(*this_geometry);
         quicksched.register_task(*this_geometry);
@@ -507,7 +454,7 @@ public:
           ++result_index;
 
           ShapeAveragingTask *averaging_task =
-              new ShapeAveragingTask(*_shape_distribution, *this_result);
+              new ShapeAveragingTask(_shape_distribution, *this_result);
           quicksched.register_task(*averaging_task);
           averaging_task->link_resources(quicksched);
           tasks[task_index] = averaging_task;
@@ -526,16 +473,9 @@ public:
             resources[resource_index] = this_unaveraged_result;
             ++resource_index;
 
-            OrientationDistributionResource *this_orientation;
-            if (particle_size > 1.e-5) {
-              if (_shape_distribution->get_shape(ishape) > 1.) {
-                this_orientation = oblate_orientation;
-              } else {
-                this_orientation = prolate_orientation;
-              }
-            } else {
-              this_orientation = random_orientation;
-            }
+            const OrientationDistribution &this_orientation =
+                _alignment_distribution.get_distribution(
+                    particle_size, _shape_distribution.get_shape(ishape));
 
             // allocate the corresponding interaction variables and control
             // object
@@ -608,8 +548,7 @@ public:
             }
 
             AlignmentAverageTask *alignment_task = new AlignmentAverageTask(
-                *this_orientation, *this_single_Tmatrix,
-                *this_ensemble_Tmatrix);
+                this_orientation, *this_single_Tmatrix, *this_ensemble_Tmatrix);
             quicksched.register_task(*alignment_task);
             alignment_task->link_resources(quicksched);
             tasks[task_index] = alignment_task;
