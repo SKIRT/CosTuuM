@@ -28,6 +28,9 @@ private:
   /*! @brief Wavelength parameter axis. */
   const std::vector<float_type> _wavelengths;
 
+  /*! @brief Number of results per parameter set. */
+  const uint_fast32_t _number_of_results;
+
 public:
   /**
    * @brief Constructor.
@@ -35,11 +38,14 @@ public:
    * @param compositions Composition parameter axis.
    * @param sizes Dust grain size parameter axis.
    * @param wavelengths Wavelength parameter axis.
+   * @param number_of_results Number of results per parameter set.
    */
   inline ResultKey(const std::vector<int_fast32_t> &compositions,
                    const std::vector<float_type> &sizes,
-                   const std::vector<float_type> &wavelengths)
-      : _compositions(compositions), _sizes(sizes), _wavelengths(wavelengths) {}
+                   const std::vector<float_type> &wavelengths,
+                   const uint_fast32_t number_of_results = 1)
+      : _compositions(compositions), _sizes(sizes), _wavelengths(wavelengths),
+        _number_of_results(number_of_results) {}
 
   /**
    * @brief Get the number of composition parameter values.
@@ -61,6 +67,13 @@ public:
    * @return Number of wavelength parameter values.
    */
   inline size_t wavelength_size() const { return _wavelengths.size(); }
+
+  /**
+   * @brief Get the number of results per parameter set.
+   *
+   * @return Number of results per parameter set.
+   */
+  inline uint_fast32_t results_size() const { return _number_of_results; }
 
   /**
    * @brief Get the composition value corresponding to the given index.
@@ -105,18 +118,24 @@ public:
    * @param composition_index Composition index.
    * @param size_index Dust grain size index.
    * @param wavelength_index Wavelength index.
+   * @param result_index Index of a result in the list of all results for this
+   * parameter set.
    * @return Corresponding index in the result array.
    */
   inline size_t get_result_index(const size_t composition_index,
                                  const size_t size_index,
-                                 const size_t wavelength_index) const {
+                                 const size_t wavelength_index,
+                                 const uint_fast32_t result_index = 0) const {
 
     ctm_assert(composition_index < _compositions.size());
     ctm_assert(size_index < _sizes.size());
     ctm_assert(wavelength_index < _wavelengths.size());
+    ctm_assert(result_index < _number_of_results);
 
-    return composition_index * _sizes.size() * _wavelengths.size() +
-           size_index * _wavelengths.size() + wavelength_index;
+    return composition_index * _sizes.size() * _wavelengths.size() *
+               _number_of_results +
+           size_index * _wavelengths.size() * _number_of_results +
+           wavelength_index * _number_of_results + result_index;
   }
 };
 
