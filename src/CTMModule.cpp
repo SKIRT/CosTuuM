@@ -784,8 +784,63 @@ static PyObject *get_equal_volume_radius(PyObject *self, PyObject *args,
 }
 
 /**
- * @brief Test to see if the task-based algorithm can be coupled to the Python
- * module.
+ * @brief Unpack the given 0D or 1D NumPy array into a std::vector with the
+ * same number of elements.
+ *
+ * @param numpy_array Input NumPy array.
+ * @return Output std::vector.
+ * @tparam DATA_TYPE Data type of the elements in the result vector.
+ * @tparam INPUT_TYPE Data type to use when reading values from the NumPy array.
+ */
+template <typename DATA_TYPE, typename INPUT_TYPE = DATA_TYPE>
+inline std::vector<DATA_TYPE> unpack_numpy_array(PyArrayObject *numpy_array) {
+
+  // determine the size of the array
+  npy_intp array_size;
+  const npy_intp array_ndim = PyArray_NDIM(numpy_array);
+  if (array_ndim > 1) {
+    ctm_warning("Wrong shape for input array!");
+    return std::vector<DATA_TYPE>();
+  }
+  if (array_ndim > 0) {
+    const npy_intp *array_dims = PyArray_DIMS(numpy_array);
+    array_size = array_dims[0];
+  } else {
+    array_size = 1;
+    npy_intp newdims[1] = {1};
+    PyArray_Dims newdimsobj;
+    newdimsobj.ptr = newdims;
+    newdimsobj.len = 1;
+    numpy_array = reinterpret_cast<PyArrayObject *>(
+        PyArray_Newshape(numpy_array, &newdimsobj, NPY_ANYORDER));
+  }
+
+  std::vector<DATA_TYPE> array(array_size);
+  for (npy_intp i = 0; i < array_size; ++i) {
+    array[i] =
+        *(reinterpret_cast<INPUT_TYPE *>(PyArray_GETPTR1(numpy_array, i)));
+  }
+
+  return array;
+}
+
+/**
+ * @brief Get a table of absorption coefficients for the given input dust grain
+ * sizes, dust grain types, wavelengths and angles, using the given shape and
+ * alignment distributions.
+ *
+ * Required arguments are:
+ *  - types: Array of dust grain types.
+ *  - sizes: Array of dust grain sizes (in m).
+ *  - wavelengths: Array of incoming/outgoing photon wavelengths (in m).
+ *  - thetas: Array of zenith angles (in radians).
+ *  - shape_distribution: Shape distribution object (needs proper
+ *  implementation).
+ *  - alignment_distribution: Alignment distribution object (needs proper
+ *  implementation).
+ *
+ * Additional optional arguments are:
+ *  - to be added
  *
  * @param self Module object.
  * @param args Positional arguments.
@@ -793,6 +848,29 @@ static PyObject *get_equal_volume_radius(PyObject *self, PyObject *args,
  * @return Nothing.
  */
 static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
+
+  // parse arguments //
+
+  // required arguments
+  PyArrayObject *input_types;
+  PyArrayObject *input_sizes;
+  PyArrayObject *input_wavelengths;
+  PyArrayObject *input_thetas;
+
+  // list of keywords
+  static char *kwlist[] = {strdup("sizes"), strdup("types"),
+                           strdup("wavelengths"), strdup("thetas"), nullptr};
+
+  // parse positional and keyword arguments
+  if (!PyArg_ParseTupleAndKeywords(
+          args, kwargs, "O&O&O&O&", kwlist, PyArray_Converter, &input_types,
+          PyArray_Converter, &input_sizes, PyArray_Converter,
+          &input_wavelengths, PyArray_Converter, &input_thetas)) {
+    // again, we do not call ctm_error to avoid killing the Python interpreter
+    ctm_warning("Wrong arguments provided!");
+    // this time, a nullptr return will signal an error to Python
+    return nullptr;
+  }
 
   uint_fast32_t shape_distribution_type = 2;
   ShapeDistribution *shape_distribution;
@@ -808,42 +886,32 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   TaskManager task_manager(10, 100, 2, 1.e-4, 1e10, *shape_distribution,
                            alignment_distribution);
 
-  const float_type log_min_size = -9.;
-  const float_type log_max_size = -5.;
-  const uint_fast32_t num_sizes = 11;
-  std::vector<float_type> sizes(num_sizes);
-  for (uint_fast32_t isize = 0; isize < num_sizes; ++isize) {
-    sizes[isize] =
-        pow(10., log_min_size +
-                     isize * (log_max_size - log_min_size) / (num_sizes - 1.));
+  std::vector<int_fast32_t> types =
+      unpack_numpy_array<int_fast32_t>(input_types);
+  for (uint_fast32_t i = 0; i < types.size(); ++i) {
+    task_manager.add_composition(types[i]);
   }
+  Py_DECREF(input_types);
 
-  const float_type log_min_wavelength = -5.;
-  const float_type log_max_wavelength = -3.;
-  const uint_fast32_t num_wavelengths = 11;
-  std::vector<float_type> wavelengths(num_wavelengths);
-  for (uint_fast32_t ilambda = 0; ilambda < num_wavelengths; ++ilambda) {
-    wavelengths[ilambda] =
-        pow(10., log_min_wavelength +
-                     ilambda * (log_max_wavelength - log_min_wavelength) /
-                         (num_wavelengths - 1.));
-  }
-
-  task_manager.add_composition(DUSTGRAINTYPE_SILICON);
+  std::vector<float_type> sizes =
+      unpack_numpy_array<float_type, double>(input_sizes);
   for (uint_fast32_t i = 0; i < sizes.size(); ++i) {
     task_manager.add_size(sizes[i]);
   }
+  Py_DECREF(input_sizes);
+
+  std::vector<float_type> wavelengths =
+      unpack_numpy_array<float_type, double>(input_wavelengths);
   for (uint_fast32_t i = 0; i < wavelengths.size(); ++i) {
     task_manager.add_wavelength(wavelengths[i]);
   }
+  Py_DECREF(input_wavelengths);
 
-  QuickSched quicksched(4, true, "test_TaskManager.log");
+  QuickSched quicksched(4, true, "CTMModule_taskgraph.log");
 
-  const uint_fast32_t ntheta = 10;
-  std::vector<float_type> thetas(ntheta);
-  for (uint_fast32_t i = 0; i < ntheta; ++i) {
-    thetas[i] = (i + 0.5) * M_PI / ntheta;
-  }
+  std::vector<float_type> thetas =
+      unpack_numpy_array<float_type, double>(input_thetas);
+  Py_DECREF(input_thetas);
 
   std::vector<Task *> tasks;
   std::vector<Resource *> resources;
@@ -857,7 +925,37 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   quicksched.execute_tasks();
   Py_END_ALLOW_THREADS;
 
-  return nullptr;
+  npy_intp result_dims[5] = {
+      static_cast<npy_intp>(result_key->composition_size()),
+      static_cast<npy_intp>(result_key->size_size()),
+      static_cast<npy_intp>(result_key->wavelength_size()),
+      static_cast<npy_intp>(thetas.size()), 2};
+  PyArrayObject *result_array = reinterpret_cast<PyArrayObject *>(
+      PyArray_SimpleNew(5, result_dims, NPY_DOUBLE));
+
+  for (npy_intp itype = 0; itype < result_dims[0]; ++itype) {
+    for (npy_intp isize = 0; isize < result_dims[1]; ++isize) {
+      for (npy_intp ilambda = 0; ilambda < result_dims[2]; ++ilambda) {
+        for (npy_intp itheta = 0; itheta < result_dims[3]; ++itheta) {
+          const npy_intp result_index =
+              result_key->get_result_index(0, isize, ilambda);
+          const AbsorptionCoefficientResult &result =
+              *static_cast<AbsorptionCoefficientResult *>(
+                  results[result_index]);
+          npy_intp Qabs_array_index[5] = {itype, isize, ilambda, itheta, 0};
+          npy_intp Qabspol_array_index[5] = {itype, isize, ilambda, itheta, 1};
+          *reinterpret_cast<double *>(
+              PyArray_GetPtr(result_array, Qabs_array_index)) =
+              static_cast<double>(result.get_Qabs(itheta));
+          *reinterpret_cast<double *>(
+              PyArray_GetPtr(result_array, Qabspol_array_index)) =
+              static_cast<double>(result.get_Qabspol(itheta));
+        } // theta
+      }   // lambda
+    }     // size
+  }       // type
+
+  return PyArray_Squeeze(result_array);
 }
 
 /*! @brief Methods exposed by the CTMmodule. */
