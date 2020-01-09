@@ -557,8 +557,8 @@ public:
             AbsorptionCoefficientTask *absorption_task =
                 new AbsorptionCoefficientTask(
                     *grid, *this_interaction_variables, *this_ensemble_Tmatrix,
-                    *nbased_resources, *special_wigner,
-                    *this_unaveraged_result);
+                    *nbased_resources, *special_wigner, *this_unaveraged_result,
+                    true);
             quicksched.register_task(*absorption_task);
             absorption_task->link_resources(quicksched);
             quicksched.link_tasks(*alignment_task, *absorption_task);

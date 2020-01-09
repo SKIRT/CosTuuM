@@ -714,7 +714,7 @@ public:
       }
     }
 
-    // set the order and number of quadrature poitns of the T-matrix
+    // set the order and number of quadrature points of the T-matrix
     _Tmatrix._nmax = _nmax;
     _Tmatrix._ngauss = _ngauss;
 
@@ -1021,12 +1021,16 @@ public:
         aux._RgJ22(n1 - 1, n2 - 1) = this_RgJ22 * an12;
       }
     }
+
+    const std::complex<float_type> k2mr =
+        _interaction_variables.get_material_wavenumber_times_wavenumber();
+    const double k2 = _interaction_variables.get_wavenumber_squared();
     for (uint_fast32_t n1 = _m; n1 < nmax + 1; ++n1) {
-      const uint_fast32_t k1 = n1 + 1 - _m;
-      const uint_fast32_t kk1 = k1 + nm;
+      const uint_fast32_t ki1 = n1 + 1 - _m;
+      const uint_fast32_t kki1 = ki1 + nm;
       for (uint_fast32_t n2 = _m; n2 < nmax + 1; ++n2) {
-        const uint_fast32_t k2 = n2 + 1 - _m;
-        const uint_fast32_t kk2 = k2 + nm;
+        const uint_fast32_t ki2 = n2 + 1 - _m;
+        const uint_fast32_t kki2 = ki2 + nm;
 
         const std::complex<float_type> icompl(0., 1.);
         // a factor -i is missing in J11 and J22
@@ -1046,41 +1050,17 @@ public:
         const std::complex<float_type> this_J22 = -aux._J22(n1 - 1, n2 - 1);
         const std::complex<float_type> this_RgJ22 = -aux._RgJ22(n1 - 1, n2 - 1);
 
-        aux._Q(k1 - 1, k2 - 1) =
-            _interaction_variables.get_material_wavenumber_times_wavenumber() *
-                this_J21 +
-            _interaction_variables.get_wavenumber_squared() * this_J12;
-        aux._RgQ(k1 - 1, k2 - 1) =
-            _interaction_variables.get_material_wavenumber_times_wavenumber() *
-                this_RgJ21 +
-            _interaction_variables.get_wavenumber_squared() * this_RgJ12;
+        aux._Q(ki1 - 1, ki2 - 1) = k2mr * this_J21 + k2 * this_J12;
+        aux._RgQ(ki1 - 1, ki2 - 1) = k2mr * this_RgJ21 + k2 * this_RgJ12;
 
-        aux._Q(k1 - 1, kk2 - 1) =
-            _interaction_variables.get_material_wavenumber_times_wavenumber() *
-                this_J11 +
-            _interaction_variables.get_wavenumber_squared() * this_J22;
-        aux._RgQ(k1 - 1, kk2 - 1) =
-            _interaction_variables.get_material_wavenumber_times_wavenumber() *
-                this_RgJ11 +
-            _interaction_variables.get_wavenumber_squared() * this_RgJ22;
+        aux._Q(ki1 - 1, kki2 - 1) = k2mr * this_J11 + k2 * this_J22;
+        aux._RgQ(ki1 - 1, kki2 - 1) = k2mr * this_RgJ11 + k2 * this_RgJ22;
 
-        aux._Q(kk1 - 1, k2 - 1) =
-            _interaction_variables.get_material_wavenumber_times_wavenumber() *
-                this_J22 +
-            _interaction_variables.get_wavenumber_squared() * this_J11;
-        aux._RgQ(kk1 - 1, k2 - 1) =
-            _interaction_variables.get_material_wavenumber_times_wavenumber() *
-                this_RgJ22 +
-            _interaction_variables.get_wavenumber_squared() * this_RgJ11;
+        aux._Q(kki1 - 1, ki2 - 1) = k2mr * this_J22 + k2 * this_J11;
+        aux._RgQ(kki1 - 1, ki2 - 1) = k2mr * this_RgJ22 + k2 * this_RgJ11;
 
-        aux._Q(kk1 - 1, kk2 - 1) =
-            _interaction_variables.get_material_wavenumber_times_wavenumber() *
-                this_J12 +
-            _interaction_variables.get_wavenumber_squared() * this_J21;
-        aux._RgQ(kk1 - 1, kk2 - 1) =
-            _interaction_variables.get_material_wavenumber_times_wavenumber() *
-                this_RgJ12 +
-            _interaction_variables.get_wavenumber_squared() * this_RgJ21;
+        aux._Q(kki1 - 1, kki2 - 1) = k2mr * this_J12 + k2 * this_J21;
+        aux._RgQ(kki1 - 1, kki2 - 1) = k2mr * this_RgJ12 + k2 * this_RgJ21;
       }
     }
 

@@ -840,7 +840,24 @@ inline std::vector<DATA_TYPE> unpack_numpy_array(PyArrayObject *numpy_array) {
  *  implementation).
  *
  * Additional optional arguments are:
- *  - to be added
+ *  - minimum_order: Minimum order of spherical basis function expansion to use.
+ *  - maximum_order: Maximum allowed order of spherical basis function
+ *  expansion.
+ *  - gauss_legendre_factor: Number of Gauss-Legendre quadrature points to use
+ *  as a multiplicative factor of the spherical basis function expansion order.
+ *  - tolerance: Maximum allowed relative difference between two successive
+ *  orders of T-matrix calculations that decides when the calculation is
+ *  converged.
+ *  - maximum_memory_size: Maximum allowed memory usage of the algorithm (in
+ *  bytes).
+ *  - number_of_threads: Number of shared-memory threads to use to run the
+ *  calculation.
+ *  - quicksched_graph_log: Name for the QuickSched graph log file to write (or
+ *  None for no graph log).
+ *  - quicksched_task_log: Name for the QuickSched task log file to write (or
+ *  None for no task log).
+ *  - quicksched_task_type_log: Name for the QuickSched task type log file to
+ *  write (or None for no task type log).
  *
  * @param self Module object.
  * @param args Positional arguments.
@@ -857,20 +874,50 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   PyArrayObject *input_wavelengths;
   PyArrayObject *input_thetas;
 
-  // list of keywords
-  static char *kwlist[] = {strdup("sizes"), strdup("types"),
-                           strdup("wavelengths"), strdup("thetas"), nullptr};
+  // optional arguments
+  uint_fast32_t input_nmin = 10;
+  uint_fast32_t input_nmax = 100;
+  uint_fast32_t input_glfac = 2;
+  float_type input_tolerance = 1.e-4;
+  size_t input_memory_size = 1e10;
+  int_fast32_t input_nthread = 4;
+  const char *input_graph_log_name = nullptr;
+  const char *input_task_log_name = nullptr;
+  const char *input_task_type_log_name = nullptr;
 
+  // list of keywords
+  static char *kwlist[] = {strdup("types"),
+                           strdup("sizes"),
+                           strdup("wavelengths"),
+                           strdup("thetas"),
+                           strdup("minimum_order"),
+                           strdup("maximum_order"),
+                           strdup("gauss_legendre_factor"),
+                           strdup("tolerance"),
+                           strdup("maximum_memory_size"),
+                           strdup("number_of_threads"),
+                           strdup("quicksched_graph_log"),
+                           strdup("quicksched_task_log"),
+                           strdup("quicksched_task_type_log"),
+                           nullptr};
+
+  // placeholders for float_type arguments
+  double input_tolerance_d = input_tolerance;
   // parse positional and keyword arguments
   if (!PyArg_ParseTupleAndKeywords(
-          args, kwargs, "O&O&O&O&", kwlist, PyArray_Converter, &input_types,
-          PyArray_Converter, &input_sizes, PyArray_Converter,
-          &input_wavelengths, PyArray_Converter, &input_thetas)) {
+          args, kwargs, "O&O&O&O&|IIIdIIsss", kwlist, PyArray_Converter,
+          &input_types, PyArray_Converter, &input_sizes, PyArray_Converter,
+          &input_wavelengths, PyArray_Converter, &input_thetas, &input_nmin,
+          &input_nmax, &input_glfac, &input_tolerance_d, &input_memory_size,
+          &input_nthread, &input_graph_log_name, &input_task_log_name,
+          &input_task_type_log_name)) {
     // again, we do not call ctm_error to avoid killing the Python interpreter
     ctm_warning("Wrong arguments provided!");
     // this time, a nullptr return will signal an error to Python
     return nullptr;
   }
+  // convert float_type arguments
+  input_tolerance = input_tolerance_d;
 
   uint_fast32_t shape_distribution_type = 2;
   ShapeDistribution *shape_distribution;
@@ -883,7 +930,8 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
     shape_distribution = new SingleShapeShapeDistribution(1.00001);
   }
   SizeBasedAlignmentDistribution alignment_distribution(1.e-5, 0, 100);
-  TaskManager task_manager(10, 100, 2, 1.e-4, 1e10, *shape_distribution,
+  TaskManager task_manager(input_nmin, input_nmax, input_glfac, input_tolerance,
+                           input_memory_size, *shape_distribution,
                            alignment_distribution);
 
   std::vector<int_fast32_t> types =
@@ -907,7 +955,8 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   }
   Py_DECREF(input_wavelengths);
 
-  QuickSched quicksched(4, true, "CTMModule_taskgraph.log");
+  QuickSched quicksched(input_nthread, input_graph_log_name != nullptr,
+                        input_graph_log_name);
 
   std::vector<float_type> thetas =
       unpack_numpy_array<float_type, double>(input_thetas);
@@ -924,6 +973,19 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   Py_BEGIN_ALLOW_THREADS;
   quicksched.execute_tasks();
   Py_END_ALLOW_THREADS;
+
+  if (input_task_log_name) {
+    std::ofstream taskfile(input_task_log_name);
+    taskfile << "# thread\tstart\tend\ttype\ttask id\n";
+    for (uint_fast32_t i = 0; i < tasks.size(); ++i) {
+      quicksched.print_task(*tasks[i], taskfile);
+    }
+  }
+  if (input_task_type_log_name) {
+    std::ofstream typefile(input_task_type_log_name);
+    typefile << "# type\tlabel\n";
+    quicksched.print_type_dict(typefile);
+  }
 
   npy_intp result_dims[5] = {
       static_cast<npy_intp>(result_key->composition_size()),
@@ -954,6 +1016,20 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
       }   // lambda
     }     // size
   }       // type
+
+  for (uint_fast32_t i = 0; i < tasks.size(); ++i) {
+    delete tasks[i];
+  }
+  for (uint_fast32_t i = 0; i < resources.size(); ++i) {
+    delete resources[i];
+  }
+  delete result_key;
+  for (uint_fast32_t i = 0; i < results.size(); ++i) {
+    delete results[i];
+  }
+  delete space_manager;
+
+  delete shape_distribution;
 
   return PyArray_Squeeze(result_array);
 }

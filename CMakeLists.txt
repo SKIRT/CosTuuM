@@ -255,8 +255,12 @@ add_custom_target(CompilerInfo
                   DEPENDS ${PROJECT_BINARY_DIR}/src/CompilerInfo.cpp)
 
 # Find Python
-find_package(PythonLibs 3.0)
+# Note the order as advised in the documentation:
+# If calling both find_package(PythonInterp) and find_package(PythonLibs), call
+# find_package(PythonInterp) first to get the currently active Python version by
+# default with a consistent version of PYTHON_LIBRARIES.
 find_package(PythonInterp 3.0)
+find_package(PythonLibs 3.0)
 if(PYTHONLIBS_FOUND AND PYTHONINTERP_FOUND)
   # Check if NumPy can be found
   execute_process(COMMAND ${PYTHON_EXECUTABLE} -c
