@@ -34,7 +34,11 @@ def main():
                 include_dirs=[
                     "@PROJECT_SOURCE_DIR@/src",
                     "@PROJECT_BINARY_DIR@/src",
+                    "@PROJECT_SOURCE_DIR@/quicksched",
                 ],
+                libraries=["@LIBQUICKSCHED_SHARED@"],
+                library_dirs=["@PROJECT_BINARY_DIR@/lib"],
+                runtime_library_dirs=["@PROJECT_BINARY_DIR@/lib"],
                 depends=header_dependencies,
             )
         ],

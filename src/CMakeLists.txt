@@ -58,6 +58,7 @@ if(HAVE_PYTHON)
                     COMMAND ${PYTHON_EXECUTABLE}
                               ${PROJECT_BINARY_DIR}/setup.py build
                               --build-lib ${PROJECT_BINARY_DIR}/bin)
+  add_dependencies(CTMmodule ${LIBQUICKSCHED_SHARED})
 
   # add an installation script, so that 'make install' installs the Python
   # module (it will then be available for the current user from anywhere in
