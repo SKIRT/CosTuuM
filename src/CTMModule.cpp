@@ -8,9 +8,9 @@
 
 #include "Configuration.hpp"
 #include "DavisGreensteinOrientationDistribution.hpp"
-#include "DraineHensleyShapeDistribution.hpp"
 #include "MishchenkoOrientationDistribution.hpp"
-#include "SingleShapeShapeDistribution.hpp"
+#include "PyAlignmentDistribution.hpp"
+#include "PyShapeDistribution.hpp"
 #include "SizeBasedAlignmentDistribution.hpp"
 #include "TMatrixCalculator.hpp"
 #include "TaskManager.hpp"
@@ -27,283 +27,6 @@ using namespace boost::multiprecision;
 #else
 using namespace std;
 #endif
-
-/// ShapeDistribution object
-
-/**
- * C struct wrapper around a ShapeDistribution object.
- */
-typedef struct {
-  /*! @brief Python object members. */
-  PyObject_HEAD;
-  /*! @brief Wrapped ShapeDistribution object. */
-  ShapeDistribution *_shape_distribution;
-} ShapeDistributionObject;
-
-/**
- * @brief Destructor for the ShapeDistribution wrapper object.
- *
- * @param self ShapeDistributionObject that is being deallocated.
- */
-static void ShapeDistributionObject_dealloc(ShapeDistributionObject *self) {
-  // first free the wrapped ShapeDistribution object
-  // note that it doesn't matter which object we wrap here
-  delete self->_shape_distribution;
-  // then free the Python object
-  Py_TYPE(self)->tp_free(reinterpret_cast<PyObject *>(self));
-}
-
-/**
- * @brief Constructor for the ShapeDistribution wrapper object.
- *
- * We use a single constructor for all ShapeDistribution implementations and
- * initialise the wrapped object to a nullptr. The wrapped object is created
- * later, in the initialisation function, depending on the specific
- * implementation that is chosen.
- *
- * @param type Type for the object.
- * @param args Positional arguments.
- * @param kwargs Keyword arguments.
- * @return Pointer to the newly created object.
- */
-static PyObject *ShapeDistributionObject_new(PyTypeObject *type, PyObject *args,
-                                             PyObject *kwargs) {
-  // allocate the Python object
-  ShapeDistributionObject *self =
-      reinterpret_cast<ShapeDistributionObject *>(type->tp_alloc(type, 0));
-  // set the wrapped object to a nullptr, the object will be initialised later,
-  // depending on the specific implementation that is chosen
-  self->_shape_distribution = nullptr;
-  return reinterpret_cast<PyObject *>(self);
-}
-
-/**
- * @brief init() function for a SingleShapeShapeDistribution object.
- *
- * Required arguments are:
- *  - axis_ratio: Axis ratio parameter for the single shape contained in this
- *    distribution.
- *
- * @param self ShapeDistribution wrapper object that is being initialised.
- * @param args Positional arguments.
- * @param kwargs Keyword arguments.
- * @return 0 on success, 1 on failure.
- */
-static int ShapeDistributionObject_init_SingleShapeShapeDistribution(
-    ShapeDistributionObject *self, PyObject *args, PyObject *kwargs) {
-
-  // required arguments
-  float_type axis_ratio;
-
-  /// parse arguments
-  // list of keywords (in the expected order)
-  // note that we need to use strdup because the Python API expects char*,
-  // while C++ strings are const char*
-  // not doing this results in compilation warnings
-  static char *kwlist[] = {strdup("axis_ratio"), nullptr};
-
-  // allocate temporary variables to store double precision arguments
-  double axis_ratio_d;
-  // parse the keywords/positional arguments
-  // d is a double
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "d", kwlist, &axis_ratio_d)) {
-    // PyArg_ParseTupleAndKeywords will return 0 if a required argument was
-    // missing, if an argument of the wrong type was provided or if the number
-    // of arguments does not match the expectation
-    // we use ctm_warning so that we can gracefully exit and let Python handle
-    // the exception
-    // ctm_error would call abort, which would kill the Python interpreter
-    ctm_warning("Wrong arguments provided!");
-    // exit code 1 signals to Python that something was wrong
-    return 1;
-  }
-  // unpack double precision arguments
-  axis_ratio = axis_ratio_d;
-
-  // create the object
-  self->_shape_distribution = new SingleShapeShapeDistribution(axis_ratio);
-
-  return 0;
-}
-
-/**
- * @brief init() function for a DraineHensleyShapeDistribution object.
- *
- * Optional arguments are:
- *  - numpoints: Number of points to use to sample the distribution (default:
- *    20).
- *
- * @param self ShapeDistribution wrapper object that is being initialised.
- * @param args Positional arguments.
- * @param kwargs Keyword arguments.
- * @return 0 on success, 1 on failure.
- */
-static int ShapeDistributionObject_init_DraineHensleyShapeDistribution(
-    ShapeDistributionObject *self, PyObject *args, PyObject *kwargs) {
-
-  // optional arguments
-  uint_fast32_t npoints = 20;
-
-  /// parse arguments
-  // list of keywords (in the expected order)
-  // note that we need to use strdup because the Python API expects char*,
-  // while C++ strings are const char*
-  // not doing this results in compilation warnings
-  static char *kwlist[] = {strdup("npoints"), nullptr};
-
-  // parse the keywords/positional arguments
-  // I is an integer
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|I", kwlist, &npoints)) {
-    // PyArg_ParseTupleAndKeywords will return 0 if a required argument was
-    // missing, if an argument of the wrong type was provided or if the number
-    // of arguments does not match the expectation
-    // we use ctm_warning so that we can gracefully exit and let Python handle
-    // the exception
-    // ctm_error would call abort, which would kill the Python interpreter
-    ctm_warning("Wrong arguments provided!");
-    // exit code 1 signals to Python that something was wrong
-    return 1;
-  }
-
-  // create the object
-  self->_shape_distribution = new DraineHensleyShapeDistribution(npoints);
-
-  return 0;
-}
-
-/*! @brief List of ShapeDistribution methods that are exposed to Python. */
-static PyMethodDef ShapeDistributionObject_methods[] = {{nullptr}};
-
-/*! @brief Type for SingleShapeShapeDistribution wrapper objects. */
-static PyTypeObject SingleShapeShapeDistributionObjectType = {
-    PyVarObject_HEAD_INIT(nullptr, 0)};
-
-/*! @brief Type for DraineHensleyShapeDistribution wrapper objects. */
-static PyTypeObject DraineHensleyShapeDistributionObjectType = {
-    PyVarObject_HEAD_INIT(nullptr, 0)};
-
-/// AlignmentDistribution object
-
-/**
- * C struct wrapper around an AlignmentDistribution object.
- */
-typedef struct {
-  /*! @brief Python object members. */
-  PyObject_HEAD;
-  /*! @brief Wrapped AlignmentDistribution object. */
-  AlignmentDistribution *_alignment_distribution;
-} AlignmentDistributionObject;
-
-/**
- * @brief Destructor for the AlignmentDistribution wrapper object.
- *
- * @param self AlignmentDistributionObject that is being deallocated.
- */
-static void
-AlignmentDistributionObject_dealloc(AlignmentDistributionObject *self) {
-  // first free the wrapped AlignmentDistribution object
-  // note that it doesn't matter which object we wrap here
-  delete self->_alignment_distribution;
-  // then free the Python object
-  Py_TYPE(self)->tp_free(reinterpret_cast<PyObject *>(self));
-}
-
-/**
- * @brief Constructor for the AlignmentDistribution wrapper object.
- *
- * We use a single constructor for all AlignmentDistribution implementations and
- * initialise the wrapped object to a nullptr. The wrapped object is created
- * later, in the initialisation function, depending on the specific
- * implementation that is chosen.
- *
- * @param type Type for the object.
- * @param args Positional arguments.
- * @param kwargs Keyword arguments.
- * @return Pointer to the newly created object.
- */
-static PyObject *AlignmentDistributionObject_new(PyTypeObject *type,
-                                                 PyObject *args,
-                                                 PyObject *kwargs) {
-  // allocate the Python object
-  AlignmentDistributionObject *self =
-      reinterpret_cast<AlignmentDistributionObject *>(type->tp_alloc(type, 0));
-  // set the wrapped object to a nullptr, the object will be initialised later,
-  // depending on the specific implementation that is chosen
-  self->_alignment_distribution = nullptr;
-  return reinterpret_cast<PyObject *>(self);
-}
-
-/**
- * @brief init() function for a SizeBasedAlignmentDistribution object.
- *
- * Required arguments are:
- *  - minimum_size: Transition size above which dust grains are assumed to align
- *    with the magnetic field (in m).
- *  - aligned_orientation_distribution_type: Type of orientation distribution to
- *    use for aligned grains (needs proper documentation).
- *
- * Optional arguments are:
- *  - maximum_order: Maximum order of spherical basis function expansions
- *    (default: 100).
- *
- * @param self AlignmentDistribution wrapper object that is being initialised.
- * @param args Positional arguments.
- * @param kwargs Keyword arguments.
- * @return 0 on success, 1 on failure.
- */
-static int AlignmentDistributionObject_init_SizeBasedAlignmentDistribution(
-    AlignmentDistributionObject *self, PyObject *args, PyObject *kwargs) {
-
-  // required arguments
-  float_type minimum_size;
-  int_fast32_t aligned_orientation_distribution_type;
-
-  // optional arguments
-  uint_fast32_t maximum_order = 100;
-
-  /// parse arguments
-  // list of keywords (in the expected order)
-  // note that we need to use strdup because the Python API expects char*,
-  // while C++ strings are const char*
-  // not doing this results in compilation warnings
-  static char *kwlist[] = {strdup("minimum_size"),
-                           strdup("aligned_orientation_distribution_type"),
-                           strdup("maximum_order"), nullptr};
-
-  // allocate temporary variables to store double precision arguments
-  double minimum_size_d;
-  // parse the keywords/positional arguments
-  // d is a double
-  // I is an integer
-  if (!PyArg_ParseTupleAndKeywords(
-          args, kwargs, "dI|I", kwlist, &minimum_size_d,
-          &aligned_orientation_distribution_type, &maximum_order)) {
-    // PyArg_ParseTupleAndKeywords will return 0 if a required argument was
-    // missing, if an argument of the wrong type was provided or if the number
-    // of arguments does not match the expectation
-    // we use ctm_warning so that we can gracefully exit and let Python handle
-    // the exception
-    // ctm_error would call abort, which would kill the Python interpreter
-    ctm_warning("Wrong arguments provided!");
-    // exit code 1 signals to Python that something was wrong
-    return 1;
-  }
-  // unpack double precision arguments
-  minimum_size = minimum_size_d;
-
-  // create the object
-  self->_alignment_distribution = new SizeBasedAlignmentDistribution(
-      minimum_size, aligned_orientation_distribution_type, maximum_order);
-
-  return 0;
-}
-
-/*! @brief List of AlignmentDistribution methods that are exposed to Python. */
-static PyMethodDef AlignmentDistributionObject_methods[] = {{nullptr}};
-
-/*! @brief Type for SizeBasedAlignmentDistribution wrapper objects. */
-static PyTypeObject SizeBasedAlignmentDistributionObjectType = {
-    PyVarObject_HEAD_INIT(nullptr, 0)};
 
 /// T-matrix object
 
@@ -1150,8 +873,8 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   PyArrayObject *input_sizes;
   PyArrayObject *input_wavelengths;
   PyArrayObject *input_thetas;
-  ShapeDistributionObject *shape_distribution_object;
-  AlignmentDistributionObject *alignment_distribution_object;
+  PyShapeDistribution *shape_distribution_object;
+  PyAlignmentDistribution *alignment_distribution_object;
 
   // optional arguments
   uint_fast32_t input_nmin = 10;
@@ -1385,77 +1108,15 @@ PyMODINIT_FUNC PyInit_CosTuuM() {
                      reinterpret_cast<PyObject *>(
                          &MishchenkoOrientationDistributionObjectType));
 
-  // set the required fields in the SingleShapeShapeDistributionObjectType
-  // struct
-  SingleShapeShapeDistributionObjectType.tp_name =
-      "CosTuuM.SingleShapeShapeDistribution";
-  SingleShapeShapeDistributionObjectType.tp_basicsize =
-      sizeof(ShapeDistributionObject);
-  SingleShapeShapeDistributionObjectType.tp_dealloc =
-      (destructor)ShapeDistributionObject_dealloc;
-  SingleShapeShapeDistributionObjectType.tp_methods =
-      ShapeDistributionObject_methods;
-  SingleShapeShapeDistributionObjectType.tp_init =
-      (initproc)ShapeDistributionObject_init_SingleShapeShapeDistribution;
-  SingleShapeShapeDistributionObjectType.tp_new = ShapeDistributionObject_new;
-
-  // finalize creation of the SingleShapeShapeDistributionObjectType
-  PyType_Ready(&SingleShapeShapeDistributionObjectType);
-  // add a SingleShapeShapeDistributionObjectType to the module
-  Py_INCREF(&SingleShapeShapeDistributionObjectType);
-  PyModule_AddObject(
-      m, "SingleShapeShapeDistribution",
-      reinterpret_cast<PyObject *>(&SingleShapeShapeDistributionObjectType));
-
-  // set the required fields in the DraineHensleyShapeDistributionObjectType
-  // struct
-  DraineHensleyShapeDistributionObjectType.tp_name =
-      "CosTuuM.DraineHensleyShapeDistribution";
-  DraineHensleyShapeDistributionObjectType.tp_basicsize =
-      sizeof(ShapeDistributionObject);
-  DraineHensleyShapeDistributionObjectType.tp_dealloc =
-      (destructor)ShapeDistributionObject_dealloc;
-  DraineHensleyShapeDistributionObjectType.tp_methods =
-      ShapeDistributionObject_methods;
-  DraineHensleyShapeDistributionObjectType.tp_init =
-      (initproc)ShapeDistributionObject_init_DraineHensleyShapeDistribution;
-  DraineHensleyShapeDistributionObjectType.tp_new = ShapeDistributionObject_new;
-
-  // finalize creation of the SingleShapeShapeDistributionObjectType
-  PyType_Ready(&DraineHensleyShapeDistributionObjectType);
-  // add a SingleShapeShapeDistributionObjectType to the module
-  Py_INCREF(&DraineHensleyShapeDistributionObjectType);
-  PyModule_AddObject(
-      m, "DraineHensleyShapeDistribution",
-      reinterpret_cast<PyObject *>(&DraineHensleyShapeDistributionObjectType));
-
-  // set the required fields in the SizeBasedAlignmentDistributionObjectType
-  // struct
-  SizeBasedAlignmentDistributionObjectType.tp_name =
-      "CosTuuM.SizeBasedAlignmentDistribution";
-  SizeBasedAlignmentDistributionObjectType.tp_basicsize =
-      sizeof(AlignmentDistributionObject);
-  SizeBasedAlignmentDistributionObjectType.tp_dealloc =
-      (destructor)AlignmentDistributionObject_dealloc;
-  SizeBasedAlignmentDistributionObjectType.tp_methods =
-      AlignmentDistributionObject_methods;
-  SizeBasedAlignmentDistributionObjectType.tp_init =
-      (initproc)AlignmentDistributionObject_init_SizeBasedAlignmentDistribution;
-  SizeBasedAlignmentDistributionObjectType.tp_new =
-      AlignmentDistributionObject_new;
-
-  // finalize creation of the SingleShapeShapeDistributionObjectType
-  PyType_Ready(&SizeBasedAlignmentDistributionObjectType);
-  // add a SingleShapeShapeDistributionObjectType to the module
-  Py_INCREF(&SizeBasedAlignmentDistributionObjectType);
-  PyModule_AddObject(
-      m, "SizeBasedAlignmentDistribution",
-      reinterpret_cast<PyObject *>(&SizeBasedAlignmentDistributionObjectType));
-
   // add constants for the different orientation distribution types that can
   // be used for aligned grains
   PyModule_AddIntConstant(m, "DAVIS_GREENSTEIN_ALIGNMENT", 0);
   PyModule_AddIntConstant(m, "MISHCHENKO_ALIGNMENT", 1);
+
+  PySingleShapeShapeDistribution::initialize(m);
+  PyDraineHensleyShapeDistribution::initialize(m);
+
+  PySizeBasedAlignmentDistribution::initialize(m);
 
   // return the module object
   return m;
