@@ -87,7 +87,7 @@ public:
    *  - maximum_order: Maximum order of spherical basis function expansions
    *    (default: 100).
    *
-   * @param self ShapeDistribution wrapper object that is being initialised.
+   * @param self AlignmentDistribution wrapper object that is being initialised.
    * @param args Positional arguments.
    * @param kwargs Keyword arguments.
    * @return 0 on success, 1 on failure.
@@ -167,9 +167,9 @@ public:
     PySizeBasedAlignmentDistributionType.tp_init = (initproc)init;
     PySizeBasedAlignmentDistributionType.tp_new = alloc;
 
-    // finalize creation of the PySingleShapeShapeDistributionType
+    // finalize creation of the PySizeBasedAlignmentDistributionType
     PyType_Ready(&PySizeBasedAlignmentDistributionType);
-    // add a PySingleShapeShapeDistributionType to the module
+    // add a PySizeBasedAlignmentDistributionType to the module
     Py_INCREF(&PySizeBasedAlignmentDistributionType);
     PyModule_AddObject(
         module, "SizeBasedAlignmentDistribution",

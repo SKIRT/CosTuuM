@@ -70,7 +70,7 @@ public:
 
   /**
    * @brief Evaluate the shape distribution at a given number of Gauss-Legendre
-   * quadrature poitns.
+   * quadrature points.
    *
    * @param npoints Number of points to use.
    */

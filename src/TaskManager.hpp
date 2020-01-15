@@ -14,8 +14,8 @@
 #include "AlignmentDistribution.hpp"
 #include "Configuration.hpp"
 #include "DavisGreensteinOrientationDistribution.hpp"
-#include "DraineDustProperties.hpp"
 #include "DraineHensleyShapeDistribution.hpp"
+#include "DustProperties.hpp"
 #include "GaussBasedResources.hpp"
 #include "MishchenkoOrientationDistribution.hpp"
 #include "NBasedResources.hpp"
@@ -65,6 +65,9 @@ private:
   /*! @brief Alignment distribution for the dust grains. */
   const AlignmentDistribution &_alignment_distribution;
 
+  /*! @brief Dust grain properties. */
+  const DustProperties &_dust_properties;
+
   /*! @brief Requested particle compositions. */
   std::vector<int_fast32_t> _compositions;
 
@@ -93,6 +96,7 @@ public:
    * of dust grains are distributed.
    * @param alignment_distribution Alignment distribution that specifies how
    * dust grains align with the magnetic field.
+   * @param dust_properties Dust grain properties.
    */
   inline TaskManager(const uint_fast32_t minimum_order,
                      const uint_fast32_t maximum_order,
@@ -100,12 +104,14 @@ public:
                      const float_type tolerance,
                      const size_t maximum_memory_usage,
                      const ShapeDistribution &shape_distribution,
-                     const AlignmentDistribution &alignment_distribution)
+                     const AlignmentDistribution &alignment_distribution,
+                     const DustProperties &dust_properties)
       : _minimum_order(minimum_order), _maximum_order(maximum_order),
         _gauss_legendre_factor(gauss_legendre_factor), _tolerance(tolerance),
         _maximum_memory_usage(maximum_memory_usage),
         _shape_distribution(shape_distribution),
-        _alignment_distribution(alignment_distribution) {}
+        _alignment_distribution(alignment_distribution),
+        _dust_properties(dust_properties) {}
 
   /**
    * @brief Add the given particle composition to the list of compositions that
@@ -413,7 +419,6 @@ public:
           "AbsorptionCoefficientResult", memory_log_file, memory_used);
     }
 
-    const DraineDustProperties dust_properties;
     // step 4: loop over all parameter values and set up parameter specific
     // tasks
     // first: figure out how much space is left for interaction and T-matrix
@@ -540,8 +545,8 @@ public:
           // get the refractive index for this grain type, particle size and
           // interaction wavelength
           const std::complex<float_type> refractive_index =
-              dust_properties.get_refractive_index(wavelength, particle_size,
-                                                   grain_type);
+              _dust_properties.get_refractive_index(wavelength, particle_size,
+                                                    grain_type);
 
           InteractionVariables *this_interaction_variables =
               new InteractionVariables(particle_size, wavelength,

@@ -7,11 +7,9 @@
  */
 
 #include "Configuration.hpp"
-#include "DavisGreensteinOrientationDistribution.hpp"
-#include "MishchenkoOrientationDistribution.hpp"
 #include "PyAlignmentDistribution.hpp"
+#include "PyDustProperties.hpp"
 #include "PyShapeDistribution.hpp"
-#include "SizeBasedAlignmentDistribution.hpp"
 #include "TMatrixCalculator.hpp"
 #include "TaskManager.hpp"
 
@@ -859,6 +857,7 @@ inline std::vector<DATA_TYPE> unpack_numpy_array(PyArrayObject *numpy_array) {
  *  - thetas: Array of zenith angles (in radians).
  *  - shape_distribution: Shape distribution object to use.
  *  - alignment_distribution: Alignment distribution object to use.
+ *  - dust_properties: Dust properties object to use.
  *
  * Additional optional arguments are:
  *  - minimum_order: Minimum order of spherical basis function expansion to use.
@@ -900,6 +899,7 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   PyArrayObject *input_thetas;
   PyShapeDistribution *shape_distribution_object;
   PyAlignmentDistribution *alignment_distribution_object;
+  PyDustProperties *dust_properties_object;
 
   // optional arguments
   uint_fast32_t input_nmin = 10;
@@ -922,6 +922,7 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
                            strdup("thetas"),
                            strdup("shape_distribution"),
                            strdup("alignment_distribution"),
+                           strdup("dust_properties"),
                            strdup("minimum_order"),
                            strdup("maximum_order"),
                            strdup("gauss_legendre_factor"),
@@ -949,14 +950,15 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   int do_extinction_b = do_extinction;
   // parse positional and keyword arguments
   if (!PyArg_ParseTupleAndKeywords(
-          args, kwargs, "O&O&O&O&OO|IIIdkizzzzpp", kwlist, PyArray_Converter,
+          args, kwargs, "O&O&O&O&OOO|IIIdkizzzzpp", kwlist, PyArray_Converter,
           &input_types, PyArray_Converter, &input_sizes, PyArray_Converter,
           &input_wavelengths, PyArray_Converter, &input_thetas,
           &shape_distribution_object, &alignment_distribution_object,
-          &input_nmin_i, &input_nmax_i, &input_glfac_i, &input_tolerance_d,
-          &input_memory_size_i, &input_nthread_i, &input_graph_log_name,
-          &input_task_log_name, &input_task_type_log_name,
-          &input_memory_log_name, &do_absorption_b, &do_extinction_b)) {
+          &dust_properties_object, &input_nmin_i, &input_nmax_i, &input_glfac_i,
+          &input_tolerance_d, &input_memory_size_i, &input_nthread_i,
+          &input_graph_log_name, &input_task_log_name,
+          &input_task_type_log_name, &input_memory_log_name, &do_absorption_b,
+          &do_extinction_b)) {
     // again, we do not call ctm_error to avoid killing the Python interpreter
     ctm_warning("Wrong arguments provided!");
     // this time, a nullptr return will signal an error to Python
@@ -974,13 +976,15 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   do_absorption = do_absorption_b;
   do_extinction = do_extinction_b;
 
-  ShapeDistribution *shape_distribution =
+  const ShapeDistribution *shape_distribution =
       shape_distribution_object->_shape_distribution;
-  AlignmentDistribution *alignment_distribution =
+  const AlignmentDistribution *alignment_distribution =
       alignment_distribution_object->_alignment_distribution;
+  const DustProperties *dust_properties =
+      dust_properties_object->_dust_properties;
   TaskManager task_manager(input_nmin, input_nmax, input_glfac, input_tolerance,
                            input_memory_size, *shape_distribution,
-                           *alignment_distribution);
+                           *alignment_distribution, *dust_properties);
 
   std::vector<int_fast32_t> types =
       unpack_numpy_array<int_fast32_t>(input_types);
@@ -1008,7 +1012,7 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
     input_graph_log = input_graph_log_name;
   }
   QuickSched quicksched(input_nthread, input_graph_log_name != nullptr,
-                        input_graph_log, true);
+                        input_graph_log, false);
 
   std::vector<float_type> thetas =
       unpack_numpy_array<float_type, double>(input_thetas);
@@ -1273,6 +1277,9 @@ PyMODINIT_FUNC PyInit_CosTuuM() {
   PyDraineHensleyShapeDistribution::initialize(m);
 
   PySizeBasedAlignmentDistribution::initialize(m);
+
+  PyDraineDustProperties::initialize(m);
+  PyCustomDustProperties::initialize(m);
 
   // return the module object
   return m;

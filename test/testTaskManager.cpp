@@ -7,6 +7,7 @@
  */
 
 #include "Assert.hpp"
+#include "DraineDustProperties.hpp"
 #include "SizeBasedAlignmentDistribution.hpp"
 #include "TaskManager.hpp"
 
@@ -119,8 +120,9 @@ int main(int argc, char **argv) {
     shape_distribution = new SingleShapeShapeDistribution(1.00001);
   }
   SizeBasedAlignmentDistribution alignment_distribution(1.e-5, 0, 100);
+  const DraineDustProperties dust_properties;
   TaskManager task_manager(10, 100, 2, 1.e-4, 1e10, *shape_distribution,
-                           alignment_distribution);
+                           alignment_distribution, dust_properties);
 
   const float_type log_min_size = -9.;
   const float_type log_max_size = -5.;

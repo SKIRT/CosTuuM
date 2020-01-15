@@ -9,26 +9,13 @@
 #define DRAINEDUSTPROPERTIES_HPP
 
 #include "DraineDustPropertiesDataLocation.hpp"
+#include "DustProperties.hpp"
 #include "Table.hpp"
 
-#include <complex>
-
 /**
- * @brief Possible types of dust grains.
+ * @brief Draine and collaborators dust optical dust properties.
  */
-enum DustGrainTypes {
-  /*! @brief Carbon grains. */
-  DUSTGRAINTYPE_CARBON = 0,
-  /*! @brief Silicon grains. */
-  DUSTGRAINTYPE_SILICON,
-  /*! @brief Number of dust grain types. */
-  NUMBER_OF_DUSTGRAINTYPES
-};
-
-/**
- * @brief The DraineDustProperties class
- */
-class DraineDustProperties {
+class DraineDustProperties : public DustProperties {
 private:
   /*! @brief Fraction of carbon grains that is parallel aligned. */
   const float_type _fraction_parallel;
@@ -100,6 +87,8 @@ public:
     _table_carbon_perpendicular_large.add_column<1>(1.);
     _table_carbon_perpendicular_large.add_column<3>(1.);
   }
+
+  virtual ~DraineDustProperties() {}
 
   /**
    * @brief Get the refractive index for the given wavelength, grain size and
