@@ -207,7 +207,15 @@ public:
     std::sort(_sizes.begin(), _sizes.end());
     std::sort(_wavelengths.begin(), _wavelengths.end());
 
-    result_key = new ResultKey(_compositions, _sizes, _wavelengths);
+    uint_fast32_t number_of_results = 0;
+    if (do_extinction) {
+      ++number_of_results;
+    }
+    if (do_absorption) {
+      ++number_of_results;
+    }
+    result_key =
+        new ResultKey(_compositions, _sizes, _wavelengths, number_of_results);
 
     // get the dimensions of the computational grid
     const uint_fast32_t number_of_compositions = _compositions.size();
@@ -499,15 +507,16 @@ public:
                          2 * total_number_of_Tmatrices,
                      nullptr);
     uint_fast32_t resource_index = resource_offset;
-    results.resize(total_number_of_interactions, nullptr);
+    results.resize(number_of_results * total_number_of_interactions, nullptr);
     uint_fast32_t result_index = 0;
     const uint_fast32_t task_offset = tasks.size();
     // for each T-matrix,
     // we need to add interaction and m=0 tasks for each quadrature point
     // we need to add m=/=0 tasks for each order
     const uint_fast32_t tasks_per_Tmatrix =
-        2 * number_of_quadrature_tasks + _maximum_order + 5;
-    tasks.resize(task_offset + total_number_of_interactions +
+        2 * number_of_quadrature_tasks + _maximum_order + 6;
+    tasks.resize(task_offset +
+                     number_of_results * total_number_of_interactions +
                      total_number_of_Tmatrices * tasks_per_Tmatrix,
                  nullptr);
     uint_fast32_t task_index = task_offset;

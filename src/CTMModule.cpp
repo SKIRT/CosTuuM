@@ -1045,11 +1045,18 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
     quicksched.print_type_dict(typefile);
   }
 
+  npy_intp result_size = 0;
+  if (do_absorption) {
+    result_size += 2;
+  }
+  if (do_extinction) {
+    result_size += 3;
+  }
   npy_intp result_dims[5] = {
       static_cast<npy_intp>(result_key->composition_size()),
       static_cast<npy_intp>(result_key->size_size()),
       static_cast<npy_intp>(result_key->wavelength_size()),
-      static_cast<npy_intp>(thetas.size()), 2};
+      static_cast<npy_intp>(thetas.size()), result_size};
   PyArrayObject *result_array = reinterpret_cast<PyArrayObject *>(
       PyArray_SimpleNew(5, result_dims, NPY_DOUBLE));
 
@@ -1057,19 +1064,51 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
     for (npy_intp isize = 0; isize < result_dims[1]; ++isize) {
       for (npy_intp ilambda = 0; ilambda < result_dims[2]; ++ilambda) {
         for (npy_intp itheta = 0; itheta < result_dims[3]; ++itheta) {
-          const npy_intp result_index =
-              result_key->get_result_index(0, isize, ilambda);
-          const AbsorptionCoefficientResult &result =
-              *static_cast<AbsorptionCoefficientResult *>(
-                  results[result_index]);
-          npy_intp Qabs_array_index[5] = {itype, isize, ilambda, itheta, 0};
-          npy_intp Qabspol_array_index[5] = {itype, isize, ilambda, itheta, 1};
-          *reinterpret_cast<double *>(
-              PyArray_GetPtr(result_array, Qabs_array_index)) =
-              static_cast<double>(result.get_Qabs(itheta));
-          *reinterpret_cast<double *>(
-              PyArray_GetPtr(result_array, Qabspol_array_index)) =
-              static_cast<double>(result.get_Qabspol(itheta));
+          npy_intp iresult = 0;
+          if (do_absorption) {
+            const npy_intp result_index =
+                result_key->get_result_index(0, isize, ilambda, 1);
+            const AbsorptionCoefficientResult &result =
+                *static_cast<AbsorptionCoefficientResult *>(
+                    results[result_index]);
+            npy_intp Qabs_array_index[5] = {itype, isize, ilambda, itheta,
+                                            iresult};
+            ++iresult;
+            npy_intp Qabspol_array_index[5] = {itype, isize, ilambda, itheta,
+                                               iresult};
+            ++iresult;
+            *reinterpret_cast<double *>(
+                PyArray_GetPtr(result_array, Qabs_array_index)) =
+                static_cast<double>(result.get_Qabs(itheta));
+            *reinterpret_cast<double *>(
+                PyArray_GetPtr(result_array, Qabspol_array_index)) =
+                static_cast<double>(result.get_Qabspol(itheta));
+          }
+          if (do_extinction) {
+            const npy_intp result_index =
+                result_key->get_result_index(0, isize, ilambda, 0);
+            const ExtinctionCoefficientResult &result =
+                *static_cast<ExtinctionCoefficientResult *>(
+                    results[result_index]);
+            npy_intp Qext_array_index[5] = {itype, isize, ilambda, itheta,
+                                            iresult};
+            ++iresult;
+            npy_intp Qextpol_array_index[5] = {itype, isize, ilambda, itheta,
+                                               iresult};
+            ++iresult;
+            npy_intp Qextcpol_array_index[5] = {itype, isize, ilambda, itheta,
+                                                iresult};
+            ++iresult;
+            *reinterpret_cast<double *>(
+                PyArray_GetPtr(result_array, Qext_array_index)) =
+                static_cast<double>(result.get_Qext(itheta));
+            *reinterpret_cast<double *>(
+                PyArray_GetPtr(result_array, Qextpol_array_index)) =
+                static_cast<double>(result.get_Qextpol(itheta));
+            *reinterpret_cast<double *>(
+                PyArray_GetPtr(result_array, Qextcpol_array_index)) =
+                static_cast<double>(result.get_Qextcpol(itheta));
+          }
         } // theta
       }   // lambda
     }     // size
