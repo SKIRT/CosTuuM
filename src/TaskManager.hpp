@@ -514,7 +514,7 @@ public:
     // we need to add interaction and m=0 tasks for each quadrature point
     // we need to add m=/=0 tasks for each order
     const uint_fast32_t tasks_per_Tmatrix =
-        2 * number_of_quadrature_tasks + _maximum_order + 6;
+        2 * number_of_quadrature_tasks + _maximum_order + 4 + number_of_results;
     tasks.resize(task_offset +
                      number_of_results * total_number_of_interactions +
                      total_number_of_Tmatrices * tasks_per_Tmatrix,
