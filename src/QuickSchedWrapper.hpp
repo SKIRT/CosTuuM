@@ -83,6 +83,54 @@ public:
 };
 
 /**
+ * @brief Object used to (optionally) provide progress output.
+ */
+class TaskCounter {
+private:
+  /*! @brief Number of tasks that have finished. */
+  std::atomic<uint_fast32_t> _num_tasks_done;
+
+  /*! @brief Total number of tasks. */
+  uint_fast32_t _total_number_of_tasks;
+
+  /*! @brief Output interval. */
+  uint_fast32_t _output_interval;
+
+public:
+  /**
+   * @brief Empty constructor.
+   */
+  inline TaskCounter()
+      : _num_tasks_done(0), _total_number_of_tasks(0), _output_interval(1000) {}
+
+  /**
+   * @brief Add a task to the internal counter.
+   */
+  inline void add_task() { ++_total_number_of_tasks; }
+
+  /**
+   * @brief Set the output interval as a fraction of the total number of tasks.
+   *
+   * @param fraction Output interval fraction.
+   */
+  inline void set_output_fraction(double fraction) {
+    _output_interval = std::round(fraction * _total_number_of_tasks);
+  }
+
+  /**
+   * @brief Tell the object that another task finished.
+   */
+  inline void task_done() {
+    ++_num_tasks_done;
+    const uint_fast32_t num_done_now = _num_tasks_done.load();
+    if (num_done_now % _output_interval == 0) {
+      ctm_warning("Processed %" PRIuFAST32 "/%" PRIuFAST32 " tasks.",
+                  num_done_now, _total_number_of_tasks);
+    }
+  }
+};
+
+/**
  * @brief Wrapped task.
  */
 class WrappedTask {
@@ -90,26 +138,18 @@ private:
   /*! @brief Pointer to the actual task. */
   Task *_task;
 
-  /*! @brief Reference to the finished task counter. */
-  std::atomic<uint_fast32_t> &_num_tasks_done;
-
-  /*! @brief Reference to the total number of tasks. */
-  const uint_fast32_t &_total_number_of_tasks;
+  /*! @brief Pointer to the TaskCounter (if any). */
+  TaskCounter *_task_counter;
 
 public:
   /**
    * @brief Constructor.
    *
    * @param task Pointer to the task that is wrapped.
-   * @param num_tasks_done Reference to the atomic task counter used for
-   * progress updates.
-   * @param total_number_of_tasks Reference to the total number of tasks
-   * counter used for progress updates.
+   * @param task_counter TaskCounter that displays progress information.
    */
-  inline WrappedTask(Task *task, std::atomic<uint_fast32_t> &num_tasks_done,
-                     const uint_fast32_t &total_number_of_tasks)
-      : _task(task), _num_tasks_done(num_tasks_done),
-        _total_number_of_tasks(total_number_of_tasks) {}
+  inline WrappedTask(Task *task, TaskCounter *task_counter = nullptr)
+      : _task(task), _task_counter(task_counter) {}
 
   /**
    * @brief Execute the wrapped task.
@@ -118,11 +158,8 @@ public:
    */
   inline void execute(const int_fast32_t thread_id) {
     _task->execute(thread_id);
-    ++_num_tasks_done;
-    const uint_fast32_t num_done_now = _num_tasks_done.load();
-    if (num_done_now % 1000 == 0) {
-      ctm_warning("Processed %" PRIuFAST32 "/%" PRIuFAST32 " tasks.",
-                  num_done_now, _total_number_of_tasks);
+    if (_task_counter) {
+      _task_counter->task_done();
     }
   }
 };
@@ -217,11 +254,8 @@ private:
   /*! @brief Log file (if present). */
   std::ofstream _output_file;
 
-  /*! @brief Atomic counter to keep track of tasks that have finished. */
-  std::atomic<uint_fast32_t> _num_tasks_done;
-
-  /*! @brief Total number of tasks that need to be executed. */
-  uint_fast32_t _total_number_of_tasks;
+  /*! @brief TaskCounter that displays progress reports. */
+  TaskCounter *_task_counter;
 
 public:
   /**
@@ -245,17 +279,23 @@ public:
    * execution.
    * @param write_log Write a log file?
    * @param log_name Name of the log file.
+   * @param display_progress Display execution progress in the terminal?
    */
   inline QuickSched(const int_fast32_t number_of_threads,
                     const bool write_log = false,
-                    const std::string log_name = "")
+                    const std::string log_name = "",
+                    const bool display_progress = true)
       : _number_of_threads(number_of_threads), _task_type(0),
-        _write_log(write_log), _num_tasks_done(0), _total_number_of_tasks(0) {
+        _write_log(write_log), _task_counter(nullptr) {
     bzero(&_s, sizeof(struct qsched));
     qsched_init(&_s, number_of_threads, qsched_flag_none);
 
     if (_write_log) {
       _output_file.open(log_name);
+    }
+
+    if (display_progress) {
+      _task_counter = new TaskCounter();
     }
   }
 
@@ -264,7 +304,10 @@ public:
    *
    * Free memory used by library.
    */
-  inline ~QuickSched() { qsched_free(&_s); }
+  inline ~QuickSched() {
+    qsched_free(&_s);
+    delete _task_counter;
+  }
 
   /**
    * @brief Get the number of threads used during parallel execution.
@@ -284,6 +327,10 @@ public:
 
     if (_write_log) {
       _output_file.flush();
+    }
+
+    if (_task_counter) {
+      _task_counter->set_output_fraction(0.01);
     }
 
     if (number_of_threads <= 0) {
@@ -323,8 +370,10 @@ public:
    */
   inline void register_task(Task &task) {
 
-    ++_total_number_of_tasks;
-    WrappedTask wrapper(&task, _num_tasks_done, _total_number_of_tasks);
+    WrappedTask wrapper(&task, _task_counter);
+    if (_task_counter) {
+      _task_counter->add_task();
+    }
     int_fast32_t task_type;
     const std::string task_type_name = typeid(task).name();
     auto it = _type_dict.find(task_type_name);

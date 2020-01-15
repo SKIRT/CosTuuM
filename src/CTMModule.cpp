@@ -909,7 +909,7 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   double input_tolerance_d = input_tolerance;
   // parse positional and keyword arguments
   if (!PyArg_ParseTupleAndKeywords(
-          args, kwargs, "O&O&O&O&OO|IIIdIIsss", kwlist, PyArray_Converter,
+          args, kwargs, "O&O&O&O&OO|IIIdIIzzz", kwlist, PyArray_Converter,
           &input_types, PyArray_Converter, &input_sizes, PyArray_Converter,
           &input_wavelengths, PyArray_Converter, &input_thetas,
           &shape_distribution_object, &alignment_distribution_object,
@@ -958,7 +958,7 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
     input_graph_log = input_graph_log_name;
   }
   QuickSched quicksched(input_nthread, input_graph_log_name != nullptr,
-                        input_graph_log);
+                        input_graph_log, false);
 
   std::vector<float_type> thetas =
       unpack_numpy_array<float_type, double>(input_thetas);
@@ -1112,6 +1112,10 @@ PyMODINIT_FUNC PyInit_CosTuuM() {
   // be used for aligned grains
   PyModule_AddIntConstant(m, "DAVIS_GREENSTEIN_ALIGNMENT", 0);
   PyModule_AddIntConstant(m, "MISHCHENKO_ALIGNMENT", 1);
+
+  // add constants for the different material types that can be used
+  PyModule_AddIntConstant(m, "CARBON", 0);
+  PyModule_AddIntConstant(m, "SILICON", 1);
 
   PySingleShapeShapeDistribution::initialize(m);
   PyDraineHensleyShapeDistribution::initialize(m);

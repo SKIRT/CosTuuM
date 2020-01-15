@@ -157,6 +157,7 @@ public:
    * @param space_manager TMatrixAuxiliarySpaceManager that manages per thread
    * additional space for the T-matrix calculation. Needs to be deleted by
    * caller after the computation finishes.
+   * @param verbose Output diagnostic warnings?
    */
   inline void generate_tasks(const std::vector<float_type> &theta,
                              const uint_fast32_t ngauss, QuickSched &quicksched,
@@ -164,7 +165,8 @@ public:
                              std::vector<Resource *> &resources,
                              ResultKey *&result_key,
                              std::vector<Result *> &results,
-                             TMatrixAuxiliarySpaceManager *&space_manager) {
+                             TMatrixAuxiliarySpaceManager *&space_manager,
+                             const bool verbose = false) {
 
     // sort the input arrays
     std::sort(_sizes.begin(), _sizes.end());
@@ -186,8 +188,11 @@ public:
         number_of_compositions * number_of_sizes * number_of_wavelengths;
     const uint_fast32_t total_number_of_Tmatrices =
         total_number_of_interactions * number_of_shapes;
-    ctm_warning("Number of T-matrices that needs to be computed: %" PRIuFAST32,
-                total_number_of_Tmatrices);
+    if (verbose) {
+      ctm_warning(
+          "Number of T-matrices that needs to be computed: %" PRIuFAST32,
+          total_number_of_Tmatrices);
+    }
 
     // we need to keep track of memory to make sure we respect the user
     // defined limit
@@ -337,10 +342,12 @@ public:
 
     // we are done using memory: output the total
     memory_used += number_of_tmatrices * tmatrix_memory_requirement;
-    ctm_warning("Total memory usage: %s",
-                Utilities::human_readable_bytes(memory_used).c_str());
-    ctm_warning("Space to store %" PRIuFAST32 " T-matrices.",
-                number_of_tmatrices);
+    if (verbose) {
+      ctm_warning("Total memory usage: %s",
+                  Utilities::human_readable_bytes(memory_used).c_str());
+      ctm_warning("Space to store %" PRIuFAST32 " T-matrices.",
+                  number_of_tmatrices);
+    }
 
     // now actually allocate the resources
     std::vector<InteractionResource *> interaction_resources(
