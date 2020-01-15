@@ -1,12 +1,12 @@
 /**
- * @file AbsorptionCoefficientTask.hpp
+ * @file ExtinctionCoefficientTask.hpp
  *
- * @brief Task that computes AbsorptionCoefficients.
+ * @brief Task that computes ExtinctionCoefficients.
  *
  * @author Bert Vandenbroucke (bert.vandenbroucke@ugent.be)
  */
-#ifndef ABSORPTIONCOEFFICIENTTASK_HPP
-#define ABSORPTIONCOEFFICIENTTASK_HPP
+#ifndef EXTINCTIONCOEFFICIENTTASK_HPP
+#define EXTINCTIONCOEFFICIENTTASK_HPP
 
 #include "Configuration.hpp"
 #include "InteractionResource.hpp"
@@ -17,22 +17,25 @@
 #include <vector>
 
 /**
- * @brief Result of an absorption coefficient calculation.
+ * @brief Result of an extinction coefficient calculation.
  */
-class AbsorptionCoefficientResult : public Result {
+class ExtinctionCoefficientResult : public Result {
 
   /*! @brief Give access to the computation task. */
-  friend class AbsorptionCoefficientTask;
+  friend class ExtinctionCoefficientTask;
 
   /*! @brief Give access to the averaging task. */
-  friend class AbsorptionShapeAveragingTask;
+  friend class ExtinctionShapeAveragingTask;
 
 private:
-  /*! @brief Absorption coefficients. */
-  std::vector<float_type> _Qabs;
+  /*! @brief Extinction coefficients. */
+  std::vector<float_type> _Qext;
 
-  /*! @brief Polarised absorption coefficients. */
-  std::vector<float_type> _Qabspol;
+  /*! @brief Polarised extinction coefficients. */
+  std::vector<float_type> _Qextpol;
+
+  /*! @brief Circularly polarised extinction coefficients. */
+  std::vector<float_type> _Qextcpol;
 
 public:
   /**
@@ -44,18 +47,19 @@ public:
    * @param number_of_angles Number of angular points at which the coefficients
    * are computed.
    */
-  inline AbsorptionCoefficientResult(const int_fast32_t composition,
+  inline ExtinctionCoefficientResult(const int_fast32_t composition,
                                      const float_type size,
                                      const float_type wavelength,
                                      const uint_fast32_t number_of_angles)
       : Result(composition, size, wavelength,
-               RESULTTYPE_ABSORPTIONCOEFFICIENTS),
-        _Qabs(number_of_angles, 0.), _Qabspol(number_of_angles, 0.) {}
+               RESULTTYPE_EXTINCTIONCOEFFICIENTS),
+        _Qext(number_of_angles, 0.), _Qextpol(number_of_angles, 0.),
+        _Qextcpol(number_of_angles, 0.) {}
 
-  virtual ~AbsorptionCoefficientResult() {}
+  virtual ~ExtinctionCoefficientResult() {}
 
   /**
-   * @brief Get the size in memory of a hypothetical AbsorptionCoefficientResult
+   * @brief Get the size in memory of a hypothetical ExtinctionCoefficientResult
    * object with the given parameters.
    *
    * @param number_of_angles Number of angular points at which the coefficients
@@ -63,46 +67,58 @@ public:
    * @return Size in bytes that the object would occupy.
    */
   static inline size_t get_memory_size(const uint_fast32_t number_of_angles) {
-    size_t size = sizeof(AbsorptionCoefficientResult);
-    size += 2 * number_of_angles * sizeof(float_type);
+    size_t size = sizeof(ExtinctionCoefficientResult);
+    size += 3 * number_of_angles * sizeof(float_type);
     return size;
   }
 
   /**
-   * @brief Get the absorption coefficient for the given index.
+   * @brief Get the extinction coefficient for the given index.
    *
    * @param index Index.
-   * @return Corresponding absorption coefficient.
+   * @return Corresponding extinction coefficient.
    */
-  inline float_type get_Qabs(const uint_fast32_t index) const {
-    ctm_assert(index < _Qabs.size());
-    return _Qabs[index];
+  inline float_type get_Qext(const uint_fast32_t index) const {
+    ctm_assert(index < _Qext.size());
+    return _Qext[index];
   }
 
   /**
-   * @brief Get the polarised absorption coefficient for the given index.
+   * @brief Get the polarised extinction coefficient for the given index.
    *
    * @param index Index.
-   * @return Corresponding polarised absorption coefficient.
+   * @return Corresponding polarised extinction coefficient.
    */
-  inline float_type get_Qabspol(const uint_fast32_t index) const {
-    ctm_assert(index < _Qabspol.size());
-    return _Qabspol[index];
+  inline float_type get_Qextpol(const uint_fast32_t index) const {
+    ctm_assert(index < _Qextpol.size());
+    return _Qextpol[index];
+  }
+
+  /**
+   * @brief Get the circularly polarised extinction coefficient for the given
+   * index.
+   *
+   * @param index Index.
+   * @return Corresponding circularly polarised extinction coefficient.
+   */
+  inline float_type get_Qextcpol(const uint_fast32_t index) const {
+    ctm_assert(index < _Qextcpol.size());
+    return _Qextcpol[index];
   }
 };
 
 /**
- * @brief Angular grid used to compute absorption cross sections.
+ * @brief Angular grid used to compute extinction cross sections.
  */
-class AbsorptionCoefficientGrid : public Resource,
+class ExtinctionCoefficientGrid : public Resource,
                                   public Task,
                                   public Computable {
 
   /*! @brief Give access to the computation task. */
-  friend class AbsorptionCoefficientTask;
+  friend class ExtinctionCoefficientTask;
 
   /*! @brief Give access to special Wigner D resources. */
-  friend class AbsorptionSpecialWignerDResources;
+  friend class ExtinctionSpecialWignerDResources;
 
 private:
   /*! @brief Input zenith angles (in radians). */
@@ -117,66 +133,35 @@ private:
   /*! @brief Inverse sines of the input zenith angles. */
   std::vector<float_type> _sin_theta_in_inverse;
 
-  /*! @brief Cosines of the output zenith angles. */
-  std::vector<float_type> _cos_theta_out;
-
-  /*! @brief Sines of the output zenith angles. */
-  std::vector<float_type> _sin_theta_out;
-
-  /*! @brief Inverse sines of the output zenith angles. */
-  std::vector<float_type> _sin_theta_out_inverse;
-
-  /*! @brief Gauss-Legendre weights for cosines of the output zenith angles. */
-  std::vector<float_type> _cos_theta_out_weights;
-
-  /*! @brief Cosines of the output azimuth angles. */
-  std::vector<float_type> _cos_phi_out;
-
-  /*! @brief Sines of the output azimuth angles. */
-  std::vector<float_type> _sin_phi_out;
-
-  /*! @brief Gauss-Legendre weights for the output azimuth angles. */
-  std::vector<float_type> _phi_out_weights;
-
 public:
   /**
    * @brief Constructor.
    *
    * @param ntheta Number of zenith angles.
    * @param theta Grid of zenith angles (in radians, of size ntheta or more).
-   * @param ngauss Number of Gauss-Legendre quadrature points for directional
-   * averaging.
    */
-  inline AbsorptionCoefficientGrid(const uint_fast32_t ntheta,
-                                   const float_type *theta,
-                                   const uint_fast32_t ngauss)
+  inline ExtinctionCoefficientGrid(const uint_fast32_t ntheta,
+                                   const float_type *theta)
       : _theta_in(ntheta), _cos_theta_in(ntheta), _sin_theta_in(ntheta),
-        _sin_theta_in_inverse(ntheta), _cos_theta_out(ngauss),
-        _sin_theta_out(ngauss), _sin_theta_out_inverse(ngauss),
-        _cos_theta_out_weights(ngauss), _cos_phi_out(ngauss),
-        _sin_phi_out(ngauss), _phi_out_weights(ngauss) {
+        _sin_theta_in_inverse(ntheta) {
 
     for (uint_fast32_t i = 0; i < ntheta; ++i) {
       _theta_in[i] = theta[i];
     }
   }
 
-  virtual ~AbsorptionCoefficientGrid() {}
+  virtual ~ExtinctionCoefficientGrid() {}
 
   /**
-   * @brief Get the size in memory of a hypothetical AbsorptionCoefficientGrid
+   * @brief Get the size in memory of a hypothetical ExtinctionCoefficientGrid
    * object with the given parameters.
    *
    * @param ntheta Number of zenith angles.
-   * @param ngauss Number of Gauss-Legendre quadrature points for directional
-   * averaging.
    * @return Size in bytes that the object would occupy.
    */
-  static inline size_t get_memory_size(const uint_fast32_t ntheta,
-                                       const uint_fast32_t ngauss) {
-    size_t size = sizeof(AbsorptionCoefficientGrid);
+  static inline size_t get_memory_size(const uint_fast32_t ntheta) {
+    size_t size = sizeof(ExtinctionCoefficientGrid);
     size += 4 * ntheta * sizeof(float_type);
-    size += 6 * ngauss * sizeof(float_type);
     return size;
   }
 
@@ -208,28 +193,6 @@ public:
         _sin_theta_in_inverse[igauss] = 9000.;
       }
     }
-
-    const uint_fast32_t ngauss = _cos_theta_out.size();
-    SpecialFunctions::get_gauss_legendre_points_and_weights<float_type>(
-        ngauss, _cos_theta_out, _cos_theta_out_weights);
-    // note that we temporarily store the phi angles in cos_phi
-    SpecialFunctions::get_gauss_legendre_points_and_weights_ab<float_type>(
-        ngauss, 0., 2. * M_PI, _cos_phi_out, _phi_out_weights);
-
-    for (uint_fast32_t igauss = 0; igauss < ngauss; ++igauss) {
-      _sin_theta_out[igauss] =
-          sqrt((1. - _cos_theta_out[igauss]) * (1. + _cos_theta_out[igauss]));
-      if (_sin_theta_out[igauss] != 0.) {
-        _sin_theta_out_inverse[igauss] = 1. / _sin_theta_out[igauss];
-      } else {
-        _sin_theta_out_inverse[igauss] = 9000.;
-      }
-
-      // convert the phi angles to cos_phi
-      _cos_phi_out[igauss] = cos(_cos_phi_out[igauss]);
-      _sin_phi_out[igauss] =
-          sqrt((1. - _cos_phi_out[igauss]) * (1. + _cos_phi_out[igauss]));
-    }
   }
 
   /**
@@ -244,77 +207,62 @@ public:
  * @brief Precomputed special Wigner D functions that depend on a specific value
  * of @f$n_{max}@f$ and @f$n_{GL}@f$.
  */
-class AbsorptionSpecialWignerDResources : public Resource,
+class ExtinctionSpecialWignerDResources : public Resource,
                                           public Task,
                                           public Computable {
 private:
   /*! @brief Maximum order, @f$n_{max}@f$. */
   const uint_fast32_t _nmax;
 
-  /*! @brief Absorption coefficient grid to use. */
-  const AbsorptionCoefficientGrid &_grid;
+  /*! @brief Extinction coefficient grid to use. */
+  const ExtinctionCoefficientGrid &_grid;
 
   /*! @brief Wigner D functions divided by sine for input angles. */
-  std::vector<Matrix<float_type>> _wigner_d_sinx[2];
+  std::vector<Matrix<float_type>> _wigner_d_sinx;
 
   /*! @brief Derivatives of the Wigner D functions for input angles. */
-  std::vector<Matrix<float_type>> _dwigner_d[2];
+  std::vector<Matrix<float_type>> _dwigner_d;
 
 public:
   /**
    * @brief Constructor.
    *
    * @param nmax Maximum order, @f$n_{max}@f$.
-   * @param grid Absorption coefficient grid.
+   * @param grid Extinction coefficient grid.
    */
-  inline AbsorptionSpecialWignerDResources(
-      const uint_fast32_t nmax, const AbsorptionCoefficientGrid &grid)
+  inline ExtinctionSpecialWignerDResources(
+      const uint_fast32_t nmax, const ExtinctionCoefficientGrid &grid)
       : _nmax(nmax), _grid(grid) {
 
     const uint_fast32_t np1 = nmax + 1;
 
-    _wigner_d_sinx[0].reserve(np1);
+    _wigner_d_sinx.reserve(np1);
     for (uint_fast32_t i = 0; i < np1; ++i) {
-      _wigner_d_sinx[0].push_back(
+      _wigner_d_sinx.push_back(
           Matrix<float_type>(grid._cos_theta_in.size(), nmax));
     }
-    _dwigner_d[0].reserve(np1);
+    _dwigner_d.reserve(np1);
     for (uint_fast32_t i = 0; i < np1; ++i) {
-      _dwigner_d[0].push_back(
-          Matrix<float_type>(grid._cos_theta_in.size(), nmax));
-    }
-
-    _wigner_d_sinx[1].reserve(np1);
-    for (uint_fast32_t i = 0; i < np1; ++i) {
-      _wigner_d_sinx[1].push_back(
-          Matrix<float_type>(grid._cos_theta_out.size(), nmax));
-    }
-    _dwigner_d[1].reserve(np1);
-    for (uint_fast32_t i = 0; i < np1; ++i) {
-      _dwigner_d[1].push_back(
-          Matrix<float_type>(grid._cos_theta_out.size(), nmax));
+      _dwigner_d.push_back(Matrix<float_type>(grid._cos_theta_in.size(), nmax));
     }
   }
 
-  virtual ~AbsorptionSpecialWignerDResources() {}
+  virtual ~ExtinctionSpecialWignerDResources() {}
 
   /**
-   * @brief Get the size in memory of a hypothetical SpecialWignerDResources
-   * object with the given parameters.
+   * @brief Get the size in memory of a hypothetical
+   * ExtinctionSpecialWignerDResources object with the given parameters.
    *
    * @param nmax Maximum order, @f$n_{max}@f$.
-   * @param grid Absorption coefficient grid.
+   * @param grid Extinction coefficient grid.
    * @return Size in bytes of the hypothetical object.
    */
   static inline size_t get_memory_size(const uint_fast32_t nmax,
-                                       const AbsorptionCoefficientGrid &grid) {
-    size_t size = sizeof(AbsorptionSpecialWignerDResources);
+                                       const ExtinctionCoefficientGrid &grid) {
+    size_t size = sizeof(ExtinctionSpecialWignerDResources);
     // input angles
     size +=
         2 * (nmax + 1) * grid._cos_theta_in.size() * nmax * sizeof(float_type);
-    // output angles
-    size +=
-        2 * (nmax + 1) * grid._cos_theta_out.size() * nmax * sizeof(float_type);
     return size;
   }
 
@@ -344,17 +292,8 @@ public:
         SpecialFunctions::wigner_dn_0m_sinx(
             _grid._cos_theta_in[itheta_in], _grid._sin_theta_in[itheta_in],
             _grid._sin_theta_in_inverse[itheta_in], _nmax, m,
-            &_wigner_d_sinx[0][m].get_row(itheta_in)[0],
-            &_dwigner_d[0][m].get_row(itheta_in)[0]);
-      }
-      const uint_fast32_t ntheta_out = _grid._cos_theta_out.size();
-      for (uint_fast32_t itheta_out = 0; itheta_out < ntheta_out;
-           ++itheta_out) {
-        SpecialFunctions::wigner_dn_0m_sinx(
-            _grid._cos_theta_out[itheta_out], _grid._sin_theta_out[itheta_out],
-            _grid._sin_theta_out_inverse[itheta_out], _nmax, m,
-            &_wigner_d_sinx[1][m].get_row(itheta_out)[0],
-            &_dwigner_d[1][m].get_row(itheta_out)[0]);
+            &_wigner_d_sinx[m].get_row(itheta_in)[0],
+            &_dwigner_d[m].get_row(itheta_in)[0]);
       }
     }
     make_available();
@@ -363,58 +302,54 @@ public:
   /**
    * @brief Get the special Wigner D function for the given input angle.
    *
-   * @param igrid Internal grid to sample.
    * @param m @f$m@f$ value.
    * @param itheta_in Index of the input angle.
    * @param n Order, @f$n@f$.
    * @return Corresponding special Wigner D function value.
    */
-  inline float_type get_wigner_d_sinx(const uint_fast8_t igrid,
-                                      const uint_fast32_t m,
+  inline float_type get_wigner_d_sinx(const uint_fast32_t m,
                                       const uint_fast32_t itheta_in,
                                       const uint_fast32_t n) const {
 
-    ctm_assert(m < _wigner_d_sinx[igrid].size());
-    ctm_assert(itheta_in < _wigner_d_sinx[igrid][m].get_number_of_rows());
+    ctm_assert(m < _wigner_d_sinx.size());
+    ctm_assert(itheta_in < _wigner_d_sinx[m].get_number_of_rows());
     ctm_assert(n > 0);
-    ctm_assert(n - 1 < _wigner_d_sinx[igrid][m].get_number_of_columns());
+    ctm_assert(n - 1 < _wigner_d_sinx[m].get_number_of_columns());
     // check that the resource was actually computed
     check_use();
-    return _wigner_d_sinx[igrid][m](itheta_in, n - 1);
+    return _wigner_d_sinx[m](itheta_in, n - 1);
   }
 
   /**
    * @brief Get the derivative of the Wigner D function for the given input
    * angle.
    *
-   * @param igrid Internal grid to sample.
    * @param m @f$m@f$ value.
    * @param itheta_in Index of the input angle.
    * @param n Order, @f$n@f$.
    * @return Corresponding derivative value.
    */
-  inline float_type get_dwigner_d(const uint_fast8_t igrid,
-                                  const uint_fast32_t m,
+  inline float_type get_dwigner_d(const uint_fast32_t m,
                                   const uint_fast32_t itheta_in,
                                   const uint_fast32_t n) const {
 
-    ctm_assert(m < _dwigner_d[igrid].size());
-    ctm_assert(itheta_in < _dwigner_d[igrid][m].get_number_of_rows());
+    ctm_assert(m < _dwigner_d.size());
+    ctm_assert(itheta_in < _dwigner_d[m].get_number_of_rows());
     ctm_assert(n > 0);
-    ctm_assert(n - 1 < _dwigner_d[igrid][m].get_number_of_columns());
+    ctm_assert(n - 1 < _dwigner_d[m].get_number_of_columns());
     // check that the resource was actually computed
     check_use();
-    return _dwigner_d[igrid][m](itheta_in, n - 1);
+    return _dwigner_d[m](itheta_in, n - 1);
   }
 };
 
 /**
- * @brief Task that computes AbsorptionCoefficients.
+ * @brief Task that computes ExtinctionCoefficients.
  */
-class AbsorptionCoefficientTask : public Task {
+class ExtinctionCoefficientTask : public Task {
 private:
   /*! @brief Zenith angle grid to use. */
-  const AbsorptionCoefficientGrid &_grid;
+  const ExtinctionCoefficientGrid &_grid;
 
   /*! @brief Interaction variables. */
   const InteractionVariables &_interaction_variables;
@@ -426,13 +361,10 @@ private:
   const NBasedResources &_nfactors;
 
   /*! @brief Special Wigner D resources to use (read only). */
-  const AbsorptionSpecialWignerDResources &_wigner_d;
+  const ExtinctionSpecialWignerDResources &_wigner_d;
 
   /*! @brief Resource in which the result is stored. */
-  AbsorptionCoefficientResult &_result;
-
-  /*! @brief Subtract the directionally averaged scattering cross sections? */
-  const bool _account_for_scattering;
+  ExtinctionCoefficientResult &_result;
 
 public:
   /**
@@ -444,21 +376,18 @@ public:
    * @param nfactors N based resources to use.
    * @param wigner_d Special Wigner D resources to use.
    * @param result Resource in which the result is stored.
-   * @param account_for_scattering Subtract the directionally averaged
-   * scattering cross sections?
    */
-  inline AbsorptionCoefficientTask(
-      const AbsorptionCoefficientGrid &grid,
+  inline ExtinctionCoefficientTask(
+      const ExtinctionCoefficientGrid &grid,
       const InteractionVariables &interaction_variables,
       const TMatrixResource &Tmatrix, const NBasedResources &nfactors,
-      const AbsorptionSpecialWignerDResources &wigner_d,
-      AbsorptionCoefficientResult &result,
-      const bool account_for_scattering = false)
+      const ExtinctionSpecialWignerDResources &wigner_d,
+      ExtinctionCoefficientResult &result)
       : _grid(grid), _interaction_variables(interaction_variables),
         _Tmatrix(Tmatrix), _nfactors(nfactors), _wigner_d(wigner_d),
-        _result(result), _account_for_scattering(account_for_scattering) {}
+        _result(result) {}
 
-  virtual ~AbsorptionCoefficientTask() {}
+  virtual ~ExtinctionCoefficientTask() {}
 
   /**
    * @brief Link the resources for this task.
@@ -479,23 +408,20 @@ public:
 
   /**
    * @brief Get the forward scattering matrix @f$S@f$ for a scattering event
-   * from the given input angles to the given output angles at a particle with
-   * its symmetry axis fixed to the @f$z@f$-axis of the reference frame.
+   * from the given input angles with its symmetry axis fixed to the
+   * @f$z@f$-axis of the reference frame.
    *
-   * @param grid_in Internal input grid to sample.
    * @param itheta_in Index of the input zenith angle.
-   * @param grid_out Internal output grid to sample.
-   * @param itheta_out Index of the output zenith angle.
    * @param cosphi_out Cosine of the output azimuth angle,
    * @f$\cos(\phi{}_s)@f$.
    * @param sinphi_out Sine of the output azimuth angle,
    * @f$\sin(\phi{}_s)@f$.
    * @return Scattering matrix for this scattering event.
    */
-  inline Matrix<std::complex<float_type>> get_forward_scattering_matrix(
-      const uint_fast8_t grid_in, const uint_fast32_t itheta_in,
-      const uint_fast8_t grid_out, const uint_fast32_t itheta_out,
-      const float_type cosphi_out, const float_type sinphi_out) const {
+  inline Matrix<std::complex<float_type>>
+  get_forward_scattering_matrix(const uint_fast32_t itheta_in,
+                                const float_type cosphi_out,
+                                const float_type sinphi_out) const {
 
     const uint_fast32_t nmax = _Tmatrix.get_nmax();
 
@@ -525,17 +451,15 @@ public:
 
         // get the specific pi and tau for this n'
         const float_type pi_nn =
-            m * _wigner_d.get_wigner_d_sinx(grid_in, m, itheta_in, nn);
-        const float_type tau_nn =
-            _wigner_d.get_dwigner_d(grid_in, m, itheta_in, nn);
+            m * _wigner_d.get_wigner_d_sinx(m, itheta_in, nn);
+        const float_type tau_nn = _wigner_d.get_dwigner_d(m, itheta_in, nn);
 
         for (uint_fast32_t n = nmin; n < nmax + 1; ++n) {
 
           // get the specific pi and tau for this n
           const float_type pi_n =
-              m * _wigner_d.get_wigner_d_sinx(grid_out, m, itheta_out, n);
-          const float_type tau_n =
-              _wigner_d.get_dwigner_d(grid_out, m, itheta_out, n);
+              m * _wigner_d.get_wigner_d_sinx(m, itheta_in, n);
+          const float_type tau_n = _wigner_d.get_dwigner_d(m, itheta_in, n);
 
           // get the c factor for these values of n and n'
           const std::complex<float_type> c_nnn = _nfactors.get_cnn(n, nn);
@@ -599,55 +523,26 @@ public:
   virtual void execute(const int_fast32_t thread_id) {
 
     const uint_fast32_t ntheta = _grid._theta_in.size();
-    const uint_fast32_t ngauss = _grid._cos_theta_out.size();
 
     for (uint_fast32_t itheta_in = 0; itheta_in < ntheta; ++itheta_in) {
 
       Matrix<std::complex<float_type>> S =
-          get_forward_scattering_matrix(0, itheta_in, 0, itheta_in, 1., 0.);
+          get_forward_scattering_matrix(itheta_in, 1., 0.);
 
       const float_type prefactor =
           2. * M_PI / _interaction_variables.get_wavenumber();
-      _result._Qabs[itheta_in] = prefactor * (S(0, 0) + S(1, 1)).imag();
-      _result._Qabspol[itheta_in] = prefactor * (S(0, 0) - S(1, 1)).imag();
-
-      if (_account_for_scattering) {
-        const float_type half(0.5);
-        for (uint_fast32_t itheta_out = 0; itheta_out < ngauss; ++itheta_out) {
-          for (uint_fast32_t iphi_out = 0; iphi_out < ngauss; ++iphi_out) {
-            const float_type cos_phi_out = _grid._cos_phi_out[iphi_out];
-            const float_type sin_phi_out = _grid._sin_phi_out[iphi_out];
-
-            Matrix<std::complex<float_type>> Stp =
-                get_forward_scattering_matrix(0, itheta_in, 1, itheta_out,
-                                              cos_phi_out, sin_phi_out);
-
-            const float_type weight = _grid._cos_theta_out_weights[itheta_out] *
-                                      _grid._phi_out_weights[iphi_out];
-            const float_type Z00 =
-                (half *
-                 (Stp(0, 0) * conj(Stp(0, 0)) + Stp(0, 1) * conj(Stp(0, 1)) +
-                  Stp(1, 0) * conj(Stp(1, 0)) + Stp(1, 1) * conj(Stp(1, 1))))
-                    .real();
-            _result._Qabs[itheta_in] -= Z00 * weight;
-
-            const float_type Z10 =
-                (half *
-                 (Stp(0, 0) * conj(Stp(0, 0)) + Stp(0, 1) * conj(Stp(0, 1)) -
-                  Stp(1, 0) * conj(Stp(1, 0)) - Stp(1, 1) * conj(Stp(1, 1))))
-                    .real();
-            _result._Qabspol[itheta_in] -= Z10 * weight;
-          }
-        }
-      }
+      _result._Qext[itheta_in] = prefactor * (S(0, 0) + S(1, 1)).imag();
+      _result._Qextpol[itheta_in] = prefactor * (S(0, 0) - S(1, 1)).imag();
+      _result._Qextcpol[itheta_in] = prefactor * (S(1, 1) - S(0, 0)).real();
 
       // normalise the coefficients
       const float_type a = _interaction_variables.get_equal_volume_radius();
       const float_type norm = M_PI * a * a;
-      _result._Qabs[itheta_in] /= norm;
-      _result._Qabspol[itheta_in] /= norm;
+      _result._Qext[itheta_in] /= norm;
+      _result._Qextpol[itheta_in] /= norm;
+      _result._Qextcpol[itheta_in] /= norm;
     }
   }
 };
 
-#endif // ABSORPTIONCOEFFICIENTTASK_HPP
+#endif // EXTINCTIONCOEFFICIENTTASK_HPP

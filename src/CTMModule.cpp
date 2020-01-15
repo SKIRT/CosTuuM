@@ -136,10 +136,14 @@ static int TmatrixObject_init(TmatrixObject *self, PyObject *args,
   double particle_radius_d, axis_ratio_d, wavelength_d;
   double cos2beta_d = static_cast<double>(cos2beta);
   double tolerance_d = static_cast<double>(tolerance);
+  // temporary variables to store integer arguments
+  unsigned int maximum_order_i = maximum_order;
+  unsigned int ndgs_i = ndgs;
+  unsigned int maximum_ngauss_i = maximum_ngauss;
   // allocate a temporary variable to store the complex refractive index
   Py_complex mr_temp;
   // allocate a temporary variable to store the equal volume radius boolean
-  int_fast32_t is_equal_volume_radius = true;
+  int is_equal_volume_radius = true;
   // parse the keywords/positional arguments
   // d is a double
   // D is a complex double (Py_complex)
@@ -147,7 +151,8 @@ static int TmatrixObject_init(TmatrixObject *self, PyObject *args,
   if (!PyArg_ParseTupleAndKeywords(
           args, kwargs, "dddD|ddIIIp", kwlist, &particle_radius_d,
           &axis_ratio_d, &wavelength_d, &mr_temp, &cos2beta_d, &tolerance_d,
-          &maximum_order, &ndgs, &maximum_ngauss, &is_equal_volume_radius)) {
+          &maximum_order_i, &ndgs_i, &maximum_ngauss_i,
+          &is_equal_volume_radius)) {
     // PyArg_ParseTupleAndKeywords will return 0 if a required argument was
     // missing, if an argument of the wrong type was provided or if the number
     // of arguments does not match the expectation
@@ -164,6 +169,10 @@ static int TmatrixObject_init(TmatrixObject *self, PyObject *args,
   wavelength = wavelength_d;
   cos2beta = cos2beta_d;
   tolerance = tolerance_d;
+  // unpack integer arguments
+  maximum_order = maximum_order_i;
+  ndgs = ndgs_i;
+  maximum_ngauss = maximum_ngauss_i;
   // get the complex components from the Py_complex and store them in the
   // std::complex variable
   mr.real(mr_temp.real);
@@ -255,14 +264,18 @@ static PyObject *TmatrixObject_get_absorption_cross_section(TmatrixObject *self,
   // list of keywords (see comment above)
   static char *kwlist[] = {strdup("theta"), strdup("ngauss"), nullptr};
 
+  // temporary variables to store integer arguments
+  unsigned int ngauss_i = ngauss;
   // parse positional and keyword arguments
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O&|I", kwlist,
-                                   PyArray_Converter, &thetas, &ngauss)) {
+                                   PyArray_Converter, &thetas, &ngauss_i)) {
     // again, we do not call ctm_error to avoid killing the Python interpreter
     ctm_warning("Wrong arguments provided!");
     // this time, a nullptr return will signal an error to Python
     return nullptr;
   }
+  // unpack integer variables
+  ngauss = ngauss_i;
 
   // determine the size of the input arrays
   npy_intp thetasize;
@@ -348,14 +361,18 @@ TmatrixObject_get_absorption_cross_sections(TmatrixObject *self, PyObject *args,
   // list of keywords (see comment above)
   static char *kwlist[] = {strdup("theta"), strdup("ngauss"), nullptr};
 
+  // temporary variables to store integer arguments
+  unsigned int ngauss_i = ngauss;
   // parse positional and keyword arguments
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O&|I", kwlist,
-                                   PyArray_Converter, &thetas, &ngauss)) {
+                                   PyArray_Converter, &thetas, &ngauss_i)) {
     // again, we do not call ctm_error to avoid killing the Python interpreter
     ctm_warning("Wrong arguments provided!");
     // this time, a nullptr return will signal an error to Python
     return nullptr;
   }
+  // unpack integer arguments
+  ngauss = ngauss_i;
 
   // determine the size of the input arrays
   npy_intp thetasize;
@@ -659,11 +676,13 @@ static int MishchenkoOrientationDistributionObject_init(
 
   // allocate temporary variables to store double precision arguments
   double cos2beta_d;
+  // temporary variables for integer arguments
+  unsigned int maximum_order_i = maximum_order;
   // parse the keywords/positional arguments
   // d is a double
   // I is an unsigned integer
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "d|I", kwlist, &cos2beta_d,
-                                   &maximum_order)) {
+                                   &maximum_order_i)) {
     // PyArg_ParseTupleAndKeywords will return 0 if a required argument was
     // missing, if an argument of the wrong type was provided or if the number
     // of arguments does not match the expectation
@@ -676,6 +695,8 @@ static int MishchenkoOrientationDistributionObject_init(
   }
   // unpack double precision arguments
   cos2beta = cos2beta_d;
+  // unpack integer arguments
+  maximum_order = maximum_order_i;
 
   self->_distribution =
       new MishchenkoOrientationDistribution(maximum_order, cos2beta);
@@ -858,6 +879,10 @@ inline std::vector<DATA_TYPE> unpack_numpy_array(PyArrayObject *numpy_array) {
  *  None for no task log).
  *  - quicksched_task_type_log: Name for the QuickSched task type log file to
  *  write (or None for no task type log).
+ *  - memory_log: Name of the memory log file to write (or None for no memory
+ *  log).
+ *  - do_absorption: Compute absorption coefficients? (default: True)
+ *  - do_extinction: Compute extinction coefficients? (default: False)
  *
  * @param self Module object.
  * @param args Positional arguments.
@@ -886,6 +911,9 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   const char *input_graph_log_name = nullptr;
   const char *input_task_log_name = nullptr;
   const char *input_task_type_log_name = nullptr;
+  const char *input_memory_log_name = nullptr;
+  bool do_absorption = true;
+  bool do_extinction = false;
 
   // list of keywords
   static char *kwlist[] = {strdup("types"),
@@ -903,19 +931,32 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
                            strdup("quicksched_graph_log"),
                            strdup("quicksched_task_log"),
                            strdup("quicksched_task_type_log"),
+                           strdup("memory_log"),
+                           strdup("do_absorption"),
+                           strdup("do_extinction"),
                            nullptr};
 
   // placeholders for float_type arguments
   double input_tolerance_d = input_tolerance;
+  // placeholders for integer arguments
+  unsigned int input_nmin_i = input_nmin;
+  unsigned int input_nmax_i = input_nmax;
+  unsigned int input_glfac_i = input_glfac;
+  unsigned long input_memory_size_i = input_memory_size;
+  int input_nthread_i = input_nthread;
+  // placeholders for bool arguments
+  int do_absorption_b = do_absorption;
+  int do_extinction_b = do_extinction;
   // parse positional and keyword arguments
   if (!PyArg_ParseTupleAndKeywords(
-          args, kwargs, "O&O&O&O&OO|IIIdIIzzz", kwlist, PyArray_Converter,
+          args, kwargs, "O&O&O&O&OO|IIIdkizzzzpp", kwlist, PyArray_Converter,
           &input_types, PyArray_Converter, &input_sizes, PyArray_Converter,
           &input_wavelengths, PyArray_Converter, &input_thetas,
           &shape_distribution_object, &alignment_distribution_object,
-          &input_nmin, &input_nmax, &input_glfac, &input_tolerance_d,
-          &input_memory_size, &input_nthread, &input_graph_log_name,
-          &input_task_log_name, &input_task_type_log_name)) {
+          &input_nmin_i, &input_nmax_i, &input_glfac_i, &input_tolerance_d,
+          &input_memory_size_i, &input_nthread_i, &input_graph_log_name,
+          &input_task_log_name, &input_task_type_log_name,
+          &input_memory_log_name, &do_absorption_b, &do_extinction_b)) {
     // again, we do not call ctm_error to avoid killing the Python interpreter
     ctm_warning("Wrong arguments provided!");
     // this time, a nullptr return will signal an error to Python
@@ -923,6 +964,15 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   }
   // convert float_type arguments
   input_tolerance = input_tolerance_d;
+  // convert integer arguments
+  input_nmin = input_nmin_i;
+  input_nmax = input_nmax_i;
+  input_glfac = input_glfac_i;
+  input_memory_size = input_memory_size_i;
+  input_nthread = input_nthread_i;
+  // convert bool arguments
+  do_absorption = do_absorption_b;
+  do_extinction = do_extinction_b;
 
   ShapeDistribution *shape_distribution =
       shape_distribution_object->_shape_distribution;
@@ -958,19 +1008,25 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
     input_graph_log = input_graph_log_name;
   }
   QuickSched quicksched(input_nthread, input_graph_log_name != nullptr,
-                        input_graph_log, false);
+                        input_graph_log, true);
 
   std::vector<float_type> thetas =
       unpack_numpy_array<float_type, double>(input_thetas);
   Py_DECREF(input_thetas);
 
+  std::string input_memory_log;
+  if (input_memory_log_name != nullptr) {
+    input_memory_log = input_memory_log_name;
+  }
   std::vector<Task *> tasks;
   std::vector<Resource *> resources;
   ResultKey *result_key = nullptr;
   std::vector<Result *> results;
   TMatrixAuxiliarySpaceManager *space_manager = nullptr;
-  task_manager.generate_tasks(thetas, 20, quicksched, tasks, resources,
-                              result_key, results, space_manager);
+  task_manager.generate_tasks(
+      thetas, 20, quicksched, tasks, resources, result_key, results,
+      space_manager, do_extinction, do_absorption, false,
+      input_memory_log_name != nullptr, input_memory_log);
 
   Py_BEGIN_ALLOW_THREADS;
   quicksched.execute_tasks();
@@ -1034,6 +1090,59 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   return PyArray_Squeeze(result_array);
 }
 
+/**
+ * @brief Get the refractive index for the given type, size and wavelength.
+ *
+ * Required arguments are:
+ *  - type: Dust grain type.
+ *  - size: Dust grain size (in m).
+ *  - wavelength: Incoming/outgoing photon wavelength (in m).
+ *
+ * @param self Module object.
+ * @param args Positional arguments.
+ * @param kwargs Keyword arguments.
+ * @return Nothing.
+ */
+static PyObject *get_refractive_index(PyObject *self, PyObject *args,
+                                      PyObject *kwargs) {
+
+  // parse arguments //
+
+  // required arguments
+  int_fast32_t type;
+  float_type size;
+  float_type wavelength;
+
+  // list of keywords
+  static char *kwlist[] = {strdup("type"), strdup("size"), strdup("wavelength"),
+                           nullptr};
+
+  // placeholders for float_type arguments
+  double size_d, wavelength_d;
+  // placeholders for int arguments
+  int type_i;
+  // parse positional and keyword arguments
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "idd", kwlist, &type_i,
+                                   &size_d, &wavelength_d)) {
+    // again, we do not call ctm_error to avoid killing the Python interpreter
+    ctm_warning("Wrong arguments provided!");
+    // this time, a nullptr return will signal an error to Python
+    return nullptr;
+  }
+  // convert float_type arguments
+  size = size_d;
+  wavelength = wavelength_d;
+  // convert int arguments
+  type = type_i;
+
+  DraineDustProperties props;
+  const std::complex<float_type> refractive_index =
+      props.get_refractive_index(wavelength, size, type);
+
+  return PyComplex_FromDoubles(static_cast<double>(refractive_index.real()),
+                               static_cast<double>(refractive_index.imag()));
+}
+
 /*! @brief Methods exposed by the CTMmodule. */
 static PyMethodDef CTMmethods[] = {
     {"get_equal_volume_radius",
@@ -1045,6 +1154,10 @@ static PyMethodDef CTMmethods[] = {
      METH_VARARGS | METH_KEYWORDS,
      "Test to see if the task-based algorithm can be coupled to the Python "
      "module."},
+    {"get_refractive_index",
+     reinterpret_cast<PyCFunction>(get_refractive_index),
+     METH_VARARGS | METH_KEYWORDS,
+     "Get the refractive index for the given material, size and wavelength."},
     {nullptr, nullptr, 0, nullptr}};
 
 /*! @brief Module definition for the CTM module. */

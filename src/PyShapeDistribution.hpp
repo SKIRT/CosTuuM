@@ -189,9 +189,11 @@ public:
     // not doing this results in compilation warnings
     static char *kwlist[] = {strdup("npoints"), nullptr};
 
+    // placeholders for integer arguments
+    unsigned int npoints_i = npoints;
     // parse the keywords/positional arguments
-    // I is an integer
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|I", kwlist, &npoints)) {
+    // I is an unsigned integer
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|I", kwlist, &npoints_i)) {
       // PyArg_ParseTupleAndKeywords will return 0 if a required argument was
       // missing, if an argument of the wrong type was provided or if the number
       // of arguments does not match the expectation
@@ -202,6 +204,8 @@ public:
       // exit code 1 signals to Python that something was wrong
       return 1;
     }
+    // unpack integer arguments
+    npoints = npoints_i;
 
     // create the object
     self->_shape_distribution = new DraineHensleyShapeDistribution(npoints);

@@ -113,12 +113,15 @@ public:
 
     // allocate temporary variables to store double precision arguments
     double minimum_size_d;
+    // temporary variables for integer arguments
+    int aligned_orientation_distribution_type_i;
+    unsigned int maximum_order_i = maximum_order;
     // parse the keywords/positional arguments
     // d is a double
     // I is an integer
     if (!PyArg_ParseTupleAndKeywords(
-            args, kwargs, "dI|I", kwlist, &minimum_size_d,
-            &aligned_orientation_distribution_type, &maximum_order)) {
+            args, kwargs, "di|I", kwlist, &minimum_size_d,
+            &aligned_orientation_distribution_type_i, &maximum_order_i)) {
       // PyArg_ParseTupleAndKeywords will return 0 if a required argument was
       // missing, if an argument of the wrong type was provided or if the number
       // of arguments does not match the expectation
@@ -131,6 +134,10 @@ public:
     }
     // unpack double precision arguments
     minimum_size = minimum_size_d;
+    // unpack integer arguments
+    aligned_orientation_distribution_type =
+        aligned_orientation_distribution_type_i;
+    maximum_order = maximum_order_i;
 
     // create the object
     self->_alignment_distribution = new SizeBasedAlignmentDistribution(

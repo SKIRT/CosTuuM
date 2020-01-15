@@ -16,7 +16,9 @@
  */
 enum ResultType {
   /*! @brief Absorption coefficient result. */
-  RESULTTYPE_ABSORPTIONCOEFFICIENTS
+  RESULTTYPE_ABSORPTIONCOEFFICIENTS = 0,
+  /*! @brief Extinction coefficient result. */
+  RESULTTYPE_EXTINCTIONCOEFFICIENTS
 };
 
 /**
