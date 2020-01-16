@@ -13,7 +13,12 @@
 #include "DraineDustProperties.hpp"
 
 #include <Python.h>
+#include <cstring>
 #include <sstream>
+
+/*! @brief Use the NumPy 1.7 API. */
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+#include <numpy/arrayobject.h>
 
 /*! @brief Type for DraineDustProperties wrapper objects. */
 static PyTypeObject PyDraineDustPropertiesType = {
@@ -189,16 +194,25 @@ private:
   /*! @brief Python function that is being wrapped. */
   PyObject *_python_function;
 
+  /*! @brief Additional arguments for the Python function. */
+  PyObject *_additional_arguments;
+
 public:
   /**
    * @brief Constructor.
    *
    * @param python_function Python function that is being wrapped.
+   * @param additional_arguments Additional arguments for the Python function.
    */
-  inline CustomDustProperties(PyObject *python_function)
-      : _python_function(python_function) {
+  inline CustomDustProperties(PyObject *python_function,
+                              PyObject *additional_arguments = nullptr)
+      : _python_function(python_function),
+        _additional_arguments(additional_arguments) {
     // tell Python we store a copy of the function object
     Py_INCREF(_python_function);
+    if (_additional_arguments) {
+      Py_INCREF(_additional_arguments);
+    }
   }
 
   /**
@@ -207,6 +221,9 @@ public:
   virtual ~CustomDustProperties() {
     // tell Python we are done with our local copy of the function object
     Py_DECREF(_python_function);
+    if (_additional_arguments) {
+      Py_DECREF(_additional_arguments);
+    }
   }
 
   /**
@@ -229,16 +246,57 @@ public:
     // wrappers for int values
     int grain_type_i = grain_type;
     // build the argument list for the Python function call
-    PyObject *arglist =
-        Py_BuildValue("(ddi)", &wavelength_d, &grain_size_d, &grain_type_i);
+    PyObject *arglist;
+
+    if (_additional_arguments) {
+      arglist = Py_BuildValue("(ddiO)", wavelength_d, grain_size_d,
+                              grain_type_i, _additional_arguments);
+    } else {
+      arglist =
+          Py_BuildValue("(ddi)", wavelength_d, grain_size_d, grain_type_i);
+    }
     // place the Python function call
     PyObject *result = PyEval_CallObject(_python_function, arglist);
     // we are done with the argument list
     Py_DECREF(arglist);
 
+    if (result == nullptr) {
+      ctm_warning("Error during function call!");
+    }
+
     // parse the result
-    const double result_real = PyComplex_RealAsDouble(result);
-    const double result_imag = PyComplex_ImagAsDouble(result);
+    double result_real, result_imag;
+    // first check what kind of result we got
+    if (strcmp(result->ob_type->tp_name, "complex") != 0) {
+      // we did not get a complex number. Check if we got a NumPy array instead
+      if (PyArray_Check(result)) {
+        // we did
+        PyArrayObject *array = reinterpret_cast<PyArrayObject *>(result);
+        // check if we got a scalar array
+        if (!PyArray_CheckScalar(array)) {
+          // nope. Bail out.
+          ctm_error("Function returns an array!");
+        }
+        // check if the array has complex elements
+        if (!PyArray_ISCOMPLEX(array)) {
+          // nope. That doesn't work.
+          ctm_error("Function does not return a complex number!");
+        }
+        // get the real and imaginary parts by casting the array to two doubles
+        double *results = reinterpret_cast<double *>(PyArray_BYTES(array));
+        result_real = results[0];
+        result_imag = results[1];
+        ctm_warning("result: %g %g", result_real, result_imag);
+      } else {
+        // nope. Give up.
+        ctm_error("Function does not return a complex number!");
+      }
+    } else {
+      // get the real and imaginary parts of the complex number
+      result_real = PyComplex_RealAsDouble(result);
+      result_imag = PyComplex_ImagAsDouble(result);
+    }
+
     // we are done with the result
     Py_DECREF(result);
 
@@ -259,6 +317,9 @@ public:
    *  a given input wavelength, dust grain size and dust grain type (in this
    *  order).
    *
+   * Optional arguments are:
+   *  - additional_arguments: Additional arguments for the Python function.
+   *
    * @param self DustProperties wrapper object that is being initialised.
    * @param args Positional arguments.
    * @param kwargs Keyword arguments.
@@ -269,17 +330,23 @@ public:
     // required arguments
     PyObject *function;
 
+    // optional arguments
+    PyObject *additional_arguments = nullptr;
+
     // list of keywords
-    static char *kwlist[] = {strdup("function"), nullptr};
+    static char *kwlist[] = {strdup("function"), strdup("additional_arguments"),
+                             nullptr};
 
     // parse positional and keyword arguments
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", kwlist, &function)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|O", kwlist, &function,
+                                     &additional_arguments)) {
       // again, we do not call ctm_error to avoid killing the Python interpreter
       ctm_warning("Wrong arguments provided!");
       return 1;
     }
 
-    self->_dust_properties = new CustomDustProperties(function);
+    self->_dust_properties =
+        new CustomDustProperties(function, additional_arguments);
 
     return 0;
   }
