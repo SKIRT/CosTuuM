@@ -286,7 +286,6 @@ public:
         double *results = reinterpret_cast<double *>(PyArray_BYTES(array));
         result_real = results[0];
         result_imag = results[1];
-        ctm_warning("result: %g %g", result_real, result_imag);
       } else {
         // nope. Give up.
         ctm_error("Function does not return a complex number!");

@@ -516,6 +516,313 @@ public:
   }
 
   /**
+   * @brief Get the forward scattering matrix @f$S@f$ for a scattering event
+   * from the given input angles to the given output angles at a particle with
+   * the given orientation.
+   *
+   * @param alpha_radians Azimuth angle of the particle's rotation axis,
+   * @f$\alpha{}@f$ (in radians).
+   * @param beta_radians Zenith angle of the particle's rotation axis,
+   * @f$\beta{}@f$ (in radians).
+   * @param theta_in_radians Zenith angle of the incoming photon,
+   * @f$\theta{}_i@f$ (in radians).
+   * @param phi_in_radians Azimuth angle of the incoming photon, @f$\phi{}_i@f$
+   * (in radians).
+   * @param theta_out_radians Zenith angle of the scattered photon,
+   * @f$\theta{}_s@f$ (in radians).
+   * @param phi_out_radians Azimuth angle fo the scattered photon,
+   * @f$\phi{}_s@f$ (in radians).
+   * @return Scattering matrix for this scattering event.
+   */
+  inline Matrix<std::complex<float_type>> get_forward_scattering_matrix(
+      const float_type alpha_radians, const float_type beta_radians,
+      const float_type theta_in_radians, const float_type phi_in_radians,
+      const float_type theta_out_radians,
+      const float_type phi_out_radians) const {
+
+    // Mishchenko includes some (buggy) corrections for small angles
+    // might be worth looking into this in a later stage...
+
+    // compute all sines and cosines in one go; we need all of them anyway
+    const float_type cosalpha = cos(alpha_radians);
+    const float_type sinalpha = sin(alpha_radians);
+    const float_type cosbeta = cos(beta_radians);
+    const float_type sinbeta = sin(beta_radians);
+    const float_type costheta_l_in = cos(theta_in_radians);
+    const float_type sintheta_l_in = sin(theta_in_radians);
+    const float_type costheta_l_out = cos(theta_out_radians);
+    const float_type sintheta_l_out = sin(theta_out_radians);
+    const float_type cosphi_l_in = cos(phi_in_radians);
+    const float_type sinphi_l_in = sin(phi_in_radians);
+    const float_type cosphi_l_out = cos(phi_out_radians);
+    const float_type sinphi_l_out = sin(phi_out_radians);
+
+    const float_type cosphirel_in =
+        cosphi_l_in * cosalpha + sinphi_l_in * sinalpha;
+    const float_type sinphirel_in =
+        sinphi_l_in * cosalpha - cosphi_l_in * sinalpha;
+
+    const float_type costheta_p_in =
+        costheta_l_in * cosbeta + sintheta_l_in * sinbeta * cosphirel_in;
+    const float_type sintheta_p_in =
+        sqrt((1. - costheta_p_in) * (1. + costheta_p_in));
+    float_type cosphi_p_in, sinphi_p_in, sintheta_p_in_inv;
+    if (sintheta_p_in != 0.) {
+      sintheta_p_in_inv = 1. / sintheta_p_in;
+      cosphi_p_in =
+          (cosbeta * sintheta_l_in * cosphirel_in - sinbeta * costheta_l_in) *
+          sintheta_p_in_inv;
+      sinphi_p_in = sintheta_l_in * sinphirel_in * sintheta_p_in_inv;
+    } else {
+      cosphi_p_in = 1.;
+      sinphi_p_in = 0.;
+      // this value will not be used, but we set it to something anyway
+      sintheta_p_in_inv = 9000.;
+    }
+
+    const float_type cosphirel_out =
+        cosphi_l_out * cosalpha + sinphi_l_out * sinalpha;
+    const float_type sinphirel_out =
+        sinphi_l_out * cosalpha - cosphi_l_out * sinalpha;
+
+    const float_type costheta_p_out =
+        costheta_l_out * cosbeta + sintheta_l_out * sinbeta * cosphirel_out;
+    const float_type sintheta_p_out =
+        sqrt((1. - costheta_p_out) * (1. + costheta_p_out));
+    float_type cosphi_p_out, sinphi_p_out, sintheta_p_out_inv;
+    if (sintheta_p_out != 0.) {
+      sintheta_p_out_inv = 1. / sintheta_p_out;
+      cosphi_p_out = (cosbeta * sintheta_l_out * cosphirel_out -
+                      sinbeta * costheta_l_out) *
+                     sintheta_p_out_inv;
+      sinphi_p_out = sintheta_l_out * sinphirel_out * sintheta_p_out_inv;
+    } else {
+      cosphi_p_out = 1.;
+      sinphi_p_out = 0.;
+      // this value will not be used, but we set it to something anyway
+      sintheta_p_out_inv = 9000.;
+    }
+
+    Matrix<float_type> B(3, 3);
+    B(0, 0) = cosalpha * cosbeta;
+    B(0, 1) = sinalpha * cosbeta;
+    B(0, 2) = -sinbeta;
+    B(1, 0) = -sinalpha;
+    B(1, 1) = cosalpha;
+    // B(1,2) remains 0.
+    B(2, 0) = cosalpha * sinbeta;
+    B(2, 1) = sinalpha * sinbeta;
+    B(2, 2) = cosbeta;
+
+    Matrix<float_type> AL_in(3, 2);
+    AL_in(0, 0) = costheta_l_in * cosphi_l_in;
+    AL_in(0, 1) = -sinphi_l_in;
+    AL_in(1, 0) = costheta_l_in * sinphi_l_in;
+    AL_in(1, 1) = cosphi_l_in;
+    AL_in(2, 0) = -sintheta_l_in;
+    // AL_in(2,1) remains 0.
+
+    Matrix<float_type> AP_in(2, 3);
+    AP_in(0, 0) = costheta_p_in * cosphi_p_in;
+    AP_in(0, 1) = costheta_p_in * sinphi_p_in;
+    AP_in(0, 2) = -sintheta_p_in;
+    AP_in(1, 0) = -sinphi_p_in;
+    AP_in(1, 1) = cosphi_p_in;
+    // AP_in(1,2) remains 0.
+
+    Matrix<float_type> AL_out(3, 2);
+    AL_out(0, 0) = costheta_l_out * cosphi_l_out;
+    AL_out(0, 1) = -sinphi_l_out;
+    AL_out(1, 0) = costheta_l_out * sinphi_l_out;
+    AL_out(1, 1) = cosphi_l_out;
+    AL_out(2, 0) = -sintheta_l_out;
+    // AL_out(2,1) remains 0.
+
+    Matrix<float_type> AP_out(2, 3);
+    AP_out(0, 0) = costheta_p_out * cosphi_p_out;
+    AP_out(0, 1) = costheta_p_out * sinphi_p_out;
+    AP_out(0, 2) = -sintheta_p_out;
+    AP_out(1, 0) = -sinphi_p_out;
+    AP_out(1, 1) = cosphi_p_out;
+    // AP_out(1,2) remains 0.
+
+    // C is a temporary matrix that contains B x AL_in
+    Matrix<float_type> C(3, 2);
+    for (uint_fast8_t i = 0; i < 3; ++i) {
+      for (uint_fast8_t j = 0; j < 2; ++j) {
+        for (uint_fast8_t k = 0; k < 3; ++k) {
+          C(i, j) += B(i, k) * AL_in(k, j);
+        }
+      }
+    }
+    Matrix<float_type> R_in(2, 2);
+    for (uint_fast8_t i = 0; i < 2; ++i) {
+      for (uint_fast8_t j = 0; j < 2; ++j) {
+        for (uint_fast8_t k = 0; k < 3; ++k) {
+          R_in(i, j) += AP_in(i, k) * C(k, j);
+        }
+      }
+    }
+
+    // now C will contain B x AL_out
+    for (uint_fast8_t i = 0; i < 3; ++i) {
+      for (uint_fast8_t j = 0; j < 2; ++j) {
+        C(i, j) = 0.;
+        for (uint_fast8_t k = 0; k < 3; ++k) {
+          C(i, j) += B(i, k) * AL_out(k, j);
+        }
+      }
+    }
+    Matrix<float_type> R_out(2, 2);
+    for (uint_fast8_t i = 0; i < 2; ++i) {
+      for (uint_fast8_t j = 0; j < 2; ++j) {
+        for (uint_fast8_t k = 0; k < 3; ++k) {
+          R_out(i, j) += AP_out(i, k) * C(k, j);
+        }
+      }
+    }
+
+    // manually invert the 2x2 matrix R_out
+    const float_type d =
+        1. / (R_out(0, 0) * R_out(1, 1) - R_out(0, 1) * R_out(1, 0));
+    const float_type temp = R_out(0, 0);
+    R_out(0, 0) = R_out(1, 1) * d;
+    R_out(0, 1) = -R_out(0, 1) * d;
+    R_out(1, 0) = -R_out(1, 0) * d;
+    R_out(1, 1) = temp * d;
+
+    const TMatrixResource &T = _Tmatrix;
+    const uint_fast32_t nmax = T.get_nmax();
+    // precompute the c factors
+    const std::complex<float_type> icompl(0., 1.);
+    Matrix<std::complex<float_type>> c(nmax, nmax);
+    std::complex<float_type> icomp_pow_nn = icompl;
+    for (uint_fast32_t nn = 1; nn < nmax + 1; ++nn) {
+      std::complex<float_type> icomp_pow_m_n_m_1(-1.);
+      for (uint_fast32_t n = 1; n < nmax + 1; ++n) {
+        // icomp_pow_nn*icomp_pow_m_n_m_1 now equals i^(nn - n - 1)
+        c(n - 1, nn - 1) = icomp_pow_m_n_m_1 * icomp_pow_nn *
+                           float_type(sqrt((2. * n + 1.) * (2. * nn + 1.) /
+                                           (n * nn * (n + 1.) * (nn + 1.))));
+        icomp_pow_m_n_m_1 /= icompl;
+      }
+      icomp_pow_nn *= icompl;
+    }
+
+    // now compute the matrix S^P
+    // we precompute e^{i(phi_out-phi_in)}
+    const std::complex<float_type> expiphi_p_out_m_in(
+        cosphi_p_out * cosphi_p_in + sinphi_p_out * sinphi_p_in,
+        sinphi_p_out * cosphi_p_in - cosphi_p_out * sinphi_p_in);
+    // e^{im(phi_out-phi_in)} is computed recursively, starting with the value
+    // for m=0: 1
+    std::complex<float_type> expimphi_p_out_m_in(1., 0.);
+    Matrix<std::complex<float_type>> S(2, 2);
+    // instead of summing over n and n', we sum over m, since then we can reuse
+    // the e^{im(phi_out-phi_in)}, pi and tau factors
+    for (uint_fast32_t m = 0; m < nmax + 1; ++m) {
+      // only n and n' values larger than or equal to m have non-trivial
+      // contributions to the S matrix
+      const uint_fast32_t nmin = std::max(m, static_cast<uint_fast32_t>(1));
+
+      // precompute the pi and tau functions for this value of m
+      std::vector<float_type> pi_in(nmax), tau_in(nmax);
+      SpecialFunctions::wigner_dn_0m_sinx(costheta_p_in, sintheta_p_in,
+                                          sintheta_p_in_inv, nmax, m, &pi_in[0],
+                                          &tau_in[0]);
+      std::vector<float_type> pi_out(nmax), tau_out(nmax);
+      SpecialFunctions::wigner_dn_0m_sinx(costheta_p_out, sintheta_p_out,
+                                          sintheta_p_out_inv, nmax, m,
+                                          &pi_out[0], &tau_out[0]);
+
+      // we get the real and imaginary part of e^{im\phi{}} and multiply with
+      // 2 to account for both m and -m
+      const float_type fcos = 2. * expimphi_p_out_m_in.real();
+      const float_type fsin = 2. * expimphi_p_out_m_in.imag();
+      // recurse the exponential for the next iteration
+      expimphi_p_out_m_in *= expiphi_p_out_m_in;
+
+      // now perform the actual sums over n and n'
+      for (uint_fast32_t nn = nmin; nn < nmax + 1; ++nn) {
+
+        // get the specific pi and tau for this n'
+        const float_type pi_nn = m * pi_in[nn - 1];
+        const float_type tau_nn = tau_in[nn - 1];
+
+        for (uint_fast32_t n = nmin; n < nmax + 1; ++n) {
+
+          // get the specific pi and tau for this n
+          const float_type pi_n = m * pi_out[n - 1];
+          const float_type tau_n = tau_out[n - 1];
+
+          // get the c factor for these values of n and n'
+          const std::complex<float_type> c_nnn = c(n - 1, nn - 1);
+
+          // get the T11 and T22 elements for this m, n and n' (we need these
+          // in all cases)
+          const std::complex<float_type> T11nmnnm = T(0, n, m, 0, nn, m);
+          const std::complex<float_type> T22nmnnm = T(1, n, m, 1, nn, m);
+          // if m=0, the T12 and T21 matrices are trivially zero, and we can
+          // simplify the expression for S
+          if (m == 0) {
+            const std::complex<float_type> factor = c_nnn * tau_n * tau_nn;
+            S(0, 0) += factor * T22nmnnm;
+            S(1, 1) += factor * T11nmnnm;
+          } else {
+            // in the general case m=/=0, we also need the T12 and T21 elements
+            // for this m, n and n'
+            const std::complex<float_type> T12nmnnm = T(0, n, m, 1, nn, m);
+            const std::complex<float_type> T21nmnnm = T(1, n, m, 0, nn, m);
+
+            // due to m symmetry, S11 and S22 only have the cosine factor,
+            // while S12 and S21 only have the sine factor
+            const std::complex<float_type> real_factor = c_nnn * fcos;
+            const std::complex<float_type> imag_factor = c_nnn * fsin;
+
+            // precompute the pi and tau factor combinations
+            const float_type pi_pi = pi_n * pi_nn;
+            const float_type pi_tau = pi_n * tau_nn;
+            const float_type tau_pi = tau_n * pi_nn;
+            const float_type tau_tau = tau_n * tau_nn;
+
+            S(0, 0) += real_factor * (T11nmnnm * pi_pi + T21nmnnm * tau_pi +
+                                      T12nmnnm * pi_tau + T22nmnnm * tau_tau);
+            S(0, 1) += imag_factor * (T11nmnnm * pi_tau + T21nmnnm * tau_tau +
+                                      T12nmnnm * pi_pi + T22nmnnm * tau_pi);
+            S(1, 0) -= imag_factor * (T11nmnnm * tau_pi + T21nmnnm * pi_pi +
+                                      T12nmnnm * tau_tau + T22nmnnm * pi_tau);
+            S(1, 1) += real_factor * (T11nmnnm * tau_tau + T21nmnnm * pi_tau +
+                                      T12nmnnm * tau_pi + T22nmnnm * pi_pi);
+          }
+        }
+      }
+    }
+    // now divide all expressions by the wavenumber
+    const float_type kinv = 1. / _interaction_variables.get_wavenumber();
+    S(0, 0) *= kinv;
+    S(0, 1) *= kinv;
+    S(1, 0) *= kinv;
+    S(1, 1) *= kinv;
+
+    // perform the double 2x2 matrix product to convert S^P to S^L
+    const std::complex<float_type> cS11 =
+        S(0, 0) * R_in(0, 0) + S(0, 1) * R_in(1, 0);
+    const std::complex<float_type> cS12 =
+        S(0, 0) * R_in(0, 1) + S(0, 1) * R_in(1, 1);
+    const std::complex<float_type> cS21 =
+        S(1, 0) * R_in(0, 0) + S(1, 1) * R_in(1, 0);
+    const std::complex<float_type> cS22 =
+        S(1, 0) * R_in(0, 1) + S(1, 1) * R_in(1, 1);
+
+    S(0, 0) = R_out(0, 0) * cS11 + R_out(0, 1) * cS21;
+    S(0, 1) = R_out(0, 0) * cS12 + R_out(0, 1) * cS22;
+    S(1, 0) = R_out(1, 0) * cS11 + R_out(1, 1) * cS21;
+    S(1, 1) = R_out(1, 0) * cS12 + R_out(1, 1) * cS22;
+
+    return S;
+  }
+
+  /**
    * @brief Execute the task.
    *
    * @param thread_id ID of the thread that executes the task.
@@ -526,8 +833,11 @@ public:
 
     for (uint_fast32_t itheta_in = 0; itheta_in < ntheta; ++itheta_in) {
 
+      //      Matrix<std::complex<float_type>> S =
+      //          get_forward_scattering_matrix(itheta_in, 1., 0.);
       Matrix<std::complex<float_type>> S =
-          get_forward_scattering_matrix(itheta_in, 1., 0.);
+          get_forward_scattering_matrix(0., 0., _grid._theta_in[itheta_in], 0.,
+                                        _grid._theta_in[itheta_in], 0.);
 
       const float_type prefactor =
           2. * M_PI / _interaction_variables.get_wavenumber();
