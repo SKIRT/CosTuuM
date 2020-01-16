@@ -236,13 +236,13 @@ public:
 
     const uint_fast32_t np1 = nmax + 1;
 
-    _wigner_d_sinx.reserve(np1);
-    for (uint_fast32_t i = 0; i < np1; ++i) {
+    _wigner_d_sinx.reserve(np1 * nmax);
+    for (uint_fast32_t i = 0; i < np1 * nmax; ++i) {
       _wigner_d_sinx.push_back(
           Matrix<float_type>(grid._cos_theta_in.size(), nmax));
     }
-    _dwigner_d.reserve(np1);
-    for (uint_fast32_t i = 0; i < np1; ++i) {
+    _dwigner_d.reserve(np1 * nmax);
+    for (uint_fast32_t i = 0; i < np1 * nmax; ++i) {
       _dwigner_d.push_back(Matrix<float_type>(grid._cos_theta_in.size(), nmax));
     }
   }
@@ -261,8 +261,8 @@ public:
                                        const ExtinctionCoefficientGrid &grid) {
     size_t size = sizeof(ExtinctionSpecialWignerDResources);
     // input angles
-    size +=
-        2 * (nmax + 1) * grid._cos_theta_in.size() * nmax * sizeof(float_type);
+    size += 2 * (nmax + 1) * nmax * grid._cos_theta_in.size() * nmax *
+            sizeof(float_type);
     return size;
   }
 
@@ -286,17 +286,19 @@ public:
    */
   virtual void execute(const int_fast32_t thread_id = 0) {
 
+    const uint_fast32_t ntheta_in = _grid._cos_theta_in.size();
     for (uint_fast32_t m = 0; m < _nmax + 1; ++m) {
-      const uint_fast32_t ntheta_in = _grid._cos_theta_in.size();
-      for (uint_fast32_t itheta_in = 0; itheta_in < ntheta_in; ++itheta_in) {
-        /// THIS IS WRONG!!!!!
-        /// we need to precompute these functions for all values of n, not only
-        /// _nmax
-        SpecialFunctions::wigner_dn_0m_sinx(
-            _grid._cos_theta_in[itheta_in], _grid._sin_theta_in[itheta_in],
-            _grid._sin_theta_in_inverse[itheta_in], _nmax, m,
-            &_wigner_d_sinx[m].get_row(itheta_in)[0],
-            &_dwigner_d[m].get_row(itheta_in)[0]);
+      for (uint_fast32_t n = 0; n < _nmax; ++n) {
+        for (uint_fast32_t itheta_in = 0; itheta_in < ntheta_in; ++itheta_in) {
+          /// THIS IS WRONG!!!!!
+          /// we need to precompute these functions for all values of n, not
+          /// only _nmax
+          SpecialFunctions::wigner_dn_0m_sinx(
+              _grid._cos_theta_in[itheta_in], _grid._sin_theta_in[itheta_in],
+              _grid._sin_theta_in_inverse[itheta_in], n + 1, m,
+              &_wigner_d_sinx[m * _nmax + n].get_row(itheta_in)[0],
+              &_dwigner_d[m * _nmax + n].get_row(itheta_in)[0]);
+        }
       }
     }
     make_available();
@@ -308,19 +310,23 @@ public:
    * @param m @f$m@f$ value.
    * @param itheta_in Index of the input angle.
    * @param n Order, @f$n@f$.
+   * @param nmax Maximum order.
    * @return Corresponding special Wigner D function value.
    */
   inline float_type get_wigner_d_sinx(const uint_fast32_t m,
                                       const uint_fast32_t itheta_in,
-                                      const uint_fast32_t n) const {
+                                      const uint_fast32_t n,
+                                      const uint_fast32_t nmax) const {
 
     ctm_assert(m < _wigner_d_sinx.size());
-    ctm_assert(itheta_in < _wigner_d_sinx[m].get_number_of_rows());
+    ctm_assert(itheta_in <
+               _wigner_d_sinx[m * _nmax + nmax].get_number_of_rows());
     ctm_assert(n > 0);
-    ctm_assert(n - 1 < _wigner_d_sinx[m].get_number_of_columns());
+    ctm_assert(n - 1 <
+               _wigner_d_sinx[m * _nmax + nmax].get_number_of_columns());
     // check that the resource was actually computed
     check_use();
-    return _wigner_d_sinx[m](itheta_in, n - 1);
+    return _wigner_d_sinx[m * _nmax + nmax](itheta_in, n - 1);
   }
 
   /**
@@ -330,19 +336,21 @@ public:
    * @param m @f$m@f$ value.
    * @param itheta_in Index of the input angle.
    * @param n Order, @f$n@f$.
+   * @param nmax Maximum order.
    * @return Corresponding derivative value.
    */
   inline float_type get_dwigner_d(const uint_fast32_t m,
                                   const uint_fast32_t itheta_in,
-                                  const uint_fast32_t n) const {
+                                  const uint_fast32_t n,
+                                  const uint_fast32_t nmax) const {
 
     ctm_assert(m < _dwigner_d.size());
-    ctm_assert(itheta_in < _dwigner_d[m].get_number_of_rows());
+    ctm_assert(itheta_in < _dwigner_d[m * _nmax + nmax].get_number_of_rows());
     ctm_assert(n > 0);
-    ctm_assert(n - 1 < _dwigner_d[m].get_number_of_columns());
+    ctm_assert(n - 1 < _dwigner_d[m * _nmax + nmax].get_number_of_columns());
     // check that the resource was actually computed
     check_use();
-    return _dwigner_d[m](itheta_in, n - 1);
+    return _dwigner_d[m * _nmax + nmax](itheta_in, n - 1);
   }
 };
 
@@ -454,15 +462,17 @@ public:
 
         // get the specific pi and tau for this n'
         const float_type pi_nn =
-            m * _wigner_d.get_wigner_d_sinx(m, itheta_in, nn);
-        const float_type tau_nn = _wigner_d.get_dwigner_d(m, itheta_in, nn);
+            m * _wigner_d.get_wigner_d_sinx(m, itheta_in, nn, nmax - 1);
+        const float_type tau_nn =
+            _wigner_d.get_dwigner_d(m, itheta_in, nn, nmax - 1);
 
         for (uint_fast32_t n = nmin; n < nmax + 1; ++n) {
 
           // get the specific pi and tau for this n
           const float_type pi_n =
-              m * _wigner_d.get_wigner_d_sinx(m, itheta_in, n);
-          const float_type tau_n = _wigner_d.get_dwigner_d(m, itheta_in, n);
+              m * _wigner_d.get_wigner_d_sinx(m, itheta_in, n, nmax - 1);
+          const float_type tau_n =
+              _wigner_d.get_dwigner_d(m, itheta_in, n, nmax - 1);
 
           // get the c factor for these values of n and n'
           const std::complex<float_type> c_nnn = _nfactors.get_cnn(n, nn);
@@ -523,6 +533,7 @@ public:
    * from the given input angles to the given output angles at a particle with
    * the given orientation.
    *
+   * @param itheta_in Index of the input zenith angle.
    * @param theta_in_radians Zenith angle of the incoming photon,
    * @f$\theta{}_i@f$ (in radians).
    * @param theta_out_radians Zenith angle of the scattered photon,
@@ -532,7 +543,8 @@ public:
    * @return Scattering matrix for this scattering event.
    */
   inline Matrix<std::complex<float_type>>
-  get_forward_scattering_matrix(const float_type theta_in_radians,
+  get_forward_scattering_matrix(const uint_fast32_t itheta_in,
+                                const float_type theta_in_radians,
                                 const float_type theta_out_radians,
                                 const float_type phi_out_radians) const {
 
@@ -617,7 +629,9 @@ public:
       for (uint_fast32_t nn = nmin; nn < nmax + 1; ++nn) {
 
         // get the specific pi and tau for this n'
-        const float_type pi_nn = m * pi_in[nn - 1];
+        //        const float_type pi_nn = m * pi_in[nn - 1];
+        const float_type pi_nn =
+            m * _wigner_d.get_wigner_d_sinx(m, itheta_in, nn, nmax - 1);
         const float_type tau_nn = tau_in[nn - 1];
 
         for (uint_fast32_t n = nmin; n < nmax + 1; ++n) {
@@ -689,10 +703,11 @@ public:
 
     for (uint_fast32_t itheta_in = 0; itheta_in < ntheta; ++itheta_in) {
 
-      //            Matrix<std::complex<float_type>> S =
-      //                get_forward_scattering_matrix(itheta_in, 1., 0.);
-      Matrix<std::complex<float_type>> S = get_forward_scattering_matrix(
-          _grid._theta_in[itheta_in], _grid._theta_in[itheta_in], 0.);
+      //      Matrix<std::complex<float_type>> S =
+      //          get_forward_scattering_matrix(itheta_in, 1., 0.);
+      Matrix<std::complex<float_type>> S =
+          get_forward_scattering_matrix(itheta_in, _grid._theta_in[itheta_in],
+                                        _grid._theta_in[itheta_in], 0.);
 
       const float_type prefactor =
           2. * M_PI / _interaction_variables.get_wavenumber();
