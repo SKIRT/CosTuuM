@@ -1024,7 +1024,7 @@ public:
 
     const std::complex<float_type> k2mr =
         _interaction_variables.get_material_wavenumber_times_wavenumber();
-    const double k2 = _interaction_variables.get_wavenumber_squared();
+    const float_type k2 = _interaction_variables.get_wavenumber_squared();
     for (uint_fast32_t n1 = _m; n1 < nmax + 1; ++n1) {
       const uint_fast32_t ki1 = n1 + 1 - _m;
       const uint_fast32_t kki1 = ki1 + nm;

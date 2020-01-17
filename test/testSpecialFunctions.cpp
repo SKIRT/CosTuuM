@@ -302,6 +302,26 @@ int main(int argc, char **argv) {
     gfile << x[i] << "\t" << w[i] << "\n";
   }
 
+  // test spherical shell integration with Gauss-Legendre quadrature
+  {
+    const uint_fast32_t ngauss = 100;
+    std::vector<float_type> cos_theta(ngauss), cos_theta_weights(ngauss);
+    std::vector<float_type> phi(ngauss), phi_weights(ngauss);
+    SpecialFunctions::get_gauss_legendre_points_and_weights<float_type>(
+        ngauss, cos_theta, cos_theta_weights);
+    SpecialFunctions::get_gauss_legendre_points_and_weights_ab<float_type>(
+        ngauss, 0., 2. * M_PI, phi, phi_weights);
+    float_type result = 0.;
+    for (uint_fast32_t i = 0; i < ngauss; ++i) {
+      for (uint_fast32_t j = 0; j < ngauss; ++j) {
+        result += cos_theta_weights[i] * phi_weights[j] *
+                  (acos(cos_theta[i]) + phi[j]);
+      }
+    }
+    ctm_warning("Result: %g", double(result));
+    assert_values_equal_rel(double(result), 6. * M_PI * M_PI, 1.e-15);
+  }
+
   /// Clebsch-Gordan coefficients
   /// We test our implementation against the values for all coefficients
   /// with n1 = 1 and n2 = 1 provided on Wikipedia:

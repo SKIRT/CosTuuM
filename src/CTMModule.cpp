@@ -938,7 +938,7 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
                            nullptr};
 
   // placeholders for float_type arguments
-  double input_tolerance_d = input_tolerance;
+  double input_tolerance_d = static_cast<double>(input_tolerance);
   // placeholders for integer arguments
   unsigned int input_nmin_i = input_nmin;
   unsigned int input_nmax_i = input_nmax;

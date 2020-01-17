@@ -82,7 +82,7 @@ inline void string_to_file(std::ofstream &ofile, const std::string value) {
 inline void array_to_file(std::ofstream &ofile,
                           const std::vector<float_type> &value) {
   for (uint_fast32_t i = 0; i < value.size(); ++i) {
-    const double ival = value[i];
+    const double ival = static_cast<double>(value[i]);
     ofile.write(reinterpret_cast<const char *>(&ival), sizeof(ival));
   }
 }

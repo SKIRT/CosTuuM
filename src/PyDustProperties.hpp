@@ -241,10 +241,10 @@ public:
                        const int_fast32_t grain_type) const {
 
     // wrappers for float_type values
-    double wavelength_d = wavelength;
-    double grain_size_d = grain_size;
+    const double wavelength_d = static_cast<double>(wavelength);
+    const double grain_size_d = static_cast<double>(grain_size);
     // wrappers for int values
-    int grain_type_i = grain_type;
+    const int grain_type_i = grain_type;
     // build the argument list for the Python function call
     PyObject *arglist;
 
