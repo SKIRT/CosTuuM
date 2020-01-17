@@ -883,6 +883,7 @@ inline std::vector<DATA_TYPE> unpack_numpy_array(PyArrayObject *numpy_array) {
  *  - do_absorption: Compute absorption coefficients? (default: True)
  *  - do_extinction: Compute extinction coefficients? (default: False)
  *  - do_scattering: Compute scattering matrices? (default: False)
+ *  - verbose: Display diagnostic output? (default: False)
  *
  * @param self Module object.
  * @param args Positional arguments.
@@ -916,6 +917,7 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   bool do_absorption = true;
   bool do_extinction = false;
   bool do_scattering = false;
+  bool verbose = false;
 
   // list of keywords
   static char *kwlist[] = {strdup("types"),
@@ -938,6 +940,7 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
                            strdup("do_absorption"),
                            strdup("do_extinction"),
                            strdup("do_scattering"),
+                           strdup("verbose"),
                            nullptr};
 
   // placeholders for float_type arguments
@@ -952,9 +955,10 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   int do_absorption_b = do_absorption;
   int do_extinction_b = do_extinction;
   int do_scattering_b = do_scattering;
+  int verbose_b = verbose;
   // parse positional and keyword arguments
   if (!PyArg_ParseTupleAndKeywords(
-          args, kwargs, "O&O&O&O&OOO|IIIdkizzzzppp", kwlist, PyArray_Converter,
+          args, kwargs, "O&O&O&O&OOO|IIIdkizzzzpppp", kwlist, PyArray_Converter,
           &input_types, PyArray_Converter, &input_sizes, PyArray_Converter,
           &input_wavelengths, PyArray_Converter, &input_thetas,
           &shape_distribution_object, &alignment_distribution_object,
@@ -962,7 +966,7 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
           &input_tolerance_d, &input_memory_size_i, &input_nthread_i,
           &input_graph_log_name, &input_task_log_name,
           &input_task_type_log_name, &input_memory_log_name, &do_absorption_b,
-          &do_extinction_b, &do_scattering_b)) {
+          &do_extinction_b, &do_scattering_b, &verbose_b)) {
     // again, we do not call ctm_error to avoid killing the Python interpreter
     ctm_warning("Wrong arguments provided!");
     // this time, a nullptr return will signal an error to Python
@@ -980,6 +984,7 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   do_absorption = do_absorption_b;
   do_extinction = do_extinction_b;
   do_scattering = do_scattering_b;
+  verbose = verbose_b;
 
   const ShapeDistribution *shape_distribution =
       shape_distribution_object->_shape_distribution;
@@ -1017,7 +1022,7 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
     input_graph_log = input_graph_log_name;
   }
   QuickSched quicksched(input_nthread, input_graph_log_name != nullptr,
-                        input_graph_log, false);
+                        input_graph_log, verbose);
 
   std::vector<float_type> thetas =
       unpack_numpy_array<float_type, double>(input_thetas);
@@ -1034,7 +1039,7 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   TMatrixAuxiliarySpaceManager *space_manager = nullptr;
   task_manager.generate_tasks(
       thetas, 20, quicksched, tasks, resources, result_key, results,
-      space_manager, do_extinction, do_absorption, do_scattering, false,
+      space_manager, do_extinction, do_absorption, do_scattering, verbose,
       input_memory_log_name != nullptr, input_memory_log);
 
   Py_BEGIN_ALLOW_THREADS;
