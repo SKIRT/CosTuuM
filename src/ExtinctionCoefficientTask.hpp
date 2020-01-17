@@ -234,17 +234,18 @@ public:
       const uint_fast32_t nmax, const ExtinctionCoefficientGrid &grid)
       : _nmax(nmax), _grid(grid) {
 
-    const uint_fast32_t np1 = nmax + 1;
+    const uint_fast32_t number_of_elements = (2 + nmax + 1) * nmax / 2;
 
-    _wigner_d_sinx.reserve(np1 * nmax);
-    for (uint_fast32_t i = 0; i < np1 * nmax; ++i) {
-      _wigner_d_sinx.push_back(
-          Matrix<float_type>(grid._cos_theta_in.size(), nmax));
+    _wigner_d_sinx.reserve(number_of_elements);
+    _dwigner_d.reserve(number_of_elements);
+    for (uint_fast32_t n = 1; n < nmax + 1; ++n) {
+      for (uint_fast32_t m = 0; m < n + 1; ++m) {
+        _wigner_d_sinx.push_back(
+            Matrix<float_type>(grid._cos_theta_in.size(), n));
+        _dwigner_d.push_back(Matrix<float_type>(grid._cos_theta_in.size(), n));
+      }
     }
-    _dwigner_d.reserve(np1 * nmax);
-    for (uint_fast32_t i = 0; i < np1 * nmax; ++i) {
-      _dwigner_d.push_back(Matrix<float_type>(grid._cos_theta_in.size(), nmax));
-    }
+    ctm_assert(_wigner_d_sinx.size() == number_of_elements);
   }
 
   virtual ~ExtinctionSpecialWignerDResources() {}
@@ -260,9 +261,11 @@ public:
   static inline size_t get_memory_size(const uint_fast32_t nmax,
                                        const ExtinctionCoefficientGrid &grid) {
     size_t size = sizeof(ExtinctionSpecialWignerDResources);
-    // input angles
-    size += 2 * (nmax + 1) * nmax * grid._cos_theta_in.size() * nmax *
-            sizeof(float_type);
+    for (uint_fast32_t n = 1; n < nmax + 1; ++n) {
+      for (uint_fast32_t m = 0; m < n + 1; ++m) {
+        size += 2 * grid._cos_theta_in.size() * n * sizeof(float_type);
+      }
+    }
     return size;
   }
 
@@ -287,14 +290,21 @@ public:
   virtual void execute(const int_fast32_t thread_id = 0) {
 
     const uint_fast32_t ntheta_in = _grid._cos_theta_in.size();
-    for (uint_fast32_t m = 0; m < _nmax + 1; ++m) {
-      for (uint_fast32_t n = 0; n < _nmax; ++n) {
+    for (uint_fast32_t n = 1; n < _nmax + 1; ++n) {
+      for (uint_fast32_t m = 0; m < n + 1; ++m) {
         for (uint_fast32_t itheta_in = 0; itheta_in < ntheta_in; ++itheta_in) {
+          const uint_fast32_t index = (2 + n) * (n - 1) / 2 + m;
+          ctm_assert(index < _wigner_d_sinx.size());
+          ctm_assert_message(_wigner_d_sinx[index].get_number_of_columns() == n,
+                             "cols: %" PRIuFAST32 ", n: %" PRIuFAST32
+                             ", m: %" PRIuFAST32 ", index: %" PRIuFAST32,
+                             _wigner_d_sinx[index].get_number_of_columns(), n,
+                             m, index);
           SpecialFunctions::wigner_dn_0m_sinx(
               _grid._cos_theta_in[itheta_in], _grid._sin_theta_in[itheta_in],
-              _grid._sin_theta_in_inverse[itheta_in], n + 1, m,
-              &_wigner_d_sinx[m * _nmax + n].get_row(itheta_in)[0],
-              &_dwigner_d[m * _nmax + n].get_row(itheta_in)[0]);
+              _grid._sin_theta_in_inverse[itheta_in], n, m,
+              &_wigner_d_sinx[index].get_row(itheta_in)[0],
+              &_dwigner_d[index].get_row(itheta_in)[0]);
         }
       }
     }
@@ -315,15 +325,19 @@ public:
                                       const uint_fast32_t n,
                                       const uint_fast32_t nmax) const {
 
-    ctm_assert(m < _wigner_d_sinx.size());
-    ctm_assert(itheta_in <
-               _wigner_d_sinx[m * _nmax + nmax].get_number_of_rows());
+    ctm_assert(nmax > 0);
+    const uint_fast32_t index = (2 + nmax) * (nmax - 1) / 2 + m;
+    ctm_assert(index < _wigner_d_sinx.size());
     ctm_assert(n > 0);
-    ctm_assert(n - 1 <
-               _wigner_d_sinx[m * _nmax + nmax].get_number_of_columns());
+    ctm_assert(m <= n);
+    ctm_assert(itheta_in < _wigner_d_sinx[index].get_number_of_rows());
+    ctm_assert_message(n - 1 < _wigner_d_sinx[index].get_number_of_columns(),
+                       "m: %" PRIuFAST32 ", n: %" PRIuFAST32
+                       ", nmax: %" PRIuFAST32 ", index: %" PRIuFAST32,
+                       m, n, nmax, index);
     // check that the resource was actually computed
     check_use();
-    return _wigner_d_sinx[m * _nmax + nmax](itheta_in, n - 1);
+    return _wigner_d_sinx[index](itheta_in, n - 1);
   }
 
   /**
@@ -341,13 +355,16 @@ public:
                                   const uint_fast32_t n,
                                   const uint_fast32_t nmax) const {
 
-    ctm_assert(m < _dwigner_d.size());
-    ctm_assert(itheta_in < _dwigner_d[m * _nmax + nmax].get_number_of_rows());
+    ctm_assert(nmax > 0);
+    const uint_fast32_t index = (2 + nmax) * (nmax - 1) / 2 + m;
+    ctm_assert(index < _dwigner_d.size());
     ctm_assert(n > 0);
-    ctm_assert(n - 1 < _dwigner_d[m * _nmax + nmax].get_number_of_columns());
+    ctm_assert(m <= n);
+    ctm_assert(itheta_in < _dwigner_d[index].get_number_of_rows());
+    ctm_assert(n - 1 < _dwigner_d[index].get_number_of_columns());
     // check that the resource was actually computed
     check_use();
-    return _dwigner_d[m * _nmax + nmax](itheta_in, n - 1);
+    return _dwigner_d[index](itheta_in, n - 1);
   }
 };
 
@@ -459,17 +476,17 @@ public:
 
         // get the specific pi and tau for this n'
         const float_type pi_nn =
-            m * _wigner_d.get_wigner_d_sinx(m, itheta_in, nn, nmax - 1);
+            m * _wigner_d.get_wigner_d_sinx(m, itheta_in, nn, nmax);
         const float_type tau_nn =
-            _wigner_d.get_dwigner_d(m, itheta_in, nn, nmax - 1);
+            _wigner_d.get_dwigner_d(m, itheta_in, nn, nmax);
 
         for (uint_fast32_t n = nmin; n < nmax + 1; ++n) {
 
           // get the specific pi and tau for this n
           const float_type pi_n =
-              m * _wigner_d.get_wigner_d_sinx(m, itheta_in, n, nmax - 1);
+              m * _wigner_d.get_wigner_d_sinx(m, itheta_in, n, nmax);
           const float_type tau_n =
-              _wigner_d.get_dwigner_d(m, itheta_in, n, nmax - 1);
+              _wigner_d.get_dwigner_d(m, itheta_in, n, nmax);
 
           // get the c factor for these values of n and n'
           // note the order of the arguments (took an awful long time to spot
