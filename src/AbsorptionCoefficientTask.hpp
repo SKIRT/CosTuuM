@@ -254,10 +254,10 @@ private:
   /*! @brief Absorption coefficient grid to use. */
   const AbsorptionCoefficientGrid &_grid;
 
-  /*! @brief Wigner D functions divided by sine for input angles. */
+  /*! @brief Wigner D functions divided by sine. */
   std::vector<Matrix<float_type>> _wigner_d_sinx[2];
 
-  /*! @brief Derivatives of the Wigner D functions for input angles. */
+  /*! @brief Derivatives of the Wigner D functions. */
   std::vector<Matrix<float_type>> _dwigner_d[2];
 
 public:
@@ -271,29 +271,25 @@ public:
       const uint_fast32_t nmax, const AbsorptionCoefficientGrid &grid)
       : _nmax(nmax), _grid(grid) {
 
-    const uint_fast32_t np1 = nmax + 1;
+    const uint_fast32_t number_of_elements = (2 + nmax + 1) * nmax / 2;
 
-    _wigner_d_sinx[0].reserve(np1);
-    for (uint_fast32_t i = 0; i < np1; ++i) {
-      _wigner_d_sinx[0].push_back(
-          Matrix<float_type>(grid._cos_theta_in.size(), nmax));
+    _wigner_d_sinx[0].reserve(number_of_elements);
+    _wigner_d_sinx[1].reserve(number_of_elements);
+    _dwigner_d[0].reserve(number_of_elements);
+    _dwigner_d[1].reserve(number_of_elements);
+    for (uint_fast32_t n = 1; n < nmax + 1; ++n) {
+      for (uint_fast32_t m = 0; m < n + 1; ++m) {
+        _wigner_d_sinx[0].push_back(
+            Matrix<float_type>(grid._cos_theta_in.size(), n));
+        _dwigner_d[0].push_back(
+            Matrix<float_type>(grid._cos_theta_in.size(), n));
+        _wigner_d_sinx[1].push_back(
+            Matrix<float_type>(grid._cos_theta_out.size(), n));
+        _dwigner_d[1].push_back(
+            Matrix<float_type>(grid._cos_theta_out.size(), n));
+      }
     }
-    _dwigner_d[0].reserve(np1);
-    for (uint_fast32_t i = 0; i < np1; ++i) {
-      _dwigner_d[0].push_back(
-          Matrix<float_type>(grid._cos_theta_in.size(), nmax));
-    }
-
-    _wigner_d_sinx[1].reserve(np1);
-    for (uint_fast32_t i = 0; i < np1; ++i) {
-      _wigner_d_sinx[1].push_back(
-          Matrix<float_type>(grid._cos_theta_out.size(), nmax));
-    }
-    _dwigner_d[1].reserve(np1);
-    for (uint_fast32_t i = 0; i < np1; ++i) {
-      _dwigner_d[1].push_back(
-          Matrix<float_type>(grid._cos_theta_out.size(), nmax));
-    }
+    ctm_assert(_wigner_d_sinx[0].size() == number_of_elements);
   }
 
   virtual ~AbsorptionSpecialWignerDResources() {}
@@ -309,12 +305,12 @@ public:
   static inline size_t get_memory_size(const uint_fast32_t nmax,
                                        const AbsorptionCoefficientGrid &grid) {
     size_t size = sizeof(AbsorptionSpecialWignerDResources);
-    // input angles
-    size +=
-        2 * (nmax + 1) * grid._cos_theta_in.size() * nmax * sizeof(float_type);
-    // output angles
-    size +=
-        2 * (nmax + 1) * grid._cos_theta_out.size() * nmax * sizeof(float_type);
+    for (uint_fast32_t n = 1; n < nmax + 1; ++n) {
+      for (uint_fast32_t m = 0; m < n + 1; ++m) {
+        size += 2 * grid._cos_theta_in.size() * n * sizeof(float_type);
+        size += 2 * grid._cos_theta_out.size() * n * sizeof(float_type);
+      }
+    }
     return size;
   }
 
@@ -338,23 +334,40 @@ public:
    */
   virtual void execute(const int_fast32_t thread_id = 0) {
 
-    for (uint_fast32_t m = 0; m < _nmax + 1; ++m) {
-      const uint_fast32_t ntheta_in = _grid._cos_theta_in.size();
-      for (uint_fast32_t itheta_in = 0; itheta_in < ntheta_in; ++itheta_in) {
-        SpecialFunctions::wigner_dn_0m_sinx(
-            _grid._cos_theta_in[itheta_in], _grid._sin_theta_in[itheta_in],
-            _grid._sin_theta_in_inverse[itheta_in], _nmax, m,
-            &_wigner_d_sinx[0][m].get_row(itheta_in)[0],
-            &_dwigner_d[0][m].get_row(itheta_in)[0]);
-      }
-      const uint_fast32_t ntheta_out = _grid._cos_theta_out.size();
-      for (uint_fast32_t itheta_out = 0; itheta_out < ntheta_out;
-           ++itheta_out) {
-        SpecialFunctions::wigner_dn_0m_sinx(
-            _grid._cos_theta_out[itheta_out], _grid._sin_theta_out[itheta_out],
-            _grid._sin_theta_out_inverse[itheta_out], _nmax, m,
-            &_wigner_d_sinx[1][m].get_row(itheta_out)[0],
-            &_dwigner_d[1][m].get_row(itheta_out)[0]);
+    const uint_fast32_t ntheta_in = _grid._cos_theta_in.size();
+    const uint_fast32_t ntheta_out = _grid._cos_theta_out.size();
+    for (uint_fast32_t n = 1; n < _nmax + 1; ++n) {
+      for (uint_fast32_t m = 0; m < n + 1; ++m) {
+        for (uint_fast32_t itheta_in = 0; itheta_in < ntheta_in; ++itheta_in) {
+          const uint_fast32_t index = (2 + n) * (n - 1) / 2 + m;
+          ctm_assert(index < _wigner_d_sinx[0].size());
+          ctm_assert_message(
+              _wigner_d_sinx[0][index].get_number_of_columns() == n,
+              "cols: %" PRIuFAST32 ", n: %" PRIuFAST32 ", m: %" PRIuFAST32
+              ", index: %" PRIuFAST32,
+              _wigner_d_sinx[0][index].get_number_of_columns(), n, m, index);
+          SpecialFunctions::wigner_dn_0m_sinx(
+              _grid._cos_theta_in[itheta_in], _grid._sin_theta_in[itheta_in],
+              _grid._sin_theta_in_inverse[itheta_in], n, m,
+              &_wigner_d_sinx[0][index].get_row(itheta_in)[0],
+              &_dwigner_d[0][index].get_row(itheta_in)[0]);
+        }
+        for (uint_fast32_t itheta_out = 0; itheta_out < ntheta_out;
+             ++itheta_out) {
+          const uint_fast32_t index = (2 + n) * (n - 1) / 2 + m;
+          ctm_assert(index < _wigner_d_sinx[1].size());
+          ctm_assert_message(
+              _wigner_d_sinx[1][index].get_number_of_columns() == n,
+              "cols: %" PRIuFAST32 ", n: %" PRIuFAST32 ", m: %" PRIuFAST32
+              ", index: %" PRIuFAST32,
+              _wigner_d_sinx[1][index].get_number_of_columns(), n, m, index);
+          SpecialFunctions::wigner_dn_0m_sinx(
+              _grid._cos_theta_out[itheta_out],
+              _grid._sin_theta_out[itheta_out],
+              _grid._sin_theta_out_inverse[itheta_out], n, m,
+              &_wigner_d_sinx[1][index].get_row(itheta_out)[0],
+              &_dwigner_d[1][index].get_row(itheta_out)[0]);
+        }
       }
     }
     make_available();
@@ -367,20 +380,29 @@ public:
    * @param m @f$m@f$ value.
    * @param itheta_in Index of the input angle.
    * @param n Order, @f$n@f$.
+   * @param nmax Maximum order.
    * @return Corresponding special Wigner D function value.
    */
   inline float_type get_wigner_d_sinx(const uint_fast8_t igrid,
                                       const uint_fast32_t m,
                                       const uint_fast32_t itheta_in,
-                                      const uint_fast32_t n) const {
+                                      const uint_fast32_t n,
+                                      const uint_fast32_t nmax) const {
 
-    ctm_assert(m < _wigner_d_sinx[igrid].size());
-    ctm_assert(itheta_in < _wigner_d_sinx[igrid][m].get_number_of_rows());
+    ctm_assert(nmax > 0);
+    const uint_fast32_t index = (2 + nmax) * (nmax - 1) / 2 + m;
+    ctm_assert(index < _wigner_d_sinx[igrid].size());
     ctm_assert(n > 0);
-    ctm_assert(n - 1 < _wigner_d_sinx[igrid][m].get_number_of_columns());
+    ctm_assert(m <= n);
+    ctm_assert(itheta_in < _wigner_d_sinx[igrid][index].get_number_of_rows());
+    ctm_assert_message(n - 1 <
+                           _wigner_d_sinx[igrid][index].get_number_of_columns(),
+                       "m: %" PRIuFAST32 ", n: %" PRIuFAST32
+                       ", nmax: %" PRIuFAST32 ", index: %" PRIuFAST32,
+                       m, n, nmax, index);
     // check that the resource was actually computed
     check_use();
-    return _wigner_d_sinx[igrid][m](itheta_in, n - 1);
+    return _wigner_d_sinx[igrid][index](itheta_in, n - 1);
   }
 
   /**
@@ -391,20 +413,25 @@ public:
    * @param m @f$m@f$ value.
    * @param itheta_in Index of the input angle.
    * @param n Order, @f$n@f$.
+   * @param nmax Maximum order.
    * @return Corresponding derivative value.
    */
   inline float_type get_dwigner_d(const uint_fast8_t igrid,
                                   const uint_fast32_t m,
                                   const uint_fast32_t itheta_in,
-                                  const uint_fast32_t n) const {
+                                  const uint_fast32_t n,
+                                  const uint_fast32_t nmax) const {
 
-    ctm_assert(m < _dwigner_d[igrid].size());
-    ctm_assert(itheta_in < _dwigner_d[igrid][m].get_number_of_rows());
+    ctm_assert(nmax > 0);
+    const uint_fast32_t index = (2 + nmax) * (nmax - 1) / 2 + m;
+    ctm_assert(index < _dwigner_d[igrid].size());
     ctm_assert(n > 0);
-    ctm_assert(n - 1 < _dwigner_d[igrid][m].get_number_of_columns());
+    ctm_assert(m <= n);
+    ctm_assert(itheta_in < _dwigner_d[igrid][index].get_number_of_rows());
+    ctm_assert(n - 1 < _dwigner_d[igrid][index].get_number_of_columns());
     // check that the resource was actually computed
     check_use();
-    return _dwigner_d[igrid][m](itheta_in, n - 1);
+    return _dwigner_d[igrid][index](itheta_in, n - 1);
   }
 };
 
@@ -525,20 +552,20 @@ public:
 
         // get the specific pi and tau for this n'
         const float_type pi_nn =
-            m * _wigner_d.get_wigner_d_sinx(grid_in, m, itheta_in, nn);
+            m * _wigner_d.get_wigner_d_sinx(grid_in, m, itheta_in, nn, nmax);
         const float_type tau_nn =
-            _wigner_d.get_dwigner_d(grid_in, m, itheta_in, nn);
+            _wigner_d.get_dwigner_d(grid_in, m, itheta_in, nn, nmax);
 
         for (uint_fast32_t n = nmin; n < nmax + 1; ++n) {
 
           // get the specific pi and tau for this n
           const float_type pi_n =
-              m * _wigner_d.get_wigner_d_sinx(grid_out, m, itheta_out, n);
+              m * _wigner_d.get_wigner_d_sinx(grid_out, m, itheta_out, n, nmax);
           const float_type tau_n =
-              _wigner_d.get_dwigner_d(grid_out, m, itheta_out, n);
+              _wigner_d.get_dwigner_d(grid_out, m, itheta_out, n, nmax);
 
           // get the c factor for these values of n and n'
-          const std::complex<float_type> c_nnn = _nfactors.get_cnn(n, nn);
+          const std::complex<float_type> c_nnn = _nfactors.get_cnn(nn, n);
 
           // get the T11 and T22 elements for this m, n and n' (we need these
           // in all cases)

@@ -1070,8 +1070,11 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
         for (npy_intp itheta = 0; itheta < result_dims[3]; ++itheta) {
           npy_intp iresult = 0;
           if (do_absorption) {
+            // we use do_extinction as the result index, because the
+            // absorption coefficients will either be result 0 or 1 depending
+            // on whether extinction coefficients are present
             const npy_intp result_index =
-                result_key->get_result_index(0, isize, ilambda, 1);
+                result_key->get_result_index(0, isize, ilambda, do_extinction);
             const AbsorptionCoefficientResult &result =
                 *static_cast<AbsorptionCoefficientResult *>(
                     results[result_index]);
