@@ -167,7 +167,8 @@ int main(int argc, char **argv) {
   std::vector<Result *> results;
   TMatrixAuxiliarySpaceManager *space_manager = nullptr;
   task_manager.generate_tasks(thetas, 20, quicksched, tasks, resources,
-                              result_key, results, space_manager, false, true);
+                              result_key, results, space_manager, false, true,
+                              false);
 
   quicksched.execute_tasks();
 

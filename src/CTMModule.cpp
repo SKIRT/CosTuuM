@@ -882,6 +882,7 @@ inline std::vector<DATA_TYPE> unpack_numpy_array(PyArrayObject *numpy_array) {
  *  log).
  *  - do_absorption: Compute absorption coefficients? (default: True)
  *  - do_extinction: Compute extinction coefficients? (default: False)
+ *  - do_scattering: Compute scattering matrices? (default: False)
  *
  * @param self Module object.
  * @param args Positional arguments.
@@ -914,6 +915,7 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   const char *input_memory_log_name = nullptr;
   bool do_absorption = true;
   bool do_extinction = false;
+  bool do_scattering = false;
 
   // list of keywords
   static char *kwlist[] = {strdup("types"),
@@ -935,6 +937,7 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
                            strdup("memory_log"),
                            strdup("do_absorption"),
                            strdup("do_extinction"),
+                           strdup("do_scattering"),
                            nullptr};
 
   // placeholders for float_type arguments
@@ -948,9 +951,10 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   // placeholders for bool arguments
   int do_absorption_b = do_absorption;
   int do_extinction_b = do_extinction;
+  int do_scattering_b = do_scattering;
   // parse positional and keyword arguments
   if (!PyArg_ParseTupleAndKeywords(
-          args, kwargs, "O&O&O&O&OOO|IIIdkizzzzpp", kwlist, PyArray_Converter,
+          args, kwargs, "O&O&O&O&OOO|IIIdkizzzzppp", kwlist, PyArray_Converter,
           &input_types, PyArray_Converter, &input_sizes, PyArray_Converter,
           &input_wavelengths, PyArray_Converter, &input_thetas,
           &shape_distribution_object, &alignment_distribution_object,
@@ -958,7 +962,7 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
           &input_tolerance_d, &input_memory_size_i, &input_nthread_i,
           &input_graph_log_name, &input_task_log_name,
           &input_task_type_log_name, &input_memory_log_name, &do_absorption_b,
-          &do_extinction_b)) {
+          &do_extinction_b, &do_scattering_b)) {
     // again, we do not call ctm_error to avoid killing the Python interpreter
     ctm_warning("Wrong arguments provided!");
     // this time, a nullptr return will signal an error to Python
@@ -975,6 +979,7 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   // convert bool arguments
   do_absorption = do_absorption_b;
   do_extinction = do_extinction_b;
+  do_scattering = do_scattering_b;
 
   const ShapeDistribution *shape_distribution =
       shape_distribution_object->_shape_distribution;
@@ -1029,7 +1034,7 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   TMatrixAuxiliarySpaceManager *space_manager = nullptr;
   task_manager.generate_tasks(
       thetas, 20, quicksched, tasks, resources, result_key, results,
-      space_manager, do_extinction, do_absorption, false,
+      space_manager, do_extinction, do_absorption, do_scattering, false,
       input_memory_log_name != nullptr, input_memory_log);
 
   Py_BEGIN_ALLOW_THREADS;
@@ -1049,77 +1054,124 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
     quicksched.print_type_dict(typefile);
   }
 
-  npy_intp result_size = 0;
-  if (do_absorption) {
-    result_size += 2;
-  }
-  if (do_extinction) {
-    result_size += 3;
-  }
-  npy_intp result_dims[5] = {
-      static_cast<npy_intp>(result_key->composition_size()),
-      static_cast<npy_intp>(result_key->size_size()),
-      static_cast<npy_intp>(result_key->wavelength_size()),
-      static_cast<npy_intp>(thetas.size()), result_size};
-  PyArrayObject *result_array = reinterpret_cast<PyArrayObject *>(
-      PyArray_SimpleNew(5, result_dims, NPY_DOUBLE));
+  PyObject *first_return_value = nullptr;
+  if (do_absorption || do_extinction) {
+    npy_intp result_size = 0;
+    if (do_absorption) {
+      result_size += 2;
+    }
+    if (do_extinction) {
+      result_size += 3;
+    }
+    npy_intp result_dims[5] = {
+        static_cast<npy_intp>(result_key->composition_size()),
+        static_cast<npy_intp>(result_key->size_size()),
+        static_cast<npy_intp>(result_key->wavelength_size()),
+        static_cast<npy_intp>(thetas.size()), result_size};
+    PyArrayObject *result_array = reinterpret_cast<PyArrayObject *>(
+        PyArray_SimpleNew(5, result_dims, NPY_DOUBLE));
 
-  for (npy_intp itype = 0; itype < result_dims[0]; ++itype) {
-    for (npy_intp isize = 0; isize < result_dims[1]; ++isize) {
-      for (npy_intp ilambda = 0; ilambda < result_dims[2]; ++ilambda) {
-        for (npy_intp itheta = 0; itheta < result_dims[3]; ++itheta) {
-          npy_intp iresult = 0;
-          if (do_absorption) {
-            // we use do_extinction as the result index, because the
-            // absorption coefficients will either be result 0 or 1 depending
-            // on whether extinction coefficients are present
-            const npy_intp result_index =
-                result_key->get_result_index(0, isize, ilambda, do_extinction);
-            const AbsorptionCoefficientResult &result =
-                *static_cast<AbsorptionCoefficientResult *>(
-                    results[result_index]);
-            npy_intp Qabs_array_index[5] = {itype, isize, ilambda, itheta,
-                                            iresult};
-            ++iresult;
-            npy_intp Qabspol_array_index[5] = {itype, isize, ilambda, itheta,
-                                               iresult};
-            ++iresult;
-            *reinterpret_cast<double *>(
-                PyArray_GetPtr(result_array, Qabs_array_index)) =
-                static_cast<double>(result.get_Qabs(itheta));
-            *reinterpret_cast<double *>(
-                PyArray_GetPtr(result_array, Qabspol_array_index)) =
-                static_cast<double>(result.get_Qabspol(itheta));
-          }
-          if (do_extinction) {
-            const npy_intp result_index =
-                result_key->get_result_index(0, isize, ilambda, 0);
-            const ExtinctionCoefficientResult &result =
-                *static_cast<ExtinctionCoefficientResult *>(
-                    results[result_index]);
-            npy_intp Qext_array_index[5] = {itype, isize, ilambda, itheta,
-                                            iresult};
-            ++iresult;
-            npy_intp Qextpol_array_index[5] = {itype, isize, ilambda, itheta,
-                                               iresult};
-            ++iresult;
-            npy_intp Qextcpol_array_index[5] = {itype, isize, ilambda, itheta,
-                                                iresult};
-            ++iresult;
-            *reinterpret_cast<double *>(
-                PyArray_GetPtr(result_array, Qext_array_index)) =
-                static_cast<double>(result.get_Qext(itheta));
-            *reinterpret_cast<double *>(
-                PyArray_GetPtr(result_array, Qextpol_array_index)) =
-                static_cast<double>(result.get_Qextpol(itheta));
-            *reinterpret_cast<double *>(
-                PyArray_GetPtr(result_array, Qextcpol_array_index)) =
-                static_cast<double>(result.get_Qextcpol(itheta));
-          }
-        } // theta
-      }   // lambda
-    }     // size
-  }       // type
+    for (npy_intp itype = 0; itype < result_dims[0]; ++itype) {
+      for (npy_intp isize = 0; isize < result_dims[1]; ++isize) {
+        for (npy_intp ilambda = 0; ilambda < result_dims[2]; ++ilambda) {
+          for (npy_intp itheta = 0; itheta < result_dims[3]; ++itheta) {
+            npy_intp iresult = 0;
+            if (do_absorption) {
+              // we use do_extinction as the result index, because the
+              // absorption coefficients will either be result 0 or 1 depending
+              // on whether extinction coefficients are present
+              const npy_intp result_index = result_key->get_result_index(
+                  itype, isize, ilambda, do_extinction);
+              const AbsorptionCoefficientResult &result =
+                  *static_cast<AbsorptionCoefficientResult *>(
+                      results[result_index]);
+              npy_intp Qabs_array_index[5] = {itype, isize, ilambda, itheta,
+                                              iresult};
+              ++iresult;
+              npy_intp Qabspol_array_index[5] = {itype, isize, ilambda, itheta,
+                                                 iresult};
+              ++iresult;
+              *reinterpret_cast<double *>(
+                  PyArray_GetPtr(result_array, Qabs_array_index)) =
+                  static_cast<double>(result.get_Qabs(itheta));
+              *reinterpret_cast<double *>(
+                  PyArray_GetPtr(result_array, Qabspol_array_index)) =
+                  static_cast<double>(result.get_Qabspol(itheta));
+            }
+            if (do_extinction) {
+              const npy_intp result_index =
+                  result_key->get_result_index(itype, isize, ilambda, 0);
+              const ExtinctionCoefficientResult &result =
+                  *static_cast<ExtinctionCoefficientResult *>(
+                      results[result_index]);
+              npy_intp Qext_array_index[5] = {itype, isize, ilambda, itheta,
+                                              iresult};
+              ++iresult;
+              npy_intp Qextpol_array_index[5] = {itype, isize, ilambda, itheta,
+                                                 iresult};
+              ++iresult;
+              npy_intp Qextcpol_array_index[5] = {itype, isize, ilambda, itheta,
+                                                  iresult};
+              ++iresult;
+              *reinterpret_cast<double *>(
+                  PyArray_GetPtr(result_array, Qext_array_index)) =
+                  static_cast<double>(result.get_Qext(itheta));
+              *reinterpret_cast<double *>(
+                  PyArray_GetPtr(result_array, Qextpol_array_index)) =
+                  static_cast<double>(result.get_Qextpol(itheta));
+              *reinterpret_cast<double *>(
+                  PyArray_GetPtr(result_array, Qextcpol_array_index)) =
+                  static_cast<double>(result.get_Qextcpol(itheta));
+            }
+          } // theta
+        }   // lambda
+      }     // size
+    }       // type
+    first_return_value = PyArray_Squeeze(result_array);
+  }
+
+  PyObject *second_return_value = nullptr;
+  if (do_scattering) {
+    npy_intp result_dims[7] = {
+        static_cast<npy_intp>(result_key->composition_size()),
+        static_cast<npy_intp>(result_key->size_size()),
+        static_cast<npy_intp>(result_key->wavelength_size()),
+        static_cast<npy_intp>(thetas.size()),
+        static_cast<npy_intp>(thetas.size()),
+        4,
+        4};
+    PyArrayObject *result_array = reinterpret_cast<PyArrayObject *>(
+        PyArray_SimpleNew(7, result_dims, NPY_DOUBLE));
+
+    uint_fast32_t num_results = do_extinction;
+    num_results += do_absorption;
+    for (npy_intp itype = 0; itype < result_dims[0]; ++itype) {
+      for (npy_intp isize = 0; isize < result_dims[1]; ++isize) {
+        for (npy_intp ilambda = 0; ilambda < result_dims[2]; ++ilambda) {
+          const npy_intp result_index =
+              result_key->get_result_index(itype, isize, ilambda, num_results);
+          const ScatteringMatrixResult &result =
+              *static_cast<ScatteringMatrixResult *>(results[result_index]);
+          for (npy_intp itheta = 0; itheta < result_dims[3]; ++itheta) {
+            for (npy_intp iphi = 0; iphi < result_dims[4]; ++iphi) {
+              const Matrix<float_type> &Z =
+                  result.get_scattering_matrix(itheta * thetas.size() + iphi);
+              for (npy_intp irow = 0; irow < 4; ++irow) {
+                for (npy_intp icol = 0; icol < 4; ++icol) {
+                  npy_intp array_index[7] = {itype, isize, ilambda, itheta,
+                                             iphi,  irow,  icol};
+                  *reinterpret_cast<double *>(
+                      PyArray_GetPtr(result_array, array_index)) =
+                      static_cast<double>(Z(irow, icol));
+                } // col
+              }   // row
+            }     // phi
+          }       // theta
+        }         // lambda
+      }           // size
+    }             // type
+    second_return_value = PyArray_Squeeze(result_array);
+  }
 
   for (uint_fast32_t i = 0; i < tasks.size(); ++i) {
     delete tasks[i];
@@ -1133,7 +1185,15 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   }
   delete space_manager;
 
-  return PyArray_Squeeze(result_array);
+  if (first_return_value != nullptr && second_return_value != nullptr) {
+    return Py_BuildValue("OO", first_return_value, second_return_value);
+  } else {
+    if (first_return_value) {
+      return first_return_value;
+    } else {
+      return second_return_value;
+    }
+  }
 }
 
 /**

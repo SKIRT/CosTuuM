@@ -186,21 +186,21 @@ public:
    * caller after the computation finishes.
    * @param do_extinction Compute extinction coefficients?
    * @param do_absorption Compute absorption coefficients?
+   * @param do_scattering Compute scattering matrices?
    * @param verbose Output diagnostic warnings?
    * @param write_memory_log Write a log file with the memory allocations?
    * @param memory_log_file_name Name of the memory log file.
    */
-  inline void generate_tasks(const std::vector<float_type> &theta,
-                             const uint_fast32_t ngauss, QuickSched &quicksched,
-                             std::vector<Task *> &tasks,
-                             std::vector<Resource *> &resources,
-                             ResultKey *&result_key,
-                             std::vector<Result *> &results,
-                             TMatrixAuxiliarySpaceManager *&space_manager,
-                             const bool do_extinction, const bool do_absorption,
-                             const bool verbose = false,
-                             const bool write_memory_log = false,
-                             const std::string memory_log_file_name = "") {
+  inline void
+  generate_tasks(const std::vector<float_type> &theta,
+                 const uint_fast32_t ngauss, QuickSched &quicksched,
+                 std::vector<Task *> &tasks, std::vector<Resource *> &resources,
+                 ResultKey *&result_key, std::vector<Result *> &results,
+                 TMatrixAuxiliarySpaceManager *&space_manager,
+                 const bool do_extinction, const bool do_absorption,
+                 const bool do_scattering, const bool verbose = false,
+                 const bool write_memory_log = false,
+                 const std::string memory_log_file_name = "") {
 
     std::ofstream *memory_log_file = nullptr;
     if (write_memory_log) {
@@ -218,6 +218,9 @@ public:
       ++number_of_results;
     }
     if (do_absorption) {
+      ++number_of_results;
+    }
+    if (do_scattering) {
       ++number_of_results;
     }
     result_key =
@@ -320,6 +323,20 @@ public:
       absorption_grid->link_resources(quicksched);
       tasks.push_back(absorption_grid);
     }
+    //  - scattering matrix grid
+    ScatteringMatrixGrid *scattering_grid = nullptr;
+    if (do_scattering) {
+      add_memory_allocation(ScatteringMatrixGrid::get_memory_size(
+                                M_PI_2, number_of_angles, number_of_angles),
+                            "ScatteringMatrixGrid", memory_log_file,
+                            memory_used);
+      scattering_grid =
+          new ScatteringMatrixGrid(M_PI_2, number_of_angles, number_of_angles);
+      quicksched.register_resource(*scattering_grid);
+      quicksched.register_task(*scattering_grid);
+      scattering_grid->link_resources(quicksched);
+      tasks.push_back(scattering_grid);
+    }
 
     //  - special Wigner D functions
     ExtinctionSpecialWignerDResources *extinction_special_wigner = nullptr;
@@ -350,6 +367,23 @@ public:
       absorption_special_wigner->link_resources(quicksched);
       quicksched.link_tasks(*absorption_grid, *absorption_special_wigner);
       tasks.push_back(absorption_special_wigner);
+    }
+
+    ScatteringMatrixSpecialWignerDResources *scattering_special_wigner =
+        nullptr;
+    if (do_scattering) {
+      add_memory_allocation(
+          ScatteringMatrixSpecialWignerDResources::get_memory_size(
+              _maximum_order, *scattering_grid),
+          "ScatteringMatrixSpecialWignerDResources", memory_log_file,
+          memory_used);
+      scattering_special_wigner = new ScatteringMatrixSpecialWignerDResources(
+          _maximum_order, *scattering_grid);
+      quicksched.register_resource(*scattering_special_wigner);
+      quicksched.register_task(*scattering_special_wigner);
+      scattering_special_wigner->link_resources(quicksched);
+      quicksched.link_tasks(*scattering_grid, *scattering_special_wigner);
+      tasks.push_back(scattering_special_wigner);
     }
 
     //  - Wigner D functions
@@ -417,6 +451,13 @@ public:
           total_number_of_Tmatrices *
               AbsorptionCoefficientResult::get_memory_size(number_of_angles),
           "AbsorptionCoefficientResult", memory_log_file, memory_used);
+    }
+    if (do_scattering) {
+      add_memory_allocation(total_number_of_Tmatrices *
+                                ScatteringMatrixResult::get_memory_size(
+                                    scattering_grid->get_number_of_angles()),
+                            "ScatteringMatrixResult", memory_log_file,
+                            memory_used);
     }
 
     // step 4: loop over all parameter values and set up parameter specific
@@ -507,6 +548,11 @@ public:
       unaveraged_absorption_results.resize(total_number_of_Tmatrices, nullptr);
     }
     uint_fast32_t unaveraged_absorption_result_index = 0;
+    std::vector<ScatteringMatrixResult *> unaveraged_scattering_results;
+    if (do_scattering) {
+      unaveraged_scattering_results.resize(total_number_of_Tmatrices, nullptr);
+    }
+    uint_fast32_t unaveraged_scattering_result_index = 0;
     const uint_fast32_t resource_offset = resources.size();
     resources.resize(resource_offset + total_number_of_interactions +
                          2 * total_number_of_Tmatrices,
@@ -518,6 +564,8 @@ public:
     // for each T-matrix,
     // we need to add interaction and m=0 tasks for each quadrature point
     // we need to add m=/=0 tasks for each order
+    // we need to add 1 alignment task and 3 reset tasks
+    // we need to add an additional calculation task for each result
     const uint_fast32_t tasks_per_Tmatrix =
         2 * number_of_quadrature_tasks + _maximum_order + 4 + number_of_results;
     tasks.resize(task_offset +
@@ -592,6 +640,25 @@ public:
             ++task_index;
           }
 
+          ScatteringMatrixResult *this_scattering_result = nullptr;
+          ScatteringMatrixShapeAveragingTask *scattering_averaging_task =
+              nullptr;
+          if (do_scattering) {
+            this_scattering_result = new ScatteringMatrixResult(
+                grain_type, particle_size, wavelength,
+                scattering_grid->get_number_of_angles());
+            quicksched.register_resource(*this_scattering_result);
+            results[result_index] = this_scattering_result;
+            ++result_index;
+
+            scattering_averaging_task = new ScatteringMatrixShapeAveragingTask(
+                _shape_distribution, *this_scattering_result);
+            quicksched.register_task(*scattering_averaging_task);
+            scattering_averaging_task->link_resources(quicksched);
+            tasks[task_index] = scattering_averaging_task;
+            ++task_index;
+          }
+
           // loop over all shapes
           for (uint_fast32_t ishape = 0; ishape < number_of_shapes; ++ishape) {
 
@@ -622,6 +689,20 @@ public:
                       this_unaveraged_absorption_result;
               ++unaveraged_absorption_result_index;
               resources[resource_index] = this_unaveraged_absorption_result;
+              ++resource_index;
+            }
+
+            ScatteringMatrixResult *this_unaveraged_scattering_result = nullptr;
+            if (do_scattering) {
+              this_unaveraged_scattering_result = new ScatteringMatrixResult(
+                  grain_type, particle_size, wavelength,
+                  scattering_grid->get_number_of_angles());
+              quicksched.register_resource(*this_unaveraged_scattering_result);
+              unaveraged_scattering_results
+                  [unaveraged_scattering_result_index] =
+                      this_unaveraged_scattering_result;
+              ++unaveraged_scattering_result_index;
+              resources[resource_index] = this_unaveraged_scattering_result;
               ++resource_index;
             }
 
@@ -748,6 +829,27 @@ public:
                                     *absorption_averaging_task);
             }
 
+            ScatteringMatrixTask *scattering_task = nullptr;
+            if (do_scattering) {
+              scattering_task = new ScatteringMatrixTask(
+                  *scattering_grid, *this_interaction_variables,
+                  *this_ensemble_Tmatrix, *nbased_resources,
+                  *scattering_special_wigner,
+                  *this_unaveraged_scattering_result);
+              quicksched.register_task(*scattering_task);
+              scattering_task->link_resources(quicksched);
+              quicksched.link_tasks(*alignment_task, *scattering_task);
+              quicksched.link_tasks(*scattering_special_wigner,
+                                    *scattering_task);
+              tasks[task_index] = scattering_task;
+              ++task_index;
+
+              scattering_averaging_task->add_input_matrices(
+                  quicksched, ishape, this_unaveraged_scattering_result);
+              quicksched.link_tasks(*scattering_task,
+                                    *scattering_averaging_task);
+            }
+
             ResetTMatrixResourceTask *reset_task1 =
                 new ResetTMatrixResourceTask(*this_single_Tmatrix);
             quicksched.register_task(*reset_task1);
@@ -770,6 +872,9 @@ public:
             }
             if (absorption_task) {
               quicksched.link_tasks(*absorption_task, *reset_task2);
+            }
+            if (scattering_task) {
+              quicksched.link_tasks(*scattering_task, *reset_task2);
             }
 
             ResetInteractionResourceTask *reset_task3 =
