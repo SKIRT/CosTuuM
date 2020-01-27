@@ -226,9 +226,9 @@ public:
       }
 
       // convert the phi angles to cos_phi
-      _cos_phi_out[igauss] = cos(_cos_phi_out[igauss]);
-      _sin_phi_out[igauss] =
-          sqrt((1. - _cos_phi_out[igauss]) * (1. + _cos_phi_out[igauss]));
+      const float_type phi_out = _cos_phi_out[igauss];
+      _cos_phi_out[igauss] = cos(phi_out);
+      _sin_phi_out[igauss] = sin(phi_out);
     }
   }
 

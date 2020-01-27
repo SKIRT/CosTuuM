@@ -274,7 +274,7 @@ public:
     const DATA_TYPE two(2.);
 
     // precompute sin(x) and its inverse
-    const DATA_TYPE sinx = sqrt(one - cosx * cosx);
+    const DATA_TYPE sinx = sqrt((one - cosx) * (one + cosx));
     const DATA_TYPE sinxinv = one / sinx;
     // branch out depending on the m value
     if (m == 0) {

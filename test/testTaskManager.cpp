@@ -168,7 +168,7 @@ int main(int argc, char **argv) {
   TMatrixAuxiliarySpaceManager *space_manager = nullptr;
   task_manager.generate_tasks(thetas, 20, quicksched, tasks, resources,
                               result_key, results, space_manager, false, true,
-                              false);
+                              false, false);
 
   quicksched.execute_tasks();
 

@@ -231,7 +231,7 @@ public:
         _phi_out[i] = i * dphi;
       }
       _cos_phi_out[i] = cos(_phi_out[i]);
-      _sin_phi_out[i] = sqrt((1. - _cos_phi_out[i]) * (1. + _cos_phi_out[i]));
+      _sin_phi_out[i] = sin(_phi_out[i]);
     }
 
     make_available();

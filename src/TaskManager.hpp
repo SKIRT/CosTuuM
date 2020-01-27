@@ -187,6 +187,8 @@ public:
    * @param do_extinction Compute extinction coefficients?
    * @param do_absorption Compute absorption coefficients?
    * @param do_scattering Compute scattering matrices?
+   * @param account_for_scattering Subtract the directionally averaged
+   * scattering cross sections from the absorption coefficients (unstable)?
    * @param verbose Output diagnostic warnings?
    * @param write_memory_log Write a log file with the memory allocations?
    * @param memory_log_file_name Name of the memory log file.
@@ -198,7 +200,8 @@ public:
                  ResultKey *&result_key, std::vector<Result *> &results,
                  TMatrixAuxiliarySpaceManager *&space_manager,
                  const bool do_extinction, const bool do_absorption,
-                 const bool do_scattering, const bool verbose = false,
+                 const bool do_scattering, const bool account_for_scattering,
+                 const bool verbose = false,
                  const bool write_memory_log = false,
                  const std::string memory_log_file_name = "") {
 
@@ -814,7 +817,7 @@ public:
                   *absorption_grid, *this_interaction_variables,
                   *this_ensemble_Tmatrix, *nbased_resources,
                   *absorption_special_wigner,
-                  *this_unaveraged_absorption_result, true);
+                  *this_unaveraged_absorption_result, account_for_scattering);
               quicksched.register_task(*absorption_task);
               absorption_task->link_resources(quicksched);
               quicksched.link_tasks(*alignment_task, *absorption_task);

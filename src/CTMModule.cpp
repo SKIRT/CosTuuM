@@ -883,6 +883,8 @@ inline std::vector<DATA_TYPE> unpack_numpy_array(PyArrayObject *numpy_array) {
  *  - do_absorption: Compute absorption coefficients? (default: True)
  *  - do_extinction: Compute extinction coefficients? (default: False)
  *  - do_scattering: Compute scattering matrices? (default: False)
+ *  - account_for_scattering: Subtract the directionally averaged scattering
+ *  cross sections from the absorption coefficients? (default: False)
  *  - verbose: Display diagnostic output? (default: False)
  *
  * @param self Module object.
@@ -917,6 +919,7 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   bool do_absorption = true;
   bool do_extinction = false;
   bool do_scattering = false;
+  bool account_for_scattering = false;
   bool verbose = false;
 
   // list of keywords
@@ -940,6 +943,7 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
                            strdup("do_absorption"),
                            strdup("do_extinction"),
                            strdup("do_scattering"),
+                           strdup("account_for_scattering"),
                            strdup("verbose"),
                            nullptr};
 
@@ -955,18 +959,20 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   int do_absorption_b = do_absorption;
   int do_extinction_b = do_extinction;
   int do_scattering_b = do_scattering;
+  int account_for_scattering_b = account_for_scattering;
   int verbose_b = verbose;
   // parse positional and keyword arguments
   if (!PyArg_ParseTupleAndKeywords(
-          args, kwargs, "O&O&O&O&OOO|IIIdkizzzzpppp", kwlist, PyArray_Converter,
-          &input_types, PyArray_Converter, &input_sizes, PyArray_Converter,
-          &input_wavelengths, PyArray_Converter, &input_thetas,
-          &shape_distribution_object, &alignment_distribution_object,
-          &dust_properties_object, &input_nmin_i, &input_nmax_i, &input_glfac_i,
-          &input_tolerance_d, &input_memory_size_i, &input_nthread_i,
-          &input_graph_log_name, &input_task_log_name,
-          &input_task_type_log_name, &input_memory_log_name, &do_absorption_b,
-          &do_extinction_b, &do_scattering_b, &verbose_b)) {
+          args, kwargs, "O&O&O&O&OOO|IIIdkizzzzppppp", kwlist,
+          PyArray_Converter, &input_types, PyArray_Converter, &input_sizes,
+          PyArray_Converter, &input_wavelengths, PyArray_Converter,
+          &input_thetas, &shape_distribution_object,
+          &alignment_distribution_object, &dust_properties_object,
+          &input_nmin_i, &input_nmax_i, &input_glfac_i, &input_tolerance_d,
+          &input_memory_size_i, &input_nthread_i, &input_graph_log_name,
+          &input_task_log_name, &input_task_type_log_name,
+          &input_memory_log_name, &do_absorption_b, &do_extinction_b,
+          &do_scattering_b, &account_for_scattering_b, &verbose_b)) {
     // again, we do not call ctm_error to avoid killing the Python interpreter
     ctm_warning("Wrong arguments provided!");
     // this time, a nullptr return will signal an error to Python
@@ -984,6 +990,7 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   do_absorption = do_absorption_b;
   do_extinction = do_extinction_b;
   do_scattering = do_scattering_b;
+  account_for_scattering = account_for_scattering_b;
   verbose = verbose_b;
 
   const ShapeDistribution *shape_distribution =
@@ -1039,8 +1046,9 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   TMatrixAuxiliarySpaceManager *space_manager = nullptr;
   task_manager.generate_tasks(
       thetas, 20, quicksched, tasks, resources, result_key, results,
-      space_manager, do_extinction, do_absorption, do_scattering, verbose,
-      input_memory_log_name != nullptr, input_memory_log);
+      space_manager, do_extinction, do_absorption, do_scattering,
+      account_for_scattering, verbose, input_memory_log_name != nullptr,
+      input_memory_log);
 
   Py_BEGIN_ALLOW_THREADS;
   quicksched.execute_tasks();
