@@ -219,6 +219,13 @@ public:
   inline uint_fast32_t get_maximum_order() const {
     return _coefficients.size() - 1;
   }
+
+  /**
+   * @brief Compute alignment for this distribution?
+   *
+   * @return True if the alignment should be computed.
+   */
+  virtual bool compute_alignment() const { return true; }
 };
 
 #endif // ORIENTATIONDISTRIBUTION_HPP

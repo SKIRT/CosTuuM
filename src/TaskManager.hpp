@@ -330,11 +330,11 @@ public:
     ScatteringMatrixGrid *scattering_grid = nullptr;
     if (do_scattering) {
       add_memory_allocation(ScatteringMatrixGrid::get_memory_size(
-                                M_PI_2, number_of_angles, number_of_angles),
+                                M_PI_2, number_of_angles, 2 * number_of_angles),
                             "ScatteringMatrixGrid", memory_log_file,
                             memory_used);
-      scattering_grid =
-          new ScatteringMatrixGrid(M_PI_2, number_of_angles, number_of_angles);
+      scattering_grid = new ScatteringMatrixGrid(M_PI_2, number_of_angles,
+                                                 2 * number_of_angles);
       quicksched.register_resource(*scattering_grid);
       quicksched.register_task(*scattering_grid);
       scattering_grid->link_resources(quicksched);
@@ -733,8 +733,18 @@ public:
 
             // we need to store the previous m=0 task to set up a dependency
             TMatrixM0Task *previous_m0task = nullptr;
+
+            const float_type R_V = particle_size;
+            // we need a reasonable initial guess for the order of the spherical
+            // harmonics the below expression provides this guess
+            const float_type xev = 2. * M_PI * R_V / wavelength;
+            uint_fast32_t nstart = static_cast<uint_fast32_t>(
+                std::max(float_type(4.), xev + 4.05 * cbrt(xev)));
+            ctm_assert(nstart < _maximum_order);
+
             // loop over all orders
-            for (uint_fast32_t ig = 0; ig < number_of_quadrature_tasks; ++ig) {
+            for (uint_fast32_t ig = nstart; ig < number_of_quadrature_tasks;
+                 ++ig) {
               const uint_fast32_t this_order = _minimum_order + ig;
               const uint_fast32_t this_ngauss =
                   minimum_ngauss + ig * _gauss_legendre_factor;

@@ -10,6 +10,7 @@
 
 #include "AlignmentDistribution.hpp"
 #include "DavisGreensteinOrientationDistribution.hpp"
+#include "DisabledAlignmentOrientationDistribution.hpp"
 #include "MishchenkoOrientationDistribution.hpp"
 
 #include <cmath>
@@ -67,6 +68,13 @@ public:
           new MishchenkoOrientationDistribution(2 * nmax, 0.6);
       _prolate_aligned_orientation_distribution =
           new MishchenkoOrientationDistribution(2 * nmax, 0.2);
+    } else if (aligned_orientation_distribution_type == 2) {
+      _oblate_aligned_orientation_distribution =
+          new DisabledAlignmentOrientationDistribution();
+      _prolate_aligned_orientation_distribution =
+          new DisabledAlignmentOrientationDistribution();
+    } else {
+      ctm_error("Unknown orientation distribution!");
     }
   }
 

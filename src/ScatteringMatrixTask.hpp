@@ -342,8 +342,9 @@ public:
     const uint_fast32_t ntheta_out = _grid._cos_theta_out.size();
     for (uint_fast32_t n = 1; n < _nmax + 1; ++n) {
       for (uint_fast32_t m = 0; m < n + 1; ++m) {
-        // no need to loop, there is only one input angle
         const uint_fast32_t index = (2 + n) * (n - 1) / 2 + m;
+
+        // no need to loop, there is only one input angle
         ctm_assert(index < _wigner_d_sinx[0].size());
         ctm_assert_message(
             _wigner_d_sinx[0][index].get_number_of_columns() == n,
@@ -358,7 +359,6 @@ public:
 
         for (uint_fast32_t itheta_out = 0; itheta_out < ntheta_out;
              ++itheta_out) {
-          const uint_fast32_t index = (2 + n) * (n - 1) / 2 + m;
           ctm_assert(index < _wigner_d_sinx[1].size());
           ctm_assert_message(
               _wigner_d_sinx[1][index].get_number_of_columns() == n,

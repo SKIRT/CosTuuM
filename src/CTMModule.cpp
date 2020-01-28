@@ -26,6 +26,49 @@ using namespace boost::multiprecision;
 using namespace std;
 #endif
 
+/// helper functions
+
+/**
+ * @brief Unpack the given 0D or 1D NumPy array into a std::vector with the
+ * same number of elements.
+ *
+ * @param numpy_array Input NumPy array.
+ * @return Output std::vector.
+ * @tparam DATA_TYPE Data type of the elements in the result vector.
+ * @tparam INPUT_TYPE Data type to use when reading values from the NumPy array.
+ */
+template <typename DATA_TYPE, typename INPUT_TYPE = DATA_TYPE>
+inline std::vector<DATA_TYPE> unpack_numpy_array(PyArrayObject *numpy_array) {
+
+  // determine the size of the array
+  npy_intp array_size;
+  const npy_intp array_ndim = PyArray_NDIM(numpy_array);
+  if (array_ndim > 1) {
+    ctm_warning("Wrong shape for input array!");
+    return std::vector<DATA_TYPE>();
+  }
+  if (array_ndim > 0) {
+    const npy_intp *array_dims = PyArray_DIMS(numpy_array);
+    array_size = array_dims[0];
+  } else {
+    array_size = 1;
+    npy_intp newdims[1] = {1};
+    PyArray_Dims newdimsobj;
+    newdimsobj.ptr = newdims;
+    newdimsobj.len = 1;
+    numpy_array = reinterpret_cast<PyArrayObject *>(
+        PyArray_Newshape(numpy_array, &newdimsobj, NPY_ANYORDER));
+  }
+
+  std::vector<DATA_TYPE> array(array_size);
+  for (npy_intp i = 0; i < array_size; ++i) {
+    array[i] =
+        *(reinterpret_cast<INPUT_TYPE *>(PyArray_GETPTR1(numpy_array, i)));
+  }
+
+  return array;
+}
+
 /// T-matrix object
 
 /**
@@ -186,20 +229,22 @@ static int TmatrixObject_init(TmatrixObject *self, PyObject *args,
       tolerance, ndgs, mr, maximum_ngauss);
 
   // average it out over the orientation distribution
-  OrientationDistribution *orientation;
-  if (cos2beta == 0. || cos2beta == 1.) {
-    orientation = new DavisGreensteinOrientationDistribution(
-        2 * self->_Tmatrix->get_nmax(), axis_ratio);
-  } else if (cos2beta == 1. / 3.) {
-    orientation = new OrientationDistribution(2 * self->_Tmatrix->get_nmax());
-    orientation->initialise();
-  } else {
-    orientation = new MishchenkoOrientationDistribution(
-        2 * self->_Tmatrix->get_nmax(), cos2beta);
+  if (cos2beta >= 0.) {
+    OrientationDistribution *orientation;
+    if (cos2beta == 0. || cos2beta == 1.) {
+      orientation = new DavisGreensteinOrientationDistribution(
+          2 * self->_Tmatrix->get_nmax(), axis_ratio);
+    } else if (cos2beta == 1. / 3.) {
+      orientation = new OrientationDistribution(2 * self->_Tmatrix->get_nmax());
+      orientation->initialise();
+    } else {
+      orientation = new MishchenkoOrientationDistribution(
+          2 * self->_Tmatrix->get_nmax(), cos2beta);
+    }
+    self->_Tmatrix = TMatrixCalculator::apply_orientation_distribution(
+        *self->_Tmatrix, *orientation);
+    delete orientation;
   }
-  self->_Tmatrix = TMatrixCalculator::apply_orientation_distribution(
-      *self->_Tmatrix, *orientation);
-  delete orientation;
 
   // everything went well: return 0
   return 0;
@@ -564,6 +609,134 @@ static PyObject *TmatrixObject_get_extinction_matrix(TmatrixObject *self,
   return PyArray_Squeeze(numpy_array);
 }
 
+/**
+ * @brief Compute the scattering matrix using the given T-matrix object.
+ *
+ * Required arguments are:
+ *  - theta_in: Input zenith angle (in radians).
+ *  - phi_in: Input azimuth angle (in radians).
+ *  - theta_out: Output zenith angle (in radians).
+ *  - phi_out: Output azimuth angle (in radians).
+ *
+ * Additional optional arguments are:
+ *  - alpha: Azimuth angle of the particle rotation axis (in radians).
+ *  - beta: Zenith angle of the particle rotation axis (in radians).
+ *
+ * @param self T-matrix object being used.
+ * @param args Positional arguments.
+ * @param kwargs Keyword arguments.
+ * @return Pointer to a 4x4 double precision NumPy array containing the
+ * components of the scattering matrix.
+ */
+static PyObject *TmatrixObject_get_scattering_matrix(TmatrixObject *self,
+                                                     PyObject *args,
+                                                     PyObject *kwargs) {
+
+  // required arguments
+  PyArrayObject *pytheta_ins;
+  PyArrayObject *pyphi_ins;
+  PyArrayObject *pytheta_outs;
+  PyArrayObject *pyphi_outs;
+
+  // optional arguments
+  float_type alpha = 0.;
+  float_type beta = 0.;
+
+  // list of keywords (see comment above)
+  static char *kwlist[] = {strdup("theta_in"),
+                           strdup("phi_in"),
+                           strdup("theta_out"),
+                           strdup("phi_out"),
+                           strdup("alpha"),
+                           strdup("beta"),
+                           nullptr};
+
+  // allocate temporary variables to store double precision arguments
+  double alpha_d = static_cast<double>(alpha);
+  double beta_d = static_cast<double>(beta);
+  // parse positional and keyword arguments
+  if (!PyArg_ParseTupleAndKeywords(
+          args, kwargs, "O&O&O&O&|dd", kwlist, PyArray_Converter, &pytheta_ins,
+          PyArray_Converter, &pyphi_ins, PyArray_Converter, &pytheta_outs,
+          PyArray_Converter, &pyphi_outs, &alpha_d, &beta_d)) {
+    // again, we do not call ctm_error to avoid killing the Python interpreter
+    ctm_warning("Wrong arguments provided!");
+    // this time, a nullptr return will signal an error to Python
+    return nullptr;
+  }
+  // unpack double precision values
+  alpha = alpha_d;
+  beta = beta_d;
+
+  // convert the input arrays to C++ vectors
+  std::vector<float_type> theta_ins =
+      unpack_numpy_array<float_type, double>(pytheta_ins);
+  Py_DECREF(pytheta_ins);
+  std::vector<float_type> phi_ins =
+      unpack_numpy_array<float_type, double>(pyphi_ins);
+  Py_DECREF(pyphi_ins);
+  std::vector<float_type> theta_outs =
+      unpack_numpy_array<float_type, double>(pytheta_outs);
+  Py_DECREF(pytheta_outs);
+  std::vector<float_type> phi_outs =
+      unpack_numpy_array<float_type, double>(pyphi_outs);
+  Py_DECREF(pyphi_outs);
+
+  const npy_intp theta_in_size = theta_ins.size();
+  const npy_intp phi_in_size = phi_ins.size();
+  const npy_intp theta_out_size = theta_outs.size();
+  const npy_intp phi_out_size = phi_outs.size();
+
+  // create an uninitialised double NumPy array to store the results
+  // shape: theta_in_size x phi_in_size x theta_out_size x phi_out_size x 4 x 4
+  npy_intp dims[6] = {theta_in_size, phi_in_size, theta_out_size,
+                      phi_out_size,  4,           4};
+  PyArrayObject *numpy_array =
+      reinterpret_cast<PyArrayObject *>(PyArray_SimpleNew(6, dims, NPY_DOUBLE));
+
+  // loop over all theta_in elements
+  for (npy_intp itheta_in = 0; itheta_in < theta_in_size; ++itheta_in) {
+    // get the corresponding theta_in angle
+    const float_type theta_in = theta_ins[itheta_in];
+    // loop over all phi_in elements
+    for (npy_intp iphi_in = 0; iphi_in < phi_in_size; ++iphi_in) {
+      // get the corresponding phi_in angle
+      const float_type phi_in = phi_ins[iphi_in];
+
+      // loop over all theta_out elements
+      for (npy_intp itheta_out = 0; itheta_out < theta_out_size; ++itheta_out) {
+        // get the corresponding theta_out angle
+        const float_type theta_out = theta_outs[itheta_out];
+        // loop over all phi_out elements
+        for (npy_intp iphi_out = 0; iphi_out < phi_out_size; ++iphi_out) {
+          // get the corresponding phi_out angle
+          const float_type phi_out = phi_outs[iphi_out];
+
+          // get the scattering matrix
+          Matrix<float_type> Z = self->_Tmatrix->get_scattering_matrix(
+              alpha, beta, theta_in, phi_in, theta_out, phi_out);
+
+          // copy the elements from the extinction matrix into the array
+          for (uint_fast8_t irow = 0; irow < 4; ++irow) {
+            for (uint_fast8_t icol = 0; icol < 4; ++icol) {
+              npy_intp array_index[6] = {itheta_in, iphi_in, itheta_out,
+                                         iphi_out,  irow,    icol};
+              *reinterpret_cast<double *>(
+                  PyArray_GetPtr(numpy_array, array_index)) =
+                  static_cast<double>(Z(irow, icol));
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // return the array
+  // we squeeze it so that the output dimensions match the input arrays:
+  // a 1D theta and 0D phi array e.g. will have a thetasize x 4 x 4 output
+  return PyArray_Squeeze(numpy_array);
+}
+
 /*! @brief List of T-matrix object methods that are exposed to Python. */
 static PyMethodDef TmatrixObject_methods[] = {
     {"get_nmax", reinterpret_cast<PyCFunction>(TmatrixObject_get_nmax),
@@ -584,6 +757,10 @@ static PyMethodDef TmatrixObject_methods[] = {
      reinterpret_cast<PyCFunction>(TmatrixObject_get_absorption_cross_sections),
      METH_VARARGS | METH_KEYWORDS,
      "Return both absorption cross sections for the given input angle(s)."},
+    {"get_scattering_matrix",
+     reinterpret_cast<PyCFunction>(TmatrixObject_get_scattering_matrix),
+     METH_VARARGS | METH_KEYWORDS,
+     "Return the scattering matrix for the given scattering event."},
     {nullptr}};
 
 /*! @brief Python Object type for the T-matrix (is edited in the module
@@ -802,47 +979,6 @@ static PyObject *get_equal_volume_radius(PyObject *self, PyObject *args,
       SpecialFunctions::get_equal_volume_to_equal_surface_area_sphere_ratio(
           axis_ratio) *
       radius));
-}
-
-/**
- * @brief Unpack the given 0D or 1D NumPy array into a std::vector with the
- * same number of elements.
- *
- * @param numpy_array Input NumPy array.
- * @return Output std::vector.
- * @tparam DATA_TYPE Data type of the elements in the result vector.
- * @tparam INPUT_TYPE Data type to use when reading values from the NumPy array.
- */
-template <typename DATA_TYPE, typename INPUT_TYPE = DATA_TYPE>
-inline std::vector<DATA_TYPE> unpack_numpy_array(PyArrayObject *numpy_array) {
-
-  // determine the size of the array
-  npy_intp array_size;
-  const npy_intp array_ndim = PyArray_NDIM(numpy_array);
-  if (array_ndim > 1) {
-    ctm_warning("Wrong shape for input array!");
-    return std::vector<DATA_TYPE>();
-  }
-  if (array_ndim > 0) {
-    const npy_intp *array_dims = PyArray_DIMS(numpy_array);
-    array_size = array_dims[0];
-  } else {
-    array_size = 1;
-    npy_intp newdims[1] = {1};
-    PyArray_Dims newdimsobj;
-    newdimsobj.ptr = newdims;
-    newdimsobj.len = 1;
-    numpy_array = reinterpret_cast<PyArrayObject *>(
-        PyArray_Newshape(numpy_array, &newdimsobj, NPY_ANYORDER));
-  }
-
-  std::vector<DATA_TYPE> array(array_size);
-  for (npy_intp i = 0; i < array_size; ++i) {
-    array[i] =
-        *(reinterpret_cast<INPUT_TYPE *>(PyArray_GETPTR1(numpy_array, i)));
-  }
-
-  return array;
 }
 
 /**
@@ -1150,7 +1286,7 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
         static_cast<npy_intp>(result_key->size_size()),
         static_cast<npy_intp>(result_key->wavelength_size()),
         static_cast<npy_intp>(thetas.size()),
-        static_cast<npy_intp>(thetas.size()),
+        static_cast<npy_intp>(2 * thetas.size()),
         4,
         4};
     PyArrayObject *result_array = reinterpret_cast<PyArrayObject *>(
@@ -1167,8 +1303,8 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
               *static_cast<ScatteringMatrixResult *>(results[result_index]);
           for (npy_intp itheta = 0; itheta < result_dims[3]; ++itheta) {
             for (npy_intp iphi = 0; iphi < result_dims[4]; ++iphi) {
-              const Matrix<float_type> &Z =
-                  result.get_scattering_matrix(itheta * thetas.size() + iphi);
+              const Matrix<float_type> &Z = result.get_scattering_matrix(
+                  2 * itheta * thetas.size() + iphi);
               for (npy_intp irow = 0; irow < 4; ++irow) {
                 for (npy_intp icol = 0; icol < 4; ++icol) {
                   npy_intp array_index[7] = {itype, isize, ilambda, itheta,
@@ -1344,6 +1480,7 @@ PyMODINIT_FUNC PyInit_CosTuuM() {
   // be used for aligned grains
   PyModule_AddIntConstant(m, "DAVIS_GREENSTEIN_ALIGNMENT", 0);
   PyModule_AddIntConstant(m, "MISHCHENKO_ALIGNMENT", 1);
+  PyModule_AddIntConstant(m, "DISABLE_ALIGNMENT", 2);
 
   // add constants for the different material types that can be used
   PyModule_AddIntConstant(m, "CARBON", 0);
