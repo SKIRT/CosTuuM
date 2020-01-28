@@ -186,8 +186,7 @@ public:
 
     const float_type costheta_p_in =
         costheta_l_in * cosbeta + sintheta_l_in * sinbeta * cosphirel_in;
-    const float_type sintheta_p_in =
-        sqrt((1. - costheta_p_in) * (1. + costheta_p_in));
+    const float_type sintheta_p_in = sin(acos(costheta_p_in));
     float_type cosphi_p_in, sinphi_p_in, sintheta_p_in_inv;
     if (sintheta_p_in != 0.) {
       sintheta_p_in_inv = 1. / sintheta_p_in;
@@ -209,8 +208,7 @@ public:
 
     const float_type costheta_p_out =
         costheta_l_out * cosbeta + sintheta_l_out * sinbeta * cosphirel_out;
-    const float_type sintheta_p_out =
-        sqrt((1. - costheta_p_out) * (1. + costheta_p_out));
+    const float_type sintheta_p_out = sin(acos(costheta_p_out));
     float_type cosphi_p_out, sinphi_p_out, sintheta_p_out_inv;
     if (sintheta_p_out != 0.) {
       sintheta_p_out_inv = 1. / sintheta_p_out;
