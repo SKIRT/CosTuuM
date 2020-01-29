@@ -305,6 +305,12 @@ private:
   /*! @brief Work array for Q matrix inversion. */
   std::vector<std::complex<float_type>> _work;
 
+  /*! @brief Temporary Wigner D function array. */
+  std::vector<float_type> _wigner_d;
+
+  /*! @brief Temporary Wigner D function derivative array. */
+  std::vector<float_type> _dwigner_d;
+
 public:
   /**
    * @brief Constructor.
@@ -321,7 +327,8 @@ public:
         _RgJ22(maximum_order, maximum_order),
         _Q(2 * maximum_order, 2 * maximum_order),
         _RgQ(2 * maximum_order, 2 * maximum_order),
-        _pivot_array(2 * maximum_order), _work(2 * maximum_order) {}
+        _pivot_array(2 * maximum_order), _work(2 * maximum_order),
+        _wigner_d(maximum_order), _dwigner_d(maximum_order) {}
 
   /**
    * @brief Get the size in memory of a hypothetical TMatrixAuxiliarySpace
@@ -341,6 +348,12 @@ public:
     size += 8 * maximum_order * maximum_order * sizeof(float_type);
     // RgQ
     size += 8 * maximum_order * maximum_order * sizeof(float_type);
+    // pivot
+    size += 2 * maximum_order * sizeof(uint_fast32_t);
+    // work
+    size += 4 * maximum_order * sizeof(float_type);
+    // wigner_d
+    size += 2 * maximum_order * sizeof(float_type);
     return size;
   }
 
@@ -361,6 +374,10 @@ public:
     for (uint_fast32_t i = 0; i < _pivot_array.size(); ++i) {
       _pivot_array[i] = 0;
       _work[i] = std::complex<float_type>(0.);
+    }
+    for (uint_fast32_t i = 0; i < _wigner_d.size(); ++i) {
+      _wigner_d[i] = 0.;
+      _dwigner_d[i] = 0.;
     }
   }
 };
@@ -561,21 +578,25 @@ public:
 
     aux.reset();
 
-    for (uint_fast32_t n1 = 1; n1 < _nmax + 1; ++n1) {
-      // n1 * (n1 + 1)
-      const float_type n1n1p1 = n1 * (n1 + 1.);
-      for (uint_fast32_t n2 = 1; n2 < _nmax + 1; ++n2) {
-        // n2 * (n2 + 1)
-        const float_type n2n2p1 = n2 * (n2 + 1.);
+    std::vector<float_type> &wigner_d = aux._wigner_d;
+    std::vector<float_type> &dwigner_d = aux._dwigner_d;
+    for (uint_fast32_t ig = 1; ig < _ngauss + 1; ++ig) {
 
-        std::complex<float_type> this_J12, this_J21, this_RgJ12, this_RgJ21;
-        // filter out half the components because of symmetry
-        if ((n1 + n2) % 2 == 0) {
-          for (uint_fast32_t ig = 1; ig < _ngauss + 1; ++ig) {
-            const float_type wigner_n1 = _wigner.get_wigner_d(0, ig - 1, n1);
-            const float_type dwigner_n1 = _wigner.get_dwigner_d(0, ig - 1, n1);
-            const float_type wigner_n2 = _wigner.get_wigner_d(0, ig - 1, n2);
-            const float_type dwigner_n2 = _wigner.get_dwigner_d(0, ig - 1, n2);
+      _wigner.get_wigner_functions(0, ig - 1, wigner_d, dwigner_d);
+
+      for (uint_fast32_t n1 = 1; n1 < _nmax + 1; ++n1) {
+        // n1 * (n1 + 1)
+        const float_type n1n1p1 = n1 * (n1 + 1.);
+        for (uint_fast32_t n2 = 1; n2 < _nmax + 1; ++n2) {
+          // n2 * (n2 + 1)
+          const float_type n2n2p1 = n2 * (n2 + 1.);
+
+          // filter out half the components because of symmetry
+          if ((n1 + n2) % 2 == 0) {
+            const float_type wigner_n1 = wigner_d[n1 - 1];
+            const float_type dwigner_n1 = dwigner_d[n1 - 1];
+            const float_type wigner_n2 = wigner_d[n2 - 1];
+            const float_type dwigner_n2 = dwigner_d[n2 - 1];
 
             const float_type wn1dwn2 = wigner_n1 * dwigner_n2;
             const float_type dwn1wn2 = dwigner_n1 * wigner_n2;
@@ -618,37 +639,34 @@ public:
                                     _geometry.get_r2(ig - 1);
             const float_type dr_over_ri = _geometry.get_dr_over_r(ig - 1);
 
+            // prefactor sqrt{(2n1+1)*(2n2+1)/[n1*(n1+1)*n2*(n2+1)]}
+            const float_type an12 = _nfactors.get_ann(n1, n2);
+
             const float_type f1 = wr2i * dwn1dwn2;
             const float_type f2 = wr2i * dr_over_ri * n1n1p1 * wn1dwn2;
             // r^2 * ddn1_0m/dtheta * ddn2_0m/dtheta * jn2(krmr) *
             //    ([kr*hn1(kr)]'/kr)
             // + r^2 * dr/rdtheta * n1 * (n1 + 1) * dn1_0m * ddn1_0m/dtheta *
             //    jn2(krmr) * hn1(kr) / kr
-            this_J12 += f1 * b2 + f2 * b3;
+            aux._J12(n1 - 1, n2 - 1) += an12 * (f1 * b2 + f2 * b3);
             // r^2 * ddn1_0m/dtheta * ddn2_0m/dtheta * jn2(krmr) *
             //    ([kr*jn1(kr)]'/kr)
             // + r^2 * dr/rdtheta * n1 * (n1 + 1) * dn1_0m * ddn1_0m/dtheta *
             //    jn2(krmr) * jn1(kr) / kr
-            this_RgJ12 += f1 * c2 + f2 * c3;
+            aux._RgJ12(n1 - 1, n2 - 1) += an12 * (f1 * c2 + f2 * c3);
 
             const float_type f3 = wr2i * dr_over_ri * n2n2p1 * dwn1wn2;
             // r^2 * ddn1_0m/dtheta * ddn2_0m/dtheta * hn1(kr) *
             //    ([krmr*jn2(krmr)]'/krmr)
             // + r^2 * dr/rdtheta * n2 * (n2 + 1) * ddn1_0m/dtheta * dn2_0m *
             //    jn2(krmr) * hn1(kr) / krmr
-            this_J21 += f1 * b4 + f3 * b5;
+            aux._J21(n1 - 1, n2 - 1) += an12 * (f1 * b4 + f3 * b5);
             // r^2 * ddn1_0m/dtheta * ddn2_0m/dtheta * jn1(kr) *
             //    ([krmr*jn2(krmr)]'/krmr)
             // + r^2 * dr/rdtheta * n2 * (n2 + 1) * ddn1_0m/dtheta * dn2_0m *
             //    jn2(krmr) * jn1(kr) / krmr
-            this_RgJ21 += f1 * c4 + f3 * c5;
+            aux._RgJ21(n1 - 1, n2 - 1) += an12 * (f1 * c4 + f3 * c5);
           }
-          // prefactor sqrt{(2n1+1)*(2n2+1)/[n1*(n1+1)*n2*(n2+1)]}
-          const float_type an12 = _nfactors.get_ann(n1, n2);
-          aux._J12(n1 - 1, n2 - 1) = an12 * this_J12;
-          aux._J21(n1 - 1, n2 - 1) = an12 * this_J21;
-          aux._RgJ12(n1 - 1, n2 - 1) = an12 * this_RgJ12;
-          aux._RgJ21(n1 - 1, n2 - 1) = an12 * this_RgJ21;
         }
       }
     }
@@ -851,7 +869,10 @@ public:
   virtual void execute(const int_fast32_t thread_id) {
 
     // make sure the T-matrix was actually converged
-    ctm_assert(_converged_size.is_converged());
+    ctm_assert_message(
+        _converged_size.is_converged(), "size: %g, wavelength: %g",
+        double(_interaction_variables.get_equal_volume_radius()),
+        double(2. * M_PI / _interaction_variables.get_wavenumber()));
 
     // since we don't know how many elements the T matrix will have before
     // we create the tasks, we might have tasks for elements of the T matrix
@@ -875,21 +896,22 @@ public:
     const uint_fast32_t nm = nmax + 1 - _m;
     const uint_fast32_t nm2 = 2 * nm;
 
-    for (uint_fast32_t n1 = _m; n1 < nmax + 1; ++n1) {
-      // n1 * (n1 + 1)
-      const float_type n1n1p1 = n1 * (n1 + 1.);
-      for (uint_fast32_t n2 = _m; n2 < nmax + 1; ++n2) {
-        // n2 * (n2 + 1)
-        const float_type n2n2p1 = n2 * (n2 + 1.);
+    std::vector<float_type> &wigner_ds = aux._wigner_d;
+    std::vector<float_type> &dwigner_ds = aux._dwigner_d;
+    for (uint_fast32_t ig = 0; ig < ngauss; ++ig) {
+      wigner_d.get_wigner_functions(_m, ig, wigner_ds, dwigner_ds);
+      for (uint_fast32_t n1 = _m; n1 < nmax + 1; ++n1) {
+        // n1 * (n1 + 1)
+        const float_type n1n1p1 = n1 * (n1 + 1.);
+        for (uint_fast32_t n2 = _m; n2 < nmax + 1; ++n2) {
+          // n2 * (n2 + 1)
+          const float_type n2n2p1 = n2 * (n2 + 1.);
 
-        std::complex<float_type> this_J11, this_J12, this_J21, this_J22,
-            this_RgJ11, this_RgJ12, this_RgJ21, this_RgJ22;
-        const int_fast8_t sign = ((n1 + n2) % 2 == 0) ? 1 : -1;
-        for (uint_fast32_t ig = 0; ig < ngauss; ++ig) {
-          const float_type wigner_n1 = wigner_d.get_wigner_d(_m, ig, n1);
-          const float_type dwigner_n1 = wigner_d.get_dwigner_d(_m, ig, n1);
-          const float_type wigner_n2 = wigner_d.get_wigner_d(_m, ig, n2);
-          const float_type dwigner_n2 = wigner_d.get_dwigner_d(_m, ig, n2);
+          const int_fast8_t sign = ((n1 + n2) % 2 == 0) ? 1 : -1;
+          const float_type wigner_n1 = wigner_ds[n1 - 1];
+          const float_type dwigner_n1 = dwigner_ds[n1 - 1];
+          const float_type wigner_n2 = wigner_ds[n2 - 1];
+          const float_type dwigner_n2 = dwigner_ds[n2 - 1];
 
           const float_type wn1wn2 = wigner_n1 * wigner_n2;
           const float_type wn1dwn2 = wigner_n1 * dwigner_n2;
@@ -923,6 +945,9 @@ public:
 
           const float_type dr_over_ri = geometry.get_dr_over_r(ig);
 
+          // prefactor sqrt{(2n1+1)*(2n2+1)/[n1*(n1+1)*n2*(n2+1)]}
+          const float_type an12 = _nfactors.get_ann(n1, n2);
+
           if (sign < 0) {
             // note that r2 here actually is (r2/R_V^2)
             // this is okay, since this factor appears in all elements of the
@@ -943,10 +968,10 @@ public:
             const float_type e1 = dsi * (wn1dwn2 + dwn1wn2);
             // (m / sintheta) * jn2(krmr) * hn1(kr) *
             // (dn1_0m * ddn2_0m/dtheta + ddn1_0m/dtheta * dn2_0m)
-            this_J11 += e1 * b1;
+            aux._J11(n1 - 1, n2 - 1) += an12 * (e1 * b1);
             // (m / sintheta) * jn2(krmr) * jn1(kr) *
             // (dn1_0m * ddn2_0m/dtheta + ddn1_0m/dtheta * dn2_0m)
-            this_RgJ11 += e1 * c1;
+            aux._RgJ11(n1 - 1, n2 - 1) += an12 * (e1 * c1);
 
             const float_type factor = dsi * dr_over_ri * wn1wn2;
             const float_type e2 = factor * n1n1p1;
@@ -957,14 +982,14 @@ public:
             //    * ([krmr*jn2(krmr)]'/krmr) * hn1(kr) / kr
             // + (m / sintheta) * dr/rdtheta * dn1_0m * dn2_0m * n2 * (n2 + 1)
             //    * jn2(krmr) * ([kr*hn1(kr]'/kr) / krmr
-            this_J22 += e1 * b6 + e2 * b7 + e3 * b8;
+            aux._J22(n1 - 1, n2 - 1) += an12 * (e1 * b6 + e2 * b7 + e3 * b8);
             // (m / sintheta) * ([krmr*kn2(krmr)]'/krmr) * ([kr*jn1(kr)]'/kr)
             //    * (dn1_0m * ddn2_0m/dtheta + ddn1_0m/dtheta * dn2_0m)
             // + (m / sintheta) * dr/rdtheta * dn1_0m * dn2_0m * n1 * (n1 + 1)
             //    * ([krmr*jn2(krmr)]'/krmr) * jn1(kr) / kr
             // + (m / sintheta) * dr/rdtheta * dn1_0m * dn2_0m * n2 * (n2 + 1)
             //    * jn2(krmr) * ([kr*jn1(kr]'/kr) / krmr
-            this_RgJ22 += e1 * c6 + e2 * c7 + e3 * c8;
+            aux._RgJ22(n1 - 1, n2 - 1) += an12 * (e1 * c6 + e2 * c7 + e3 * c8);
           } else {
             // note that r2 here actually is (r2/R_V^2)
             // this is okay, since this factor appears in all elements of the
@@ -986,13 +1011,13 @@ public:
             //    ([kr*hn1(kr)]'/kr)
             // + r^2 * dr/rdtheta * n1 * (n1 + 1) * dn1_0m * ddn1_0m/dtheta *
             //    jn2(krmr) * hn1(kr) / kr
-            this_J12 += f1 * b2 + f2 * b3;
+            aux._J12(n1 - 1, n2 - 1) += an12 * (f1 * b2 + f2 * b3);
             // r^2 * (m^2 / sintheta * dn1_0m * dn2_0m +
             //        ddn1_0m/dtheta * ddn2_0m/dtheta) * jn2(krmr) *
             //    ([kr*jn1(kr)]'/kr)
             // + r^2 * dr/rdtheta * n1 * (n1 + 1) * dn1_0m * ddn1_0m/dtheta *
             //    jn2(krmr) * jn1(kr) / kr
-            this_RgJ12 += f1 * c2 + f2 * c3;
+            aux._RgJ12(n1 - 1, n2 - 1) += an12 * (f1 * c2 + f2 * c3);
 
             const float_type f3 = wr2i * dr_over_ri * n2n2p1 * dwn1wn2;
             // r^2 * (m^2 / sintheta * dn1_0m * dn2_0m +
@@ -1000,25 +1025,15 @@ public:
             //    ([krmr*jn2(krmr)]'/krmr)
             // + r^2 * dr/rdtheta * n2 * (n2 + 1) * ddn1_0m/dtheta * dn2_0m *
             //    jn2(krmr) * hn1(kr) / krmr
-            this_J21 += f1 * b4 + f3 * b5;
+            aux._J21(n1 - 1, n2 - 1) += an12 * (f1 * b4 + f3 * b5);
             // r^2 * (m^2 / sintheta * dn1_0m * dn2_0m +
             //        ddn1_0m/dtheta * ddn2_0m/dtheta) * jn1(kr) *
             //    ([krmr*jn2(krmr)]'/krmr)
             // + r^2 * dr/rdtheta * n2 * (n2 + 1) * ddn1_0m/dtheta * dn2_0m *
             //    jn2(krmr) * jn1(kr) / krmr
-            this_RgJ21 += f1 * c4 + f3 * c5;
+            aux._RgJ21(n1 - 1, n2 - 1) += an12 * (f1 * c4 + f3 * c5);
           }
         }
-        // prefactor sqrt{(2n1+1)*(2n2+1)/[n1*(n1+1)*n2*(n2+1)]}
-        const float_type an12 = _nfactors.get_ann(n1, n2);
-        aux._J11(n1 - 1, n2 - 1) = this_J11 * an12;
-        aux._J12(n1 - 1, n2 - 1) = this_J12 * an12;
-        aux._J21(n1 - 1, n2 - 1) = this_J21 * an12;
-        aux._J22(n1 - 1, n2 - 1) = this_J22 * an12;
-        aux._RgJ11(n1 - 1, n2 - 1) = this_RgJ11 * an12;
-        aux._RgJ12(n1 - 1, n2 - 1) = this_RgJ12 * an12;
-        aux._RgJ21(n1 - 1, n2 - 1) = this_RgJ21 * an12;
-        aux._RgJ22(n1 - 1, n2 - 1) = this_RgJ22 * an12;
       }
     }
 

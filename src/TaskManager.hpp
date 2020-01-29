@@ -398,11 +398,11 @@ public:
       const uint_fast32_t this_order = _minimum_order + i;
       const uint_fast32_t this_ngauss =
           minimum_ngauss + i * _gauss_legendre_factor;
-      add_memory_allocation(
-          WignerDResources::get_memory_size(this_order, this_ngauss),
-          "WignerDResources", memory_log_file, memory_used);
-      WignerDResources *this_wignerdm0 =
-          new WignerDResources(this_order, this_ngauss, *quadrature_points[i]);
+      add_memory_allocation(WignerDResources::get_memory_size(
+                                this_order, this_ngauss, this_order < 100),
+                            "WignerDResources", memory_log_file, memory_used);
+      WignerDResources *this_wignerdm0 = new WignerDResources(
+          this_order, this_ngauss, *quadrature_points[i], this_order < 100);
       quicksched.register_resource(*this_wignerdm0);
       quicksched.register_task(*this_wignerdm0);
       this_wignerdm0->link_resources(quicksched);
