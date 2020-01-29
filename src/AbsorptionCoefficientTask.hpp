@@ -93,6 +93,16 @@ public:
 
 /**
  * @brief Angular grid used to compute absorption cross sections.
+ *
+ * The grid stores two sets of angles and some useful function values based on
+ * these:
+ *  - the output zenith angles that correspond to the directions for which we
+ *    want to compute absorption coefficients. These are provided by the user
+ *    and can be arbitrary.
+ *  - the input zenith and azimuth angles that correspond to a grid of incoming
+ *    directions over which we integrate. These are computed as the quadrature
+ *    points for a Gauss-Legendre quadrature rule. For these we also store the
+ *    associated Gauss-Legendre quadrature weights.
  */
 class AbsorptionCoefficientGrid : public Resource,
                                   public Task,
@@ -105,17 +115,8 @@ class AbsorptionCoefficientGrid : public Resource,
   friend class AbsorptionSpecialWignerDResources;
 
 private:
-  /*! @brief Input zenith angles (in radians). */
-  std::vector<float_type> _theta_in;
-
-  /*! @brief Cosines of the input zenith angles. */
-  std::vector<float_type> _cos_theta_in;
-
-  /*! @brief Sines of the input zenith angles. */
-  std::vector<float_type> _sin_theta_in;
-
-  /*! @brief Inverse sines of the input zenith angles. */
-  std::vector<float_type> _sin_theta_in_inverse;
+  /*! @brief Output zenith angles (in radians). */
+  std::vector<float_type> _theta_out;
 
   /*! @brief Cosines of the output zenith angles. */
   std::vector<float_type> _cos_theta_out;
@@ -126,17 +127,26 @@ private:
   /*! @brief Inverse sines of the output zenith angles. */
   std::vector<float_type> _sin_theta_out_inverse;
 
-  /*! @brief Gauss-Legendre weights for cosines of the output zenith angles. */
-  std::vector<float_type> _cos_theta_out_weights;
+  /*! @brief Cosines of the input zenith angles. */
+  std::vector<float_type> _cos_theta_in;
 
-  /*! @brief Cosines of the output azimuth angles. */
-  std::vector<float_type> _cos_phi_out;
+  /*! @brief Sines of the input zenith angles. */
+  std::vector<float_type> _sin_theta_in;
 
-  /*! @brief Sines of the output azimuth angles. */
-  std::vector<float_type> _sin_phi_out;
+  /*! @brief Inverse sines of the input zenith angles. */
+  std::vector<float_type> _sin_theta_in_inverse;
 
-  /*! @brief Gauss-Legendre weights for the output azimuth angles. */
-  std::vector<float_type> _phi_out_weights;
+  /*! @brief Gauss-Legendre weights for cosines of the input zenith angles. */
+  std::vector<float_type> _cos_theta_in_weights;
+
+  /*! @brief Cosines of the input azimuth angles. */
+  std::vector<float_type> _cos_phi_in;
+
+  /*! @brief Sines of the input azimuth angles. */
+  std::vector<float_type> _sin_phi_in;
+
+  /*! @brief Gauss-Legendre weights for the input azimuth angles. */
+  std::vector<float_type> _phi_in_weights;
 
 public:
   /**
@@ -150,14 +160,14 @@ public:
   inline AbsorptionCoefficientGrid(const uint_fast32_t ntheta,
                                    const float_type *theta,
                                    const uint_fast32_t ngauss)
-      : _theta_in(ntheta), _cos_theta_in(ntheta), _sin_theta_in(ntheta),
-        _sin_theta_in_inverse(ntheta), _cos_theta_out(ngauss),
-        _sin_theta_out(ngauss), _sin_theta_out_inverse(ngauss),
-        _cos_theta_out_weights(ngauss), _cos_phi_out(ngauss),
-        _sin_phi_out(ngauss), _phi_out_weights(ngauss) {
+      : _theta_out(ntheta), _cos_theta_out(ntheta), _sin_theta_out(ntheta),
+        _sin_theta_out_inverse(ntheta), _cos_theta_in(ngauss),
+        _sin_theta_in(ngauss), _sin_theta_in_inverse(ngauss),
+        _cos_theta_in_weights(ngauss), _cos_phi_in(ngauss), _sin_phi_in(ngauss),
+        _phi_in_weights(ngauss) {
 
     for (uint_fast32_t i = 0; i < ntheta; ++i) {
-      _theta_in[i] = theta[i];
+      _theta_out[i] = theta[i];
     }
   }
 
@@ -197,38 +207,48 @@ public:
    */
   virtual void execute(const int_fast32_t thread_id) {
 
-    const uint_fast32_t ntheta = _cos_theta_in.size();
-    for (uint_fast32_t igauss = 0; igauss < ntheta; ++igauss) {
-      _cos_theta_in[igauss] = cos(_theta_in[igauss]);
+    const uint_fast32_t ntheta = _cos_theta_out.size();
+    for (uint_fast32_t itheta = 0; itheta < ntheta; ++itheta) {
+      ctm_assert(_theta_out[itheta] >= 0.);
+      ctm_assert(_theta_out[itheta] <= M_PI);
+      _cos_theta_out[itheta] = cos(_theta_out[itheta]);
+      // note that we only use the positive root since the sin(theta) values
+      // are guaranteed to be in the range [0, 1]
+      _sin_theta_out[itheta] =
+          sqrt((1. - _cos_theta_out[itheta]) * (1. + _cos_theta_out[itheta]));
+      if (_sin_theta_out[itheta] != 0.) {
+        _sin_theta_out_inverse[itheta] = 1. / _sin_theta_out[itheta];
+      } else {
+        // this value should be ignored, we just set it to a safe and
+        // recognisable value
+        _sin_theta_out_inverse[itheta] = 9000.;
+      }
+    }
+
+    const uint_fast32_t ngauss = _cos_theta_in.size();
+    SpecialFunctions::get_gauss_legendre_points_and_weights<float_type>(
+        ngauss, _cos_theta_in, _cos_theta_in_weights);
+    // note that we temporarily store the phi angles in cos_phi
+    SpecialFunctions::get_gauss_legendre_points_and_weights_ab<float_type>(
+        ngauss, 0., 2. * M_PI, _cos_phi_in, _phi_in_weights);
+
+    for (uint_fast32_t igauss = 0; igauss < ngauss; ++igauss) {
+      // again, we know that the sin(theta) values are in the range [0, 1]
       _sin_theta_in[igauss] =
           sqrt((1. - _cos_theta_in[igauss]) * (1. + _cos_theta_in[igauss]));
       if (_sin_theta_in[igauss] != 0.) {
         _sin_theta_in_inverse[igauss] = 1. / _sin_theta_in[igauss];
       } else {
+        // again: safe and recognisable value
         _sin_theta_in_inverse[igauss] = 9000.;
-      }
-    }
-
-    const uint_fast32_t ngauss = _cos_theta_out.size();
-    SpecialFunctions::get_gauss_legendre_points_and_weights<float_type>(
-        ngauss, _cos_theta_out, _cos_theta_out_weights);
-    // note that we temporarily store the phi angles in cos_phi
-    SpecialFunctions::get_gauss_legendre_points_and_weights_ab<float_type>(
-        ngauss, 0., 2. * M_PI, _cos_phi_out, _phi_out_weights);
-
-    for (uint_fast32_t igauss = 0; igauss < ngauss; ++igauss) {
-      _sin_theta_out[igauss] =
-          sqrt((1. - _cos_theta_out[igauss]) * (1. + _cos_theta_out[igauss]));
-      if (_sin_theta_out[igauss] != 0.) {
-        _sin_theta_out_inverse[igauss] = 1. / _sin_theta_out[igauss];
-      } else {
-        _sin_theta_out_inverse[igauss] = 9000.;
       }
 
       // convert the phi angles to cos_phi
-      const float_type phi_out = _cos_phi_out[igauss];
-      _cos_phi_out[igauss] = cos(phi_out);
-      _sin_phi_out[igauss] = sin(phi_out);
+      const float_type phi_out = _cos_phi_in[igauss];
+      _cos_phi_in[igauss] = cos(phi_out);
+      // note that in this case we cannot use a sqrt(1-cos^2) rule, since we
+      // can have sin(phi)<0.
+      _sin_phi_in[igauss] = sin(phi_out);
     }
   }
 
@@ -237,7 +257,9 @@ public:
    *
    * @return Number of angles.
    */
-  inline uint_fast32_t get_number_of_angles() const { return _theta_in.size(); }
+  inline uint_fast32_t get_number_of_angles() const {
+    return _theta_out.size();
+  }
 };
 
 /**
@@ -280,13 +302,13 @@ public:
     for (uint_fast32_t n = 1; n < nmax + 1; ++n) {
       for (uint_fast32_t m = 0; m < n + 1; ++m) {
         _wigner_d_sinx[0].push_back(
-            Matrix<float_type>(grid._cos_theta_in.size(), n));
+            Matrix<float_type>(grid._cos_theta_out.size(), n));
         _dwigner_d[0].push_back(
-            Matrix<float_type>(grid._cos_theta_in.size(), n));
+            Matrix<float_type>(grid._cos_theta_out.size(), n));
         _wigner_d_sinx[1].push_back(
-            Matrix<float_type>(grid._cos_theta_out.size(), n));
+            Matrix<float_type>(grid._cos_theta_in.size(), n));
         _dwigner_d[1].push_back(
-            Matrix<float_type>(grid._cos_theta_out.size(), n));
+            Matrix<float_type>(grid._cos_theta_in.size(), n));
       }
     }
     ctm_assert(_wigner_d_sinx[0].size() == number_of_elements);
@@ -307,8 +329,8 @@ public:
     size_t size = sizeof(AbsorptionSpecialWignerDResources);
     for (uint_fast32_t n = 1; n < nmax + 1; ++n) {
       for (uint_fast32_t m = 0; m < n + 1; ++m) {
-        size += 2 * grid._cos_theta_in.size() * n * sizeof(float_type);
         size += 2 * grid._cos_theta_out.size() * n * sizeof(float_type);
+        size += 2 * grid._cos_theta_in.size() * n * sizeof(float_type);
       }
     }
     return size;
@@ -334,8 +356,8 @@ public:
    */
   virtual void execute(const int_fast32_t thread_id = 0) {
 
-    const uint_fast32_t ntheta_in = _grid._cos_theta_in.size();
-    const uint_fast32_t ntheta_out = _grid._cos_theta_out.size();
+    const uint_fast32_t ntheta_in = _grid._cos_theta_out.size();
+    const uint_fast32_t ntheta_out = _grid._cos_theta_in.size();
     for (uint_fast32_t n = 1; n < _nmax + 1; ++n) {
       for (uint_fast32_t m = 0; m < n + 1; ++m) {
         for (uint_fast32_t itheta_in = 0; itheta_in < ntheta_in; ++itheta_in) {
@@ -347,8 +369,8 @@ public:
               ", index: %" PRIuFAST32,
               _wigner_d_sinx[0][index].get_number_of_columns(), n, m, index);
           SpecialFunctions::wigner_dn_0m_sinx(
-              _grid._cos_theta_in[itheta_in], _grid._sin_theta_in[itheta_in],
-              _grid._sin_theta_in_inverse[itheta_in], n, m,
+              _grid._cos_theta_out[itheta_in], _grid._sin_theta_out[itheta_in],
+              _grid._sin_theta_out_inverse[itheta_in], n, m,
               &_wigner_d_sinx[0][index].get_row(itheta_in)[0],
               &_dwigner_d[0][index].get_row(itheta_in)[0]);
         }
@@ -362,9 +384,8 @@ public:
               ", index: %" PRIuFAST32,
               _wigner_d_sinx[1][index].get_number_of_columns(), n, m, index);
           SpecialFunctions::wigner_dn_0m_sinx(
-              _grid._cos_theta_out[itheta_out],
-              _grid._sin_theta_out[itheta_out],
-              _grid._sin_theta_out_inverse[itheta_out], n, m,
+              _grid._cos_theta_in[itheta_out], _grid._sin_theta_in[itheta_out],
+              _grid._sin_theta_in_inverse[itheta_out], n, m,
               &_wigner_d_sinx[1][index].get_row(itheta_out)[0],
               &_dwigner_d[1][index].get_row(itheta_out)[0]);
         }
@@ -509,26 +530,24 @@ public:
    * from the given input angles to the given output angles at a particle with
    * its symmetry axis fixed to the @f$z@f$-axis of the reference frame.
    *
-   * @param grid_in Internal input grid to sample.
-   * @param itheta_in Index of the input zenith angle.
    * @param grid_out Internal output grid to sample.
    * @param itheta_out Index of the output zenith angle.
-   * @param cosphi_out Cosine of the output azimuth angle,
-   * @f$\cos(\phi{}_s)@f$.
-   * @param sinphi_out Sine of the output azimuth angle,
-   * @f$\sin(\phi{}_s)@f$.
+   * @param grid_in Internal input grid to sample.
+   * @param itheta_in Index of the input zenith angle.
+   * @param cosphi_in Cosine of the input azimuth angle, @f$\cos(\phi{}_i)@f$.
+   * @param sinphi_in Sine of the input azimuth angle, @f$\sin(\phi{}_i)@f$.
    * @return Scattering matrix for this scattering event.
    */
   inline Matrix<std::complex<float_type>> get_forward_scattering_matrix(
       const uint_fast8_t grid_in, const uint_fast32_t itheta_in,
       const uint_fast8_t grid_out, const uint_fast32_t itheta_out,
-      const float_type cosphi_out, const float_type sinphi_out) const {
+      const float_type cosphi_in, const float_type sinphi_in) const {
 
     const uint_fast32_t nmax = _Tmatrix.get_nmax();
 
     // now compute the matrix S^P
     // we precompute e^{i(phi_out-phi_in)}
-    const std::complex<float_type> expiphi_p_out_m_in(cosphi_out, sinphi_out);
+    const std::complex<float_type> expiphi_p_out_m_in(cosphi_in, -sinphi_in);
     // e^{im(phi_out-phi_in)} is computed recursively, starting with the value
     // for m=0: 1
     std::complex<float_type> expimphi_p_out_m_in(1., 0.);
@@ -625,45 +644,45 @@ public:
    */
   virtual void execute(const int_fast32_t thread_id) {
 
-    const uint_fast32_t ntheta = _grid._theta_in.size();
-    const uint_fast32_t ngauss = _grid._cos_theta_out.size();
+    const uint_fast32_t ntheta = _grid._theta_out.size();
+    const uint_fast32_t ngauss = _grid._cos_theta_in.size();
 
-    for (uint_fast32_t itheta_in = 0; itheta_in < ntheta; ++itheta_in) {
+    for (uint_fast32_t itheta_out = 0; itheta_out < ntheta; ++itheta_out) {
 
       Matrix<std::complex<float_type>> S =
-          get_forward_scattering_matrix(0, itheta_in, 0, itheta_in, 1., 0.);
+          get_forward_scattering_matrix(0, itheta_out, 0, itheta_out, 1., 0.);
 
       const float_type prefactor =
           2. * M_PI / _interaction_variables.get_wavenumber();
-      _result._Qabs[itheta_in] = prefactor * (S(0, 0) + S(1, 1)).imag();
-      _result._Qabspol[itheta_in] = prefactor * (S(0, 0) - S(1, 1)).imag();
+      _result._Qabs[itheta_out] = prefactor * (S(0, 0) + S(1, 1)).imag();
+      _result._Qabspol[itheta_out] = prefactor * (S(0, 0) - S(1, 1)).imag();
 
       if (_account_for_scattering) {
         const float_type half(0.5);
-        for (uint_fast32_t itheta_out = 0; itheta_out < ngauss; ++itheta_out) {
-          for (uint_fast32_t iphi_out = 0; iphi_out < ngauss; ++iphi_out) {
-            const float_type cos_phi_out = _grid._cos_phi_out[iphi_out];
-            const float_type sin_phi_out = _grid._sin_phi_out[iphi_out];
+        for (uint_fast32_t itheta_in = 0; itheta_in < ngauss; ++itheta_in) {
+          for (uint_fast32_t iphi_in = 0; iphi_in < ngauss; ++iphi_in) {
+            const float_type cos_phi_in = _grid._cos_phi_in[iphi_in];
+            const float_type sin_phi_in = _grid._sin_phi_in[iphi_in];
 
             Matrix<std::complex<float_type>> Stp =
-                get_forward_scattering_matrix(0, itheta_in, 1, itheta_out,
-                                              cos_phi_out, sin_phi_out);
+                get_forward_scattering_matrix(1, itheta_in, 0, itheta_out,
+                                              cos_phi_in, sin_phi_in);
 
-            const float_type weight = _grid._cos_theta_out_weights[itheta_out] *
-                                      _grid._phi_out_weights[iphi_out];
+            const float_type weight = _grid._cos_theta_in_weights[itheta_in] *
+                                      _grid._phi_in_weights[iphi_in];
             const float_type Z00 =
                 (half *
                  (Stp(0, 0) * conj(Stp(0, 0)) + Stp(0, 1) * conj(Stp(0, 1)) +
                   Stp(1, 0) * conj(Stp(1, 0)) + Stp(1, 1) * conj(Stp(1, 1))))
                     .real();
-            _result._Qabs[itheta_in] -= Z00 * weight;
+            _result._Qabs[itheta_out] -= Z00 * weight;
 
             const float_type Z10 =
                 (half *
                  (Stp(0, 0) * conj(Stp(0, 0)) + Stp(0, 1) * conj(Stp(0, 1)) -
                   Stp(1, 0) * conj(Stp(1, 0)) - Stp(1, 1) * conj(Stp(1, 1))))
                     .real();
-            _result._Qabspol[itheta_in] -= Z10 * weight;
+            _result._Qabspol[itheta_out] -= Z10 * weight;
           }
         }
       }
@@ -671,8 +690,8 @@ public:
       // normalise the coefficients
       const float_type a = _interaction_variables.get_equal_volume_radius();
       const float_type norm = M_PI * a * a;
-      _result._Qabs[itheta_in] /= norm;
-      _result._Qabspol[itheta_in] /= norm;
+      _result._Qabs[itheta_out] /= norm;
+      _result._Qabspol[itheta_out] /= norm;
     }
   }
 };

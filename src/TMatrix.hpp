@@ -2132,12 +2132,12 @@ public:
 
     const float_type half(0.5);
     for (uint_fast32_t itheta = 0; itheta < ngauss; ++itheta) {
-      const float_type theta_out = thetaGL[itheta];
+      const float_type theta_in = thetaGL[itheta];
       for (uint_fast32_t iphi = 0; iphi < ngauss; ++iphi) {
-        const float_type phi_out = phiGL[iphi];
+        const float_type phi_in = phiGL[iphi];
 
         Matrix<std::complex<float_type>> Stp =
-            get_forward_scattering_matrix(theta, 0., theta_out, phi_out);
+            get_forward_scattering_matrix(theta_in, phi_in, theta, 0.);
 
         const float_type weight =
             costhetaweightsGL[itheta] * phiweightsGL[iphi];
