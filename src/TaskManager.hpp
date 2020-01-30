@@ -478,7 +478,7 @@ public:
         memory_left / tmatrix_memory_requirement, total_number_of_Tmatrices);
     // make sure the number we can allocate is larger than the number of
     // shapes (not strictly necessary, but we do this for now)
-    ctm_assert(number_of_tmatrices >= number_of_shapes);
+    //    ctm_assert(number_of_tmatrices >= number_of_shapes);
 
     // we are done using memory: output the total
     add_memory_allocation(number_of_tmatrices * tmatrix_memory_requirement,

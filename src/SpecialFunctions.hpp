@@ -28,6 +28,18 @@ const uint_fast32_t SPECIALFUNCTIONS_BESSEL_NMAX = 800;
  */
 class SpecialFunctions {
 
+private:
+  /**
+   * @brief Convert the given value to a double precision value.
+   *
+   * @param value Value to convert.
+   * @return Double precision equivalent.
+   */
+  template <typename DATA_TYPE>
+  static inline double to_double(const DATA_TYPE value) {
+    return double(value);
+  }
+
 public:
   /**
    * @brief Spherical Bessel function of the second kind for general real or
@@ -68,7 +80,7 @@ public:
    *
    * @param nmax Maximum order to compute (we compute all @f$y_n(z)@f$ for
    * @f$n\in{}[1,n_{max}]@f$).
-   * @param z Input values.
+   * @param z Input value.
    * @param y Array to store the Bessel function values in (of size nmax).
    * @param dy Array to store the first derivatives in (of size nmax).
    * @tparam DATA_TYPE Data type of input and output values.
@@ -103,8 +115,10 @@ public:
       dy[i] = y[i - 1] - ip1 * zinv * y[i];
     }
 
-    ctm_assert_no_nans(y, nmax);
-    ctm_assert_no_nans(dy, nmax);
+    ctm_assert_message_no_nans(y, nmax, "nmax: %" PRIuFAST32 ", z: %g", nmax,
+                               to_double(z));
+    ctm_assert_message_no_nans(dy, nmax, "nmax: %" PRIuFAST32 ", z: %g", nmax,
+                               to_double(z));
   }
 
   /**
@@ -199,6 +213,11 @@ public:
       const DATA_TYPE ip1(i + 1.);
       dj[i] = j[i - 1] - ip1 * zinv * j[i];
     }
+
+    ctm_assert_message_no_nans(j, nmax, "nmax: %" PRIuFAST32 ", z: %g", nmax,
+                               to_double(z));
+    ctm_assert_message_no_nans(dj, nmax, "nmax: %" PRIuFAST32 ", z: %g", nmax,
+                               to_double(z));
     return;
   }
 
@@ -1198,5 +1217,17 @@ public:
     return CM0;
   }
 };
+
+/**
+ * @brief Convert the given complex value to a double precision value.
+ *
+ * @param value Value to convert.
+ * @return Double precision equivalent: real part.
+ */
+template <>
+inline double
+SpecialFunctions::to_double(const std::complex<float_type> value) {
+  return double(value.real());
+}
 
 #endif // SPECIALFUNCTIONS_HPP

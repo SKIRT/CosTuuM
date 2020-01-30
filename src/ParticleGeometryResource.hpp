@@ -124,6 +124,13 @@ public:
   virtual int_fast32_t get_cost() const { return 68 * _r2.size() + 2978; }
 
   /**
+   * @brief Get the axis ratio for this geometry.
+   *
+   * @return Axis ratio, @f$d=\frac{a}{b}@f$.
+   */
+  inline float_type get_axis_ratio() const { return _axis_ratio; }
+
+  /**
    * @brief Get the radius for the given quadrature point.
    *
    * @param ig Index of the Gauss-Legendre quadrature point.

@@ -870,9 +870,11 @@ public:
 
     // make sure the T-matrix was actually converged
     ctm_assert_message(
-        _converged_size.is_converged(), "size: %g, wavelength: %g",
+        _converged_size.is_converged(),
+        "size: %g, wavelength: %g, axis_ratio: %g",
         double(_interaction_variables.get_equal_volume_radius()),
-        double(2. * M_PI / _interaction_variables.get_wavenumber()));
+        double(2. * M_PI / _interaction_variables.get_wavenumber()),
+        double(_converged_size.get_geometry()->get_axis_ratio()));
 
     // since we don't know how many elements the T matrix will have before
     // we create the tasks, we might have tasks for elements of the T matrix
