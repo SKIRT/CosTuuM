@@ -253,6 +253,30 @@ public:
     // defined limit
     size_t memory_used = 0;
 
+    // memory used by the QuickSched library
+    const uint_fast32_t number_of_quadrature_tasks =
+        _maximum_order - _minimum_order;
+    const uint_fast32_t number_of_geometry_tasks =
+        number_of_shapes * number_of_quadrature_tasks;
+    const uint_fast32_t tasks_per_Tmatrix =
+        2 * number_of_quadrature_tasks + _maximum_order + 4 + number_of_results;
+    const size_t num_tasks =
+        1                            // nbasedresources
+        + number_of_quadrature_tasks // quadrature tasks
+        + 2 * (do_extinction)        // extinctiongrid + extinctionwigner
+        + 2 * (do_absorption)        // absorptiongrid + absorptionwigner
+        + 2 * (do_scattering)        // scatteringgrid + scatteringwigner
+        + number_of_quadrature_tasks // wigner D resources
+        + number_of_geometry_tasks   // geometry tasks
+        + number_of_results * total_number_of_interactions +
+        total_number_of_Tmatrices * tasks_per_Tmatrix // T matrix tasks
+        ;
+    const size_t quicksched_memory = quicksched.get_memory_size(
+        quicksched.get_number_of_threads(), num_tasks);
+    add_memory_allocation(quicksched_memory, "QuickSched", memory_log_file,
+                          memory_used);
+    ctm_warning("Need to create %lu tasks", num_tasks);
+
     // allocate auxiliary space per thread
     add_memory_allocation(
         TMatrixAuxiliarySpaceManager::get_memory_size(
@@ -278,8 +302,6 @@ public:
         _minimum_order * _gauss_legendre_factor;
     const uint_fast32_t maximum_ngauss =
         _maximum_order * _gauss_legendre_factor;
-    const uint_fast32_t number_of_quadrature_tasks =
-        _maximum_order - _minimum_order;
     std::vector<GaussBasedResources *> quadrature_points(
         number_of_quadrature_tasks, nullptr);
     const uint_fast32_t quadrature_points_offset = tasks.size();
@@ -413,8 +435,6 @@ public:
 
     // step 2: compute shape quadrature points and generate shape based
     // resources that are shared between all parameter values
-    const uint_fast32_t number_of_geometry_tasks =
-        number_of_shapes * number_of_quadrature_tasks;
     std::vector<ParticleGeometryResource *> geometries(number_of_geometry_tasks,
                                                        nullptr);
     const uint_fast32_t shape_offset = tasks.size();
@@ -569,8 +589,6 @@ public:
     // we need to add m=/=0 tasks for each order
     // we need to add 1 alignment task and 3 reset tasks
     // we need to add an additional calculation task for each result
-    const uint_fast32_t tasks_per_Tmatrix =
-        2 * number_of_quadrature_tasks + _maximum_order + 4 + number_of_results;
     tasks.resize(task_offset +
                      number_of_results * total_number_of_interactions +
                      total_number_of_Tmatrices * tasks_per_Tmatrix,

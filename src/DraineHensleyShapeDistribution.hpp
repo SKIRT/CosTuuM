@@ -16,6 +16,12 @@
  */
 class DraineHensleyShapeDistribution : public ShapeDistribution {
 private:
+  /*! @brief Minimum for the shape distribution. */
+  float_type _minimum_axis_ratio;
+
+  /*! @brief Maximum for the shape distribution. */
+  float_type _maximum_axis_ratio;
+
   /**
    * @brief Get the shape factor @f$L@f$ corresponding to the given axis ratio
    * @f$d@f$.
@@ -168,11 +174,105 @@ private:
 
 public:
   /**
+   * @brief Virtual shape distribution function.
+   *
+   * @param axis_ratio Input axis ratio, @f$d = \frac{a}{b}@f$.
+   * @return Value of the shape distribution function for this axis ratio.
+   */
+  virtual float_type operator()(const float_type axis_ratio) const {
+
+    if (axis_ratio >= get_minimum_axis_ratio() &&
+        axis_ratio <= get_maximum_axis_ratio()) {
+      return cde2(get_shape_factor(axis_ratio)) * get_jacobian(axis_ratio);
+    } else {
+      return 0.;
+    }
+  }
+
+  /**
    * @brief Constructor.
    *
    * @param npoints Number of evaluation points.
+   * @param cutoff Probability value at which the distribution is cut off.
    */
-  inline DraineHensleyShapeDistribution(const uint_fast32_t npoints) {
+  inline DraineHensleyShapeDistribution(const uint_fast32_t npoints,
+                                        const float_type cutoff = 0.15) {
+
+    ctm_assert(cutoff > 0.);
+    ctm_assert(cutoff < 0.5);
+
+    // the values for _minimum_axis_ratio and _maximum_axis_ratio are used
+    // in operator() function calls, so we need to set them to sensible initial
+    // values
+    _minimum_axis_ratio = 1.;
+    _maximum_axis_ratio = 1.;
+
+    // starting from a safe guess (axis_ratio = 1), we decrease the value
+    // of _minimum_axis_ratio until it is below the target probability
+    float_type valmin = operator()(_minimum_axis_ratio) - cutoff;
+    while (valmin > 0.) {
+      _minimum_axis_ratio *= 0.5;
+      valmin = operator()(_minimum_axis_ratio) - cutoff;
+    }
+
+    // we know have a bracket [_minimum_axis_ratio, upper_bound] that contains
+    // the root that determines the minimum axis ratio
+    // we use bisection to find a reasonable approximation (relative error
+    // 0.1 %) for the root
+    float_type upper_bound = 1.;
+    float_type valmax = operator()(upper_bound) - cutoff;
+    // sensibility checks for the initial bracket values
+    ctm_assert_message(valmin < 0., "p(%g) = %g", double(_minimum_axis_ratio),
+                       double(valmin));
+    ctm_assert(valmax > 0.);
+    ctm_assert_message(valmax > 0., "p(%g) = %g", double(upper_bound),
+                       double(valmax));
+    while (fabs(_minimum_axis_ratio - upper_bound) >
+           0.005 * fabs(_minimum_axis_ratio + upper_bound)) {
+      const float_type mid = 0.5 * (_minimum_axis_ratio + upper_bound);
+      const float_type valmid = operator()(mid) - cutoff;
+      if (valmid < 0.) {
+        _minimum_axis_ratio = mid;
+        valmin = valmid;
+      } else {
+        upper_bound = mid;
+        valmax = valmid;
+      }
+    }
+
+    // starting from a safe guess (axis_ratio = 1), we increase the value
+    // of _maximum_axis_ratio until it is above the target probability
+    valmax = operator()(_maximum_axis_ratio) - cutoff;
+    while (valmax > 0.) {
+      _maximum_axis_ratio += 1.;
+      valmax = operator()(_maximum_axis_ratio) - cutoff;
+    }
+
+    // we now repeat the bisection procedure for the bracket [lower_bound,
+    // _maximum_axis_ratio]
+    float_type lower_bound = 1.;
+    valmin = operator()(lower_bound) - cutoff;
+    ctm_assert_message(valmin > 0., "p(%g) = %g", double(lower_bound),
+                       double(valmin));
+    ctm_assert_message(valmax < 0., "p(%g) = %g", double(_maximum_axis_ratio),
+                       double(valmax));
+    while (fabs(_maximum_axis_ratio - lower_bound) >
+           0.005 * fabs(_maximum_axis_ratio + lower_bound)) {
+      const float_type mid = 0.5 * (lower_bound + _maximum_axis_ratio);
+      const float_type valmid = operator()(mid) - cutoff;
+      if (valmid > 0.) {
+        lower_bound = mid;
+        valmin = valmid;
+      } else {
+        _maximum_axis_ratio = mid;
+        valmax = valmid;
+      }
+    }
+
+    // output the final values
+    ctm_warning("Shape bounds: (%g %g)", double(_minimum_axis_ratio),
+                double(_maximum_axis_ratio));
+
     evaluate(npoints);
   }
 
@@ -189,7 +289,9 @@ public:
    *
    * @return Minimum value for the distribution.
    */
-  virtual float_type get_minimum_axis_ratio() const { return 0.15; }
+  virtual float_type get_minimum_axis_ratio() const {
+    return _minimum_axis_ratio;
+  }
 
   /**
    * @brief Get the maximum axis ratio @f$d@f$ for this distribution.
@@ -202,22 +304,8 @@ public:
    *
    * @return Maximum value for the distribution.
    */
-  virtual float_type get_maximum_axis_ratio() const { return 2.31; }
-
-  /**
-   * @brief Virtual shape distribution function.
-   *
-   * @param axis_ratio Input axis ratio, @f$d = \frac{a}{b}@f$.
-   * @return Value of the shape distribution function for this axis ratio.
-   */
-  virtual float_type operator()(const float_type axis_ratio) const {
-
-    if (axis_ratio >= get_minimum_axis_ratio() &&
-        axis_ratio <= get_maximum_axis_ratio()) {
-      return cde2(get_shape_factor(axis_ratio)) * get_jacobian(axis_ratio);
-    } else {
-      return 0.;
-    }
+  virtual float_type get_maximum_axis_ratio() const {
+    return _maximum_axis_ratio;
   }
 };
 

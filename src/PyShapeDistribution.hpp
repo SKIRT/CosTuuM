@@ -171,6 +171,8 @@ public:
    * Optional arguments are:
    *  - numpoints: Number of points to use to sample the distribution (default:
    *    20).
+   *  - cutoff: Probability value that determines the lower and upper bounds
+   *    for the sampling interval of the distribution (default: 0.15).
    *
    * @param self ShapeDistribution wrapper object that is being initialised.
    * @param args Positional arguments.
@@ -181,19 +183,23 @@ public:
 
     // optional arguments
     uint_fast32_t npoints = 20;
+    float_type cutoff = 0.15;
 
     /// parse arguments
     // list of keywords (in the expected order)
     // note that we need to use strdup because the Python API expects char*,
     // while C++ strings are const char*
     // not doing this results in compilation warnings
-    static char *kwlist[] = {strdup("npoints"), nullptr};
+    static char *kwlist[] = {strdup("npoints"), strdup("cutoff"), nullptr};
 
     // placeholders for integer arguments
     unsigned int npoints_i = npoints;
+    // placeholders for float arguments
+    double cutoff_d = cutoff;
     // parse the keywords/positional arguments
     // I is an unsigned integer
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|I", kwlist, &npoints_i)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|Id", kwlist, &npoints_i,
+                                     &cutoff_d)) {
       // PyArg_ParseTupleAndKeywords will return 0 if a required argument was
       // missing, if an argument of the wrong type was provided or if the number
       // of arguments does not match the expectation
@@ -206,9 +212,12 @@ public:
     }
     // unpack integer arguments
     npoints = npoints_i;
+    // unpack float arguments
+    cutoff = cutoff_d;
 
     // create the object
-    self->_shape_distribution = new DraineHensleyShapeDistribution(npoints);
+    self->_shape_distribution =
+        new DraineHensleyShapeDistribution(npoints, cutoff);
 
     return 0;
   }

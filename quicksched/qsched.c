@@ -1382,7 +1382,8 @@ int qsched_addtask(struct qsched *s, int type, unsigned int flags, void *data,
 
     /* Allocate a new task list. */
     if ((temp = malloc(sizeof(struct task) * s->size)) == NULL)
-      quicksched_error("Failed to allocate new task list.");
+      quicksched_error("Failed to allocate new task list (%i, %lu).", s->size,
+                       sizeof(struct task));
 
     /* Copy the tasks over to the new list. */
     memcpy(temp, s->tasks, sizeof(struct task) * s->count);
