@@ -269,10 +269,6 @@ public:
       }
     }
 
-    // output the final values
-    ctm_warning("Shape bounds: (%g %g)", double(_minimum_axis_ratio),
-                double(_maximum_axis_ratio));
-
     evaluate(npoints);
   }
 

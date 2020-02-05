@@ -75,6 +75,7 @@ void qsched_res_own(struct qsched *s, qsched_res_t res, int owner) {
  * @param nr_locks Minimum number of locks.
  * @param nr_uses Minimum number of uses.
  * @param size_data Mnimum size of task data.
+ * @return Total size (in bytes) of all memory buffers.
  *
  * This procedure pre-allocates resources in the sched. Although
  * These buffers are grown automatically, this is not possible
@@ -88,9 +89,10 @@ void qsched_res_own(struct qsched *s, qsched_res_t res, int owner) {
  * #qsched_adduse are called, respectively.
  */
 
-void qsched_ensure(struct qsched *s, int nr_tasks, int nr_res, int nr_deps,
+long qsched_ensure(struct qsched *s, int nr_tasks, int nr_res, int nr_deps,
                    int nr_locks, int nr_uses, int size_data) {
 
+  long totsize = 0;
   int dirty = 0;
 
   /* Re-allocate tasks? */
@@ -105,6 +107,7 @@ void qsched_ensure(struct qsched *s, int nr_tasks, int nr_res, int nr_deps,
     s->tasks = tasks_new;
     s->size = nr_tasks;
   }
+  totsize += s->size * sizeof(struct task);
 
   /* Re-allocate resources? */
   if (s->size_res < nr_res) {
@@ -117,6 +120,7 @@ void qsched_ensure(struct qsched *s, int nr_tasks, int nr_res, int nr_deps,
     s->res = res_new;
     s->size_res = nr_res;
   }
+  totsize += s->size_res * sizeof(struct res);
 
   /* Re-allocate dependencies? */
   if (s->size_deps < nr_deps) {
@@ -135,6 +139,7 @@ void qsched_ensure(struct qsched *s, int nr_tasks, int nr_res, int nr_deps,
     s->deps_key = deps_key_new;
     s->size_deps = nr_deps;
   }
+  totsize += 2 * s->size_deps * sizeof(qsched_task_t);
 
   /* Re-allocate locks? */
   if (s->size_locks < nr_locks) {
@@ -154,6 +159,7 @@ void qsched_ensure(struct qsched *s, int nr_tasks, int nr_res, int nr_deps,
     s->locks_key = locks_key_new;
     s->size_locks = nr_locks;
   }
+  totsize += s->size_locks * (sizeof(qsched_res_t) + sizeof(qsched_task_t));
 
   /* Re-allocate uses? */
   if (s->size_uses < nr_uses) {
@@ -173,6 +179,7 @@ void qsched_ensure(struct qsched *s, int nr_tasks, int nr_res, int nr_deps,
     s->uses_key = uses_key_new;
     s->size_uses = nr_uses;
   }
+  totsize += s->size_uses * (sizeof(qsched_res_t) + sizeof(qsched_task_t));
 
   /* Re-allocate resources? */
   if (s->size_data < size_data) {
@@ -185,10 +192,13 @@ void qsched_ensure(struct qsched *s, int nr_tasks, int nr_res, int nr_deps,
     s->data = data_new;
     s->size_data = size_data;
   }
+  totsize += s->size_data;
 
   /* Mark scheduler if dirty. */
   if (dirty)
     s->flags |= qsched_flag_dirty;
+
+  return totsize;
 }
 
 /**

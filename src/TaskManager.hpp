@@ -260,22 +260,48 @@ public:
         number_of_shapes * number_of_quadrature_tasks;
     const uint_fast32_t tasks_per_Tmatrix =
         2 * number_of_quadrature_tasks + _maximum_order + 4 + number_of_results;
-    const size_t num_tasks =
-        1                            // nbasedresources
-        + number_of_quadrature_tasks // quadrature tasks
-        + 2 * (do_extinction)        // extinctiongrid + extinctionwigner
-        + 2 * (do_absorption)        // absorptiongrid + absorptionwigner
-        + 2 * (do_scattering)        // scatteringgrid + scatteringwigner
-        + number_of_quadrature_tasks // wigner D resources
-        + number_of_geometry_tasks   // geometry tasks
-        + number_of_results * total_number_of_interactions +
-        total_number_of_Tmatrices * tasks_per_Tmatrix // T matrix tasks
-        ;
-    const size_t quicksched_memory = quicksched.get_memory_size(
-        quicksched.get_number_of_threads(), num_tasks);
-    add_memory_allocation(quicksched_memory, "QuickSched", memory_log_file,
-                          memory_used);
-    ctm_warning("Need to create %lu tasks", num_tasks);
+    {
+      const size_t num_tasks =
+          1                            // nbasedresources
+          + number_of_quadrature_tasks // quadrature tasks
+          + 2 * (do_extinction)        // extinctiongrid + extinctionwigner
+          + 2 * (do_absorption)        // absorptiongrid + absorptionwigner
+          + 2 * (do_scattering)        // scatteringgrid + scatteringwigner
+          + number_of_quadrature_tasks // wigner D resources
+          + number_of_geometry_tasks   // geometry tasks
+          + number_of_results * total_number_of_interactions +
+          total_number_of_Tmatrices * tasks_per_Tmatrix // T matrix tasks
+          ;
+      const size_t num_resources =
+          1                            // nbasedresources
+          + number_of_quadrature_tasks // quadrature tasks
+          + 2 * (do_extinction)        // extinctiongrid + extinctionwigner
+          + 2 * (do_absorption)        // absorptiongrid + absorptionwigner
+          + 2 * (do_scattering)        // scatteringgrid + scatteringwigner
+          + number_of_quadrature_tasks // wigner D resources
+          + number_of_geometry_tasks   // geometry tasks
+          + 0                          // T-matrix resources...
+          + 0                          // interaction variables
+          + 0 // average extinction, absorption, scattering results
+          + 0 // unaveraged extinction, absorption, scattering results
+          + 0 // converged size resources
+          ;
+      const size_t num_dependencies = 0;
+      const size_t num_readwrite = 0;
+      const size_t num_readonly = 0;
+      (void)num_resources;
+      (void)num_dependencies;
+      (void)num_readwrite;
+      (void)num_readonly;
+      const size_t quicksched_memory = quicksched.get_memory_size(
+          quicksched.get_number_of_threads(), num_tasks);
+      add_memory_allocation(quicksched_memory, "QuickSched", memory_log_file,
+                            memory_used);
+
+      if (verbose) {
+        ctm_warning("Need to create %lu tasks", num_tasks);
+      }
+    }
 
     // allocate auxiliary space per thread
     add_memory_allocation(

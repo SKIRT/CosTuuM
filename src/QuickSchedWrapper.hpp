@@ -310,6 +310,37 @@ public:
   }
 
   /**
+   * @brief Reserve memory to store the given number of tasks, resources,
+   * depencies and resource uses.
+   *
+   * @param number_of_tasks Number of tasks that will be added by calling
+   * register_task().
+   * @param number_of_resources Number of resources that will be added by
+   * calling register_resource().
+   * @param number_of_dependencies Number of task dependencies that will be
+   * created by calling link_tasks().
+   * @param number_of_writable_resources Number of read/write resource links
+   * that will be created by calling link_task_and_resource(task, resource,
+   * true).
+   * @param number_of_readable_resources Number of read only resource links
+   * that will be created by calling link_task_and_resource(task, resource,
+   * false).
+   * @return Total memory size that was allocated (in bytes).
+   */
+  inline size_t
+  reserve_memory(const uint_fast32_t number_of_tasks,
+                 const uint_fast32_t number_of_resources,
+                 const uint_fast32_t number_of_dependencies,
+                 const uint_fast32_t number_of_writable_resources,
+                 const uint_fast32_t number_of_readable_resources) {
+
+    return qsched_ensure(&_s, number_of_tasks, number_of_resources,
+                         number_of_dependencies, number_of_writable_resources,
+                         number_of_readable_resources,
+                         number_of_tasks * sizeof(WrappedTask));
+  }
+
+  /**
    * @brief Get the approximate total size in memory that will be required to
    * store the given number of tasks.
    *

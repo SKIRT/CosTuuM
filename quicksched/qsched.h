@@ -203,6 +203,6 @@ void qsched_addtask_dynamic(struct qsched *s, int type, unsigned int flags,
                             void *data, int data_size, int cost,
                             qsched_res_t *locks, int nr_locks,
                             qsched_res_t *uses, int nr_uses);
-void qsched_ensure(struct qsched *s, int nr_tasks, int nr_res, int nr_deps,
+long qsched_ensure(struct qsched *s, int nr_tasks, int nr_res, int nr_deps,
                    int nr_locks, int nr_uses, int size_data);
 void qsched_res_own(struct qsched *s, qsched_res_t res, int owner);
