@@ -341,39 +341,6 @@ public:
   }
 
   /**
-   * @brief Get the approximate total size in memory that will be required to
-   * store the given number of tasks.
-   *
-   * @param number_of_threads Number of threads to use during parallel
-   * execution.
-   * @param number_of_tasks Number of tasks that will be stored.
-   * @return Total size in memory (in bytes).
-   */
-  inline static size_t get_memory_size(const int_fast32_t number_of_threads,
-                                       const size_t number_of_tasks) {
-
-    size_t size = sizeof(QuickSched);
-    size += number_of_threads * sizeof(struct queue);
-    size_t tasksize = qsched_size_init;
-    while (tasksize < number_of_tasks) {
-      tasksize *= qsched_stretch;
-    }
-    size += tasksize * sizeof(struct task);
-    const size_t depsize = qsched_init_depspertask * tasksize;
-    size += 2 * depsize * sizeof(int);
-    const size_t locksize = qsched_init_lockspertask * tasksize;
-    size += 2 * locksize * sizeof(int);
-    const size_t ressize = qsched_init_respertask * tasksize;
-    // struct res is not found by the compiler, so we hardcoded its size here
-    size += ressize * 4 * sizeof(int);
-    const size_t usesize = qsched_init_usespertask * tasksize;
-    size += 2 * usesize * sizeof(int);
-    const size_t datasize = qsched_init_datapertask * tasksize;
-    size += datasize;
-    return size;
-  }
-
-  /**
    * @brief Get the number of threads used during parallel execution.
    *
    * @return Number of threads.
