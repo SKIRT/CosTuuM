@@ -353,7 +353,7 @@ public:
   /**
    * @brief Get the number of read only resources for this task.
    *
-   * @return 0.
+   * @return 1.
    */
   inline static uint_fast32_t number_of_readonly_resources() { return 1; }
 

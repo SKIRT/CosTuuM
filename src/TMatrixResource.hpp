@@ -572,14 +572,14 @@ public:
   /**
    * @brief Get the number of read/write resources for this task.
    *
-   * @return 1.
+   * @return 2.
    */
   inline static uint_fast32_t number_of_readwrite_resources() { return 2; }
 
   /**
    * @brief Get the number of read only resources for this task.
    *
-   * @return 0.
+   * @return 6.
    */
   inline static uint_fast32_t number_of_readonly_resources() { return 6; }
 
