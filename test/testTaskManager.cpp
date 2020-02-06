@@ -118,6 +118,9 @@ int main(int argc, char **argv) {
     shape_distribution = new DraineHensleyShapeDistribution(20u);
   } else if (shape_distribution_type == 2) {
     shape_distribution = new SingleShapeShapeDistribution(1.00001);
+  } else {
+    ctm_error("Invalid shape distribution type!");
+    shape_distribution = nullptr;
   }
   SizeBasedAlignmentDistribution alignment_distribution(1.e-5, 0, 100);
   const DraineDustProperties dust_properties;

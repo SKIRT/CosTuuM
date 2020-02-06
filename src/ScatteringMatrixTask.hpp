@@ -95,9 +95,6 @@ class ScatteringMatrixGrid : public Resource, public Task, public Computable {
   friend class ScatteringMatrixSpecialWignerDResources;
 
 private:
-  /*! @brief Input zenith angle (in radians). */
-  const float_type _theta_in;
-
   /*! @brief Cosine of the input zenith angle. */
   const float_type _cos_theta_in;
 
@@ -145,7 +142,7 @@ public:
                               const uint_fast32_t ntheta_out,
                               const uint_fast32_t nphi_out,
                               const bool use_gauss_legendre_samples = true)
-      : _theta_in(theta_in), _cos_theta_in(cos(theta_in)),
+      : _cos_theta_in(cos(theta_in)),
         _sin_theta_in(sqrt((1. - _cos_theta_in) * (1. + _cos_theta_in))),
         _sin_theta_in_inverse((_sin_theta_in != 0.) ? 1. / _sin_theta_in
                                                     : 9000.),
@@ -184,6 +181,20 @@ public:
     // write access
     quicksched.link_task_and_resource(*this, *this, true);
   }
+
+  /**
+   * @brief Get the number of read/write resources for this task.
+   *
+   * @return 1.
+   */
+  inline static uint_fast32_t number_of_readwrite_resources() { return 1; }
+
+  /**
+   * @brief Get the number of read only resources for this task.
+   *
+   * @return 0.
+   */
+  inline static uint_fast32_t number_of_readonly_resources() { return 0; }
 
   /**
    * @brief Execute the task.
@@ -304,16 +315,16 @@ public:
    * object with the given parameters.
    *
    * @param nmax Maximum order, @f$n_{max}@f$.
-   * @param grid Scattering matrix grid.
+   * @param ntheta Number of zenith angles.
    * @return Size in bytes of the hypothetical object.
    */
   static inline size_t get_memory_size(const uint_fast32_t nmax,
-                                       const ScatteringMatrixGrid &grid) {
+                                       const uint_fast32_t ntheta) {
     size_t size = sizeof(ScatteringMatrixSpecialWignerDResources);
     for (uint_fast32_t n = 1; n < nmax + 1; ++n) {
       for (uint_fast32_t m = 0; m < n + 1; ++m) {
         size += 2 * n * sizeof(float_type);
-        size += 2 * grid._cos_theta_out.size() * n * sizeof(float_type);
+        size += 2 * ntheta * n * sizeof(float_type);
       }
     }
     return size;
@@ -331,6 +342,20 @@ public:
     // read access
     quicksched.link_task_and_resource(*this, _grid, false);
   }
+
+  /**
+   * @brief Get the number of read/write resources for this task.
+   *
+   * @return 1.
+   */
+  inline static uint_fast32_t number_of_readwrite_resources() { return 1; }
+
+  /**
+   * @brief Get the number of read only resources for this task.
+   *
+   * @return 0.
+   */
+  inline static uint_fast32_t number_of_readonly_resources() { return 1; }
 
   /**
    * @brief Compute the factors.
@@ -486,6 +511,17 @@ public:
   virtual ~ScatteringMatrixTask() {}
 
   /**
+   * @brief Get the size in memory of a hypothetical ScatteringMatrixTask
+   * object with the given parameters.
+   *
+   * @return Size in bytes that the object would occupy.
+   */
+  static inline size_t get_memory_size() {
+    size_t size = sizeof(ScatteringMatrixTask);
+    return size;
+  }
+
+  /**
    * @brief Link the resources for this task.
    *
    * @param quicksched QuickSched library.
@@ -501,6 +537,20 @@ public:
     quicksched.link_task_and_resource(*this, _grid, false);
     quicksched.link_task_and_resource(*this, _wigner_d, false);
   }
+
+  /**
+   * @brief Get the number of read/write resources for this task.
+   *
+   * @return 1.
+   */
+  inline static uint_fast32_t number_of_readwrite_resources() { return 1; }
+
+  /**
+   * @brief Get the number of read only resources for this task.
+   *
+   * @return 5.
+   */
+  inline static uint_fast32_t number_of_readonly_resources() { return 5; }
 
   /**
    * @brief Get the forward scattering matrix @f$S@f$ for a scattering event

@@ -93,6 +93,20 @@ public:
   }
 
   /**
+   * @brief Get the number of read/write resources for this task.
+   *
+   * @return 1.
+   */
+  inline static uint_fast32_t number_of_readwrite_resources() { return 1; }
+
+  /**
+   * @brief Get the number of read only resources for this task.
+   *
+   * @return 0.
+   */
+  inline static uint_fast32_t number_of_readonly_resources() { return 0; }
+
+  /**
    * @brief Compute the factors.
    *
    * @param thread_id ID of the thread that executes the task.

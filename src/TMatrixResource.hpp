@@ -540,6 +540,17 @@ public:
   virtual ~TMatrixM0Task() {}
 
   /**
+   * @brief Get the size in memory of a hypothetical TMatrixM0Task object with
+   * the given parameters.
+   *
+   * @return Size in bytes that the object would occupy.
+   */
+  static inline size_t get_memory_size() {
+    size_t size = sizeof(TMatrixM0Task);
+    return size;
+  }
+
+  /**
    * @brief Link the resources for this task.
    *
    * @param quicksched QuickSched library.
@@ -557,6 +568,20 @@ public:
     quicksched.link_task_and_resource(*this, _interaction, false);
     quicksched.link_task_and_resource(*this, _wigner, false);
   }
+
+  /**
+   * @brief Get the number of read/write resources for this task.
+   *
+   * @return 1.
+   */
+  inline static uint_fast32_t number_of_readwrite_resources() { return 2; }
+
+  /**
+   * @brief Get the number of read only resources for this task.
+   *
+   * @return 0.
+   */
+  inline static uint_fast32_t number_of_readonly_resources() { return 6; }
 
   /**
    * @brief Compute the @f$m=0@f$ elements of the T-matrix.
@@ -846,6 +871,17 @@ public:
   virtual ~TMatrixMAllTask() {}
 
   /**
+   * @brief Get the size in memory of a hypothetical TMatrixMAllTask object with
+   * the given parameters.
+   *
+   * @return Size in bytes that the object would occupy.
+   */
+  static inline size_t get_memory_size() {
+    size_t size = sizeof(TMatrixMAllTask);
+    return size;
+  }
+
+  /**
    * @brief Link the resources for this task.
    *
    * @param quicksched QuickSched library.
@@ -860,6 +896,20 @@ public:
     quicksched.link_task_and_resource(*this, _interaction_variables, false);
     quicksched.link_task_and_resource(*this, _interaction, false);
   }
+
+  /**
+   * @brief Get the number of read/write resources for this task.
+   *
+   * @return 1.
+   */
+  inline static uint_fast32_t number_of_readwrite_resources() { return 1; }
+
+  /**
+   * @brief Get the number of read only resources for this task.
+   *
+   * @return 4.
+   */
+  inline static uint_fast32_t number_of_readonly_resources() { return 4; }
 
   /**
    * @brief Compute the @f$m>0@f$ elements of the T-matrix.
@@ -1211,6 +1261,17 @@ public:
   virtual ~ResetTMatrixResourceTask() {}
 
   /**
+   * @brief Get the size in memory of a hypothetical ResetTMatrixResourceTask
+   * object with the given parameters.
+   *
+   * @return Size in bytes that the object would occupy.
+   */
+  static inline size_t get_memory_size() {
+    size_t size = sizeof(ResetTMatrixResourceTask);
+    return size;
+  }
+
+  /**
    * @brief Link the resources for this task.
    *
    * @param quicksched QuickSched library.
@@ -1219,6 +1280,20 @@ public:
     // write access
     quicksched.link_task_and_resource(*this, _Tmatrix, true);
   }
+
+  /**
+   * @brief Get the number of read/write resources for this task.
+   *
+   * @return 1.
+   */
+  inline static uint_fast32_t number_of_readwrite_resources() { return 1; }
+
+  /**
+   * @brief Get the number of read only resources for this task.
+   *
+   * @return 0.
+   */
+  inline static uint_fast32_t number_of_readonly_resources() { return 0; }
 
   /**
    * @brief Execute the task.

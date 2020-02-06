@@ -68,6 +68,17 @@ public:
         _geometry(nullptr), _wigner_d(nullptr), _is_converged(false) {}
 
   /**
+   * @brief Get the size in memory of a hypothetical ConvergedSizeResources
+   * object with the given parameters.
+   *
+   * @return Size in bytes that the object would occupy.
+   */
+  static inline size_t get_memory_size() {
+    size_t size = sizeof(ConvergedSizeResources);
+    return size;
+  }
+
+  /**
    * @brief Get the maximum order.
    *
    * @return Maximum order, @f$n_{max}@f$.

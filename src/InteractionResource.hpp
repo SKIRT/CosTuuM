@@ -60,6 +60,17 @@ public:
         _kmr(refractive_index * _k), _k2mr(refractive_index * _k2) {}
 
   /**
+   * @brief Get the size in memory of a hypothetical InteractionVariables object
+   * with the given parameters.
+   *
+   * @return Size in bytes that the object would occupy.
+   */
+  static inline size_t get_memory_size() {
+    size_t size = sizeof(InteractionVariables);
+    return size;
+  }
+
+  /**
    * @brief Get the equal volume radius, @f$R_V@f$.
    *
    * @return Equal volume radius, @f$R_V@f$.
@@ -402,6 +413,17 @@ public:
   virtual ~InteractionTask() {}
 
   /**
+   * @brief Get the size in memory of a hypothetical InteractionTask object with
+   * the given parameters.
+   *
+   * @return Size in bytes that the object would occupy.
+   */
+  static inline size_t get_memory_size() {
+    size_t size = sizeof(InteractionTask);
+    return size;
+  }
+
+  /**
    * @brief Link the resources for this task.
    *
    * @param quicksched QuickSched library.
@@ -415,6 +437,20 @@ public:
     quicksched.link_task_and_resource(*this, _converged_size, false);
     quicksched.link_task_and_resource(*this, _interaction_variables, false);
   }
+
+  /**
+   * @brief Get the number of read/write resources for this task.
+   *
+   * @return 1.
+   */
+  inline static uint_fast32_t number_of_readwrite_resources() { return 1; }
+
+  /**
+   * @brief Get the number of read only resources for this task.
+   *
+   * @return 0.
+   */
+  inline static uint_fast32_t number_of_readonly_resources() { return 3; }
 
   /**
    * @brief Compute the factors.
@@ -493,6 +529,17 @@ public:
   virtual ~ResetInteractionResourceTask() {}
 
   /**
+   * @brief Get the size in memory of a hypothetical
+   * ResetInteractionResourceTask object with the given parameters.
+   *
+   * @return Size in bytes that the object would occupy.
+   */
+  static inline size_t get_memory_size() {
+    size_t size = sizeof(ResetInteractionResourceTask);
+    return size;
+  }
+
+  /**
    * @brief Link the resources for this task.
    *
    * @param quicksched QuickSched library.
@@ -501,6 +548,20 @@ public:
     // write access
     quicksched.link_task_and_resource(*this, _interaction, true);
   }
+
+  /**
+   * @brief Get the number of read/write resources for this task.
+   *
+   * @return 1.
+   */
+  inline static uint_fast32_t number_of_readwrite_resources() { return 1; }
+
+  /**
+   * @brief Get the number of read only resources for this task.
+   *
+   * @return 0.
+   */
+  inline static uint_fast32_t number_of_readonly_resources() { return 0; }
 
   /**
    * @brief Reset the resource.

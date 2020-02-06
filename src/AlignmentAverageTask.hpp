@@ -43,6 +43,17 @@ public:
   virtual ~AlignmentAverageTask() {}
 
   /**
+   * @brief Get the size in memory of a hypothetical AlignmentAverageTask object
+   * with the given parameters.
+   *
+   * @return Size in bytes that the object would occupy.
+   */
+  static inline size_t get_memory_size() {
+    size_t size = sizeof(AlignmentAverageTask);
+    return size;
+  }
+
+  /**
    * @brief Link the resources for this task.
    *
    * @param quicksched QuickSched library.
@@ -54,6 +65,20 @@ public:
     // read access
     quicksched.link_task_and_resource(*this, _output_Tmatrix, false);
   }
+
+  /**
+   * @brief Get the number of read/write resources for this task.
+   *
+   * @return 1.
+   */
+  inline static uint_fast32_t number_of_readwrite_resources() { return 1; }
+
+  /**
+   * @brief Get the number of read only resources for this task.
+   *
+   * @return 0.
+   */
+  inline static uint_fast32_t number_of_readonly_resources() { return 1; }
 
   /**
    * @brief Execute the task.

@@ -48,6 +48,21 @@ public:
   virtual ~AbsorptionShapeAveragingTask() {}
 
   /**
+   * @brief Get the size in memory of a hypothetical
+   * AbsorptionShapeAveragingTask object with the given parameters.
+   *
+   * @param shape_distribution Shape distribution.
+   * @return Size in bytes that the object would occupy.
+   */
+  static inline size_t
+  get_memory_size(const ShapeDistribution &shape_distribution) {
+    size_t size = sizeof(AbsorptionShapeAveragingTask);
+    size += shape_distribution.get_number_of_points() *
+            sizeof(AbsorptionCoefficientResult *);
+    return size;
+  }
+
+  /**
    * @brief Link the resources for this task.
    *
    * @param quicksched QuickSched library.
@@ -56,6 +71,20 @@ public:
     // write access
     quicksched.link_task_and_resource(*this, _output_coefficients, true);
   }
+
+  /**
+   * @brief Get the number of read/write resources for this task.
+   *
+   * @return 1.
+   */
+  inline static uint_fast32_t number_of_readwrite_resources() { return 1; }
+
+  /**
+   * @brief Get the number of read only resources for this task.
+   *
+   * @return 0.
+   */
+  inline static uint_fast32_t number_of_readonly_resources() { return 0; }
 
   /**
    * @brief Add input coefficients for the calculation.
@@ -151,6 +180,21 @@ public:
   virtual ~ExtinctionShapeAveragingTask() {}
 
   /**
+   * @brief Get the size in memory of a hypothetical
+   * ExtinctionShapeAveragingTask object with the given parameters.
+   *
+   * @param shape_distribution Shape distribution.
+   * @return Size in bytes that the object would occupy.
+   */
+  static inline size_t
+  get_memory_size(const ShapeDistribution &shape_distribution) {
+    size_t size = sizeof(ExtinctionShapeAveragingTask);
+    size += shape_distribution.get_number_of_points() *
+            sizeof(ExtinctionCoefficientResult *);
+    return size;
+  }
+
+  /**
    * @brief Link the resources for this task.
    *
    * @param quicksched QuickSched library.
@@ -159,6 +203,20 @@ public:
     // write access
     quicksched.link_task_and_resource(*this, _output_coefficients, true);
   }
+
+  /**
+   * @brief Get the number of read/write resources for this task.
+   *
+   * @return 1.
+   */
+  inline static uint_fast32_t number_of_readwrite_resources() { return 1; }
+
+  /**
+   * @brief Get the number of read only resources for this task.
+   *
+   * @return 0.
+   */
+  inline static uint_fast32_t number_of_readonly_resources() { return 0; }
 
   /**
    * @brief Add input coefficients for the calculation.
@@ -258,6 +316,21 @@ public:
   virtual ~ScatteringMatrixShapeAveragingTask() {}
 
   /**
+   * @brief Get the size in memory of a hypothetical
+   * ScatteringMatrixShapeAveragingTask object with the given parameters.
+   *
+   * @param shape_distribution Shape distribution.
+   * @return Size in bytes that the object would occupy.
+   */
+  static inline size_t
+  get_memory_size(const ShapeDistribution &shape_distribution) {
+    size_t size = sizeof(ScatteringMatrixShapeAveragingTask);
+    size += shape_distribution.get_number_of_points() *
+            sizeof(ScatteringMatrixResult *);
+    return size;
+  }
+
+  /**
    * @brief Link the resources for this task.
    *
    * @param quicksched QuickSched library.
@@ -266,6 +339,20 @@ public:
     // write access
     quicksched.link_task_and_resource(*this, _output_matrices, true);
   }
+
+  /**
+   * @brief Get the number of read/write resources for this task.
+   *
+   * @return 1.
+   */
+  inline static uint_fast32_t number_of_readwrite_resources() { return 1; }
+
+  /**
+   * @brief Get the number of read only resources for this task.
+   *
+   * @return 0.
+   */
+  inline static uint_fast32_t number_of_readonly_resources() { return 0; }
 
   /**
    * @brief Add input matrices for the calculation.

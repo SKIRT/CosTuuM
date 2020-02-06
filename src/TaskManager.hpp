@@ -205,13 +205,6 @@ public:
                  const bool write_memory_log = false,
                  const std::string memory_log_file_name = "") {
 
-    std::ofstream *memory_log_file = nullptr;
-    if (write_memory_log) {
-      memory_log_file = new std::ofstream(memory_log_file_name);
-      *memory_log_file << "# label\tallocation (bytes)\n";
-      memory_log_file->flush();
-    }
-
     // sort the input arrays
     std::sort(_sizes.begin(), _sizes.end());
     std::sort(_wavelengths.begin(), _wavelengths.end());
@@ -248,200 +241,161 @@ public:
           "Number of T-matrices that needs to be computed: %" PRIuFAST32,
           total_number_of_Tmatrices);
     }
-
-    // we need to keep track of memory to make sure we respect the user
-    // defined limit
-    size_t memory_used = 0;
-
-    // memory used by the QuickSched library
-    const uint_fast32_t number_of_quadrature_tasks =
-        _maximum_order - _minimum_order;
-    const uint_fast32_t number_of_geometry_tasks =
-        number_of_shapes * number_of_quadrature_tasks;
-    const uint_fast32_t tasks_per_Tmatrix =
-        2 * number_of_quadrature_tasks + _maximum_order + 4 + number_of_results;
-    {
-      const size_t num_tasks =
-          1                            // nbasedresources
-          + number_of_quadrature_tasks // quadrature tasks
-          + 2 * (do_extinction)        // extinctiongrid + extinctionwigner
-          + 2 * (do_absorption)        // absorptiongrid + absorptionwigner
-          + 2 * (do_scattering)        // scatteringgrid + scatteringwigner
-          + number_of_quadrature_tasks // wigner D resources
-          + number_of_geometry_tasks   // geometry tasks
-          + number_of_results * total_number_of_interactions +
-          total_number_of_Tmatrices * tasks_per_Tmatrix // T matrix tasks
-          ;
-      const size_t num_resources =
-          1                            // nbasedresources
-          + number_of_quadrature_tasks // quadrature tasks
-          + 2 * (do_extinction)        // extinctiongrid + extinctionwigner
-          + 2 * (do_absorption)        // absorptiongrid + absorptionwigner
-          + 2 * (do_scattering)        // scatteringgrid + scatteringwigner
-          + number_of_quadrature_tasks // wigner D resources
-          + number_of_geometry_tasks   // geometry tasks
-          + 0                          // T-matrix resources...
-          + 0                          // interaction variables
-          + 0 // average extinction, absorption, scattering results
-          + 0 // unaveraged extinction, absorption, scattering results
-          + 0 // converged size resources
-          ;
-      const size_t num_dependencies = 0;
-      const size_t num_readwrite = 0;
-      const size_t num_readonly = 0;
-      (void)num_resources;
-      (void)num_dependencies;
-      (void)num_readwrite;
-      (void)num_readonly;
-      const size_t quicksched_memory = quicksched.get_memory_size(
-          quicksched.get_number_of_threads(), num_tasks);
-      add_memory_allocation(quicksched_memory, "QuickSched", memory_log_file,
-                            memory_used);
-
-      if (verbose) {
-        ctm_warning("Need to create %lu tasks", num_tasks);
-      }
-    }
-
-    // allocate auxiliary space per thread
-    add_memory_allocation(
-        TMatrixAuxiliarySpaceManager::get_memory_size(
-            quicksched.get_number_of_threads(), _maximum_order),
-        "TMatrixAuxiliarySpaceManager", memory_log_file, memory_used);
-    space_manager = new TMatrixAuxiliarySpaceManager(
-        quicksched.get_number_of_threads(), _maximum_order);
-
-    // step 1: set up the tasks that need to be done regardless of what the
-    // parameter values are:
-
-    //  - N based resources
-    add_memory_allocation(NBasedResources::get_memory_size(_maximum_order),
-                          "NBasedResources", memory_log_file, memory_used);
-    NBasedResources *nbased_resources = new NBasedResources(_maximum_order);
-    tasks.push_back(nbased_resources);
-    quicksched.register_resource(*nbased_resources);
-    quicksched.register_task(*nbased_resources);
-    nbased_resources->link_resources(quicksched);
-
-    //  - quadrature points
+    // number of quadrature and geometry tasks that we need
     const uint_fast32_t minimum_ngauss =
         _minimum_order * _gauss_legendre_factor;
     const uint_fast32_t maximum_ngauss =
         _maximum_order * _gauss_legendre_factor;
-    std::vector<GaussBasedResources *> quadrature_points(
-        number_of_quadrature_tasks, nullptr);
-    const uint_fast32_t quadrature_points_offset = tasks.size();
-    tasks.resize(quadrature_points_offset + number_of_quadrature_tasks,
-                 nullptr);
+    const uint_fast32_t number_of_quadrature_tasks =
+        _maximum_order - _minimum_order;
+    const uint_fast32_t number_of_geometry_tasks =
+        number_of_shapes * number_of_quadrature_tasks;
+
+    // memory allocations: we first compute how much memory we will use
+    // we need to keep track of memory to make sure we respect the user
+    // defined limit
+    // we will do a dummy creation of all tasks
+    std::ofstream *memory_log_file = nullptr;
+    if (write_memory_log) {
+      memory_log_file = new std::ofstream(memory_log_file_name);
+      *memory_log_file << "# label\tallocation (bytes)\n";
+      memory_log_file->flush();
+    }
+    // memory management variables
+    size_t memory_used = 0;
+    // quicksched counter variables
+    size_t number_of_tasks = 0;
+    size_t number_of_resources = 0;
+    size_t number_of_task_dependencies = 0;
+    size_t number_of_resource_dependencies_readwrite = 0;
+    size_t number_of_resource_dependencies_readonly = 0;
+    // pointer vector counter variables
+    size_t number_of_task_pointers = 0;
+    size_t number_of_resource_pointers = 0;
+    size_t number_of_result_pointers = 0;
+    // NBasedResources:
+    //  task + resource
+    add_memory_allocation(NBasedResources::get_memory_size(_maximum_order),
+                          "NBasedResources", memory_log_file, memory_used);
+    ++number_of_tasks;
+    ++number_of_resources;
+    number_of_resource_dependencies_readwrite +=
+        NBasedResources::number_of_readwrite_resources();
+    number_of_resource_dependencies_readonly +=
+        NBasedResources::number_of_readonly_resources();
+    ++number_of_task_pointers;
+    // GaussBasedResources:
+    //  task + resource
     for (uint_fast32_t i = 0; i < number_of_quadrature_tasks; ++i) {
       const uint_fast32_t this_ngauss =
           minimum_ngauss + i * _gauss_legendre_factor;
       add_memory_allocation(GaussBasedResources::get_memory_size(this_ngauss),
                             "GaussBasedResources", memory_log_file,
                             memory_used);
-      GaussBasedResources *this_quadrature_points =
-          new GaussBasedResources(this_ngauss);
-      quicksched.register_resource(*this_quadrature_points);
-      quicksched.register_task(*this_quadrature_points);
-      this_quadrature_points->link_resources(quicksched);
-      quadrature_points[i] = this_quadrature_points;
-      tasks[quadrature_points_offset + i] = this_quadrature_points;
+      ++number_of_tasks;
+      ++number_of_resources;
+      number_of_resource_dependencies_readwrite +=
+          GaussBasedResources::number_of_readwrite_resources();
+      number_of_resource_dependencies_readonly +=
+          GaussBasedResources::number_of_readonly_resources();
+      ++number_of_task_pointers;
     }
-
-    //  - extinction coefficient grid
-    ExtinctionCoefficientGrid *extinction_grid = nullptr;
+    // number of ExtinctionCoefficientGrids:
+    //  task + resource
     if (do_extinction) {
       add_memory_allocation(
           ExtinctionCoefficientGrid::get_memory_size(number_of_angles),
           "ExtinctionCoefficientGrid", memory_log_file, memory_used);
-      extinction_grid =
-          new ExtinctionCoefficientGrid(number_of_angles, &theta[0]);
-      quicksched.register_resource(*extinction_grid);
-      quicksched.register_task(*extinction_grid);
-      extinction_grid->link_resources(quicksched);
-      tasks.push_back(extinction_grid);
+      ++number_of_tasks;
+      ++number_of_resources;
+      number_of_resource_dependencies_readwrite +=
+          ExtinctionCoefficientGrid::number_of_readwrite_resources();
+      number_of_resource_dependencies_readonly +=
+          ExtinctionCoefficientGrid::number_of_readonly_resources();
+      ++number_of_task_pointers;
     }
-    //  - absorption coefficient grid
-    AbsorptionCoefficientGrid *absorption_grid = nullptr;
+    // number of AbsorptionCoefficientGrids:
+    //  task + resource
     if (do_absorption) {
       add_memory_allocation(
           AbsorptionCoefficientGrid::get_memory_size(number_of_angles, ngauss),
           "AbsorptionCoefficientGrid", memory_log_file, memory_used);
-      absorption_grid =
-          new AbsorptionCoefficientGrid(number_of_angles, &theta[0], ngauss);
-      quicksched.register_resource(*absorption_grid);
-      quicksched.register_task(*absorption_grid);
-      absorption_grid->link_resources(quicksched);
-      tasks.push_back(absorption_grid);
+      ++number_of_tasks;
+      ++number_of_resources;
+      number_of_resource_dependencies_readwrite +=
+          AbsorptionCoefficientGrid::number_of_readwrite_resources();
+      number_of_resource_dependencies_readonly +=
+          AbsorptionCoefficientGrid::number_of_readonly_resources();
+      ++number_of_task_pointers;
     }
-    //  - scattering matrix grid
-    ScatteringMatrixGrid *scattering_grid = nullptr;
+    // number of ScatteringMatrixGrids:
+    //  task + resource
     if (do_scattering) {
       add_memory_allocation(ScatteringMatrixGrid::get_memory_size(
                                 M_PI_2, number_of_angles, 2 * number_of_angles),
                             "ScatteringMatrixGrid", memory_log_file,
                             memory_used);
-      scattering_grid = new ScatteringMatrixGrid(M_PI_2, number_of_angles,
-                                                 2 * number_of_angles);
-      quicksched.register_resource(*scattering_grid);
-      quicksched.register_task(*scattering_grid);
-      scattering_grid->link_resources(quicksched);
-      tasks.push_back(scattering_grid);
+      ++number_of_tasks;
+      ++number_of_resources;
+      number_of_resource_dependencies_readwrite +=
+          ScatteringMatrixGrid::number_of_readwrite_resources();
+      number_of_resource_dependencies_readonly +=
+          ScatteringMatrixGrid::number_of_readonly_resources();
+      ++number_of_task_pointers;
     }
-
-    //  - special Wigner D functions
-    ExtinctionSpecialWignerDResources *extinction_special_wigner = nullptr;
+    // number of ExtinctionSpecialWignerDResources:
+    //  task + resource + 1 task dependency
     if (do_extinction) {
       add_memory_allocation(ExtinctionSpecialWignerDResources::get_memory_size(
-                                _maximum_order, *extinction_grid),
+                                _maximum_order, number_of_angles),
                             "ExtinctionSpecialWignerDResources",
                             memory_log_file, memory_used);
-      extinction_special_wigner = new ExtinctionSpecialWignerDResources(
-          _maximum_order, *extinction_grid);
-      quicksched.register_resource(*extinction_special_wigner);
-      quicksched.register_task(*extinction_special_wigner);
-      extinction_special_wigner->link_resources(quicksched);
-      quicksched.link_tasks(*extinction_grid, *extinction_special_wigner);
-      tasks.push_back(extinction_special_wigner);
+      ++number_of_tasks;
+      ++number_of_resources;
+      number_of_resource_dependencies_readwrite +=
+          ExtinctionSpecialWignerDResources::number_of_readwrite_resources();
+      number_of_resource_dependencies_readonly +=
+          ExtinctionSpecialWignerDResources::number_of_readonly_resources();
+      ++number_of_task_dependencies;
+      ++number_of_task_pointers;
     }
-
-    AbsorptionSpecialWignerDResources *absorption_special_wigner = nullptr;
+    // number of AbsorptionSpecialWignerDResources:
+    //  task + resource + 1 task dependency
     if (do_absorption) {
       add_memory_allocation(AbsorptionSpecialWignerDResources::get_memory_size(
-                                _maximum_order, *absorption_grid),
+                                _maximum_order, number_of_angles),
                             "AbsorptionSpecialWignerDResources",
                             memory_log_file, memory_used);
-      absorption_special_wigner = new AbsorptionSpecialWignerDResources(
-          _maximum_order, *absorption_grid);
-      quicksched.register_resource(*absorption_special_wigner);
-      quicksched.register_task(*absorption_special_wigner);
-      absorption_special_wigner->link_resources(quicksched);
-      quicksched.link_tasks(*absorption_grid, *absorption_special_wigner);
-      tasks.push_back(absorption_special_wigner);
+      ++number_of_tasks;
+      ++number_of_resources;
+      number_of_resource_dependencies_readwrite +=
+          AbsorptionSpecialWignerDResources::number_of_readwrite_resources();
+      number_of_resource_dependencies_readonly +=
+          AbsorptionSpecialWignerDResources::number_of_readonly_resources();
+      ++number_of_task_dependencies;
+      ++number_of_task_pointers;
     }
-
-    ScatteringMatrixSpecialWignerDResources *scattering_special_wigner =
-        nullptr;
+    // number of ScatteringMatrixSpecialWignerDResources:
+    //  task + resource + 1 task dependency
     if (do_scattering) {
       add_memory_allocation(
           ScatteringMatrixSpecialWignerDResources::get_memory_size(
-              _maximum_order, *scattering_grid),
+              _maximum_order, number_of_angles),
           "ScatteringMatrixSpecialWignerDResources", memory_log_file,
           memory_used);
-      scattering_special_wigner = new ScatteringMatrixSpecialWignerDResources(
-          _maximum_order, *scattering_grid);
-      quicksched.register_resource(*scattering_special_wigner);
-      quicksched.register_task(*scattering_special_wigner);
-      scattering_special_wigner->link_resources(quicksched);
-      quicksched.link_tasks(*scattering_grid, *scattering_special_wigner);
-      tasks.push_back(scattering_special_wigner);
+      ++number_of_tasks;
+      ++number_of_resources;
+      number_of_resource_dependencies_readwrite +=
+          ScatteringMatrixSpecialWignerDResources::
+              number_of_readwrite_resources();
+      number_of_resource_dependencies_readonly +=
+          ScatteringMatrixSpecialWignerDResources::
+              number_of_readonly_resources();
+      ++number_of_task_dependencies;
+      ++number_of_task_pointers;
     }
-
-    //  - Wigner D functions
-    std::vector<WignerDResources *> wignerdm0(number_of_quadrature_tasks,
-                                              nullptr);
-    const uint_fast32_t wignerdm0_offset = tasks.size();
-    tasks.resize(wignerdm0_offset + number_of_quadrature_tasks, nullptr);
+    // number of WignerDResources:
+    //  task + resource + 1 task dependency
     for (uint_fast32_t i = 0; i < number_of_quadrature_tasks; ++i) {
       const uint_fast32_t this_order = _minimum_order + i;
       const uint_fast32_t this_ngauss =
@@ -449,22 +403,17 @@ public:
       add_memory_allocation(WignerDResources::get_memory_size(
                                 this_order, this_ngauss, this_order < 100),
                             "WignerDResources", memory_log_file, memory_used);
-      WignerDResources *this_wignerdm0 = new WignerDResources(
-          this_order, this_ngauss, *quadrature_points[i], this_order < 100);
-      quicksched.register_resource(*this_wignerdm0);
-      quicksched.register_task(*this_wignerdm0);
-      this_wignerdm0->link_resources(quicksched);
-      quicksched.link_tasks(*quadrature_points[i], *this_wignerdm0);
-      wignerdm0[i] = this_wignerdm0;
-      tasks[wignerdm0_offset + i] = this_wignerdm0;
+      ++number_of_tasks;
+      ++number_of_resources;
+      number_of_resource_dependencies_readwrite +=
+          WignerDResources::number_of_readwrite_resources();
+      number_of_resource_dependencies_readonly +=
+          WignerDResources::number_of_readonly_resources();
+      ++number_of_task_dependencies;
+      ++number_of_task_pointers;
     }
-
-    // step 2: compute shape quadrature points and generate shape based
-    // resources that are shared between all parameter values
-    std::vector<ParticleGeometryResource *> geometries(number_of_geometry_tasks,
-                                                       nullptr);
-    const uint_fast32_t shape_offset = tasks.size();
-    tasks.resize(shape_offset + number_of_geometry_tasks, nullptr);
+    // number of ParticleGeometryResources:
+    //  task + resource + 1 task dependency
     for (uint_fast32_t is = 0; is < number_of_shapes; ++is) {
       for (uint_fast32_t ig = 0; ig < number_of_quadrature_tasks; ++ig) {
         const uint_fast32_t this_ngauss =
@@ -472,6 +421,501 @@ public:
         add_memory_allocation(
             ParticleGeometryResource::get_memory_size(this_ngauss),
             "ParticleGeometryResource", memory_log_file, memory_used);
+        ++number_of_tasks;
+        ++number_of_resources;
+        number_of_resource_dependencies_readwrite +=
+            ParticleGeometryResource::number_of_readwrite_resources();
+        number_of_resource_dependencies_readonly +=
+            ParticleGeometryResource::number_of_readonly_resources();
+        ++number_of_task_dependencies;
+        ++number_of_task_pointers;
+      }
+    }
+    // at this point, we have accounted for all computables that need to be
+    // allocated regardless of how much memory we have available
+    // next, we do a dry run of the T-matrix task setup to account for the
+    // resources that are required; this will give us the minimum required
+    // memory usage to be able to execute any computation
+
+    // loop over compositions
+    for (uint_fast32_t icomp = 0; icomp < number_of_compositions; ++icomp) {
+      // loop over all sizes
+      for (uint_fast32_t isize = 0; isize < number_of_sizes; ++isize) {
+        // loop over all wavelengths
+        for (uint_fast32_t ilambda = 0; ilambda < number_of_wavelengths;
+             ++ilambda) {
+          add_memory_allocation(InteractionVariables::get_memory_size(),
+                                "InteractionVariables", memory_log_file,
+                                memory_used);
+          ++number_of_resources;
+          ++number_of_resource_pointers;
+
+          if (do_extinction) {
+            add_memory_allocation(
+                ExtinctionCoefficientGrid::get_memory_size(number_of_angles),
+                "ExtinctionCoefficientGrid", memory_log_file, memory_used);
+            ++number_of_resources;
+            ++number_of_result_pointers;
+
+            add_memory_allocation(ExtinctionShapeAveragingTask::get_memory_size(
+                                      _shape_distribution),
+                                  "ExtinctionShapeAveragingTask",
+                                  memory_log_file, memory_used);
+            ++number_of_tasks;
+            number_of_resource_dependencies_readwrite +=
+                ExtinctionShapeAveragingTask::number_of_readwrite_resources();
+            number_of_resource_dependencies_readonly +=
+                ExtinctionShapeAveragingTask::number_of_readonly_resources();
+            ++number_of_task_pointers;
+          }
+
+          if (do_absorption) {
+            add_memory_allocation(
+                AbsorptionCoefficientResult::get_memory_size(number_of_angles),
+                "AbsorptionCoefficientResult", memory_log_file, memory_used);
+            ++number_of_resources;
+            ++number_of_result_pointers;
+
+            add_memory_allocation(AbsorptionShapeAveragingTask::get_memory_size(
+                                      _shape_distribution),
+                                  "AbsorptionShapeAveragingTask",
+                                  memory_log_file, memory_used);
+            ++number_of_tasks;
+            number_of_resource_dependencies_readwrite +=
+                AbsorptionShapeAveragingTask::number_of_readwrite_resources();
+            number_of_resource_dependencies_readonly +=
+                AbsorptionShapeAveragingTask::number_of_readonly_resources();
+            ++number_of_task_pointers;
+          }
+
+          if (do_scattering) {
+            add_memory_allocation(
+                ScatteringMatrixResult::get_memory_size(number_of_angles),
+                "ScatteringMatrixResult", memory_log_file, memory_used);
+            ++number_of_resources;
+            ++number_of_result_pointers;
+
+            add_memory_allocation(
+                ScatteringMatrixShapeAveragingTask::get_memory_size(
+                    _shape_distribution),
+                "ScatteringMatrixShapeAveragingTask", memory_log_file,
+                memory_used);
+            ++number_of_tasks;
+            number_of_resource_dependencies_readwrite +=
+                ScatteringMatrixShapeAveragingTask::
+                    number_of_readwrite_resources();
+            number_of_resource_dependencies_readonly +=
+                ScatteringMatrixShapeAveragingTask::
+                    number_of_readonly_resources();
+            ++number_of_task_pointers;
+          }
+
+          // loop over all shapes
+          for (uint_fast32_t ishape = 0; ishape < number_of_shapes; ++ishape) {
+
+            if (do_extinction) {
+              add_memory_allocation(
+                  ExtinctionCoefficientResult::get_memory_size(
+                      number_of_angles),
+                  "ExtinctionCoefficientResult", memory_log_file, memory_used);
+              ++number_of_resources;
+              ++number_of_resource_pointers;
+            }
+
+            if (do_absorption) {
+              add_memory_allocation(
+                  AbsorptionCoefficientResult::get_memory_size(
+                      number_of_angles),
+                  "AbsorptionCoefficientResult", memory_log_file, memory_used);
+              ++number_of_resources;
+              ++number_of_resource_pointers;
+            }
+
+            if (do_scattering) {
+              add_memory_allocation(
+                  ScatteringMatrixResult::get_memory_size(number_of_angles),
+                  "ScatteringMatrixResult", memory_log_file, memory_used);
+              ++number_of_resources;
+              ++number_of_resource_pointers;
+            }
+
+            // allocate the corresponding interaction variables and control
+            // object
+            add_memory_allocation(ConvergedSizeResources::get_memory_size(),
+                                  "ConvergedSizeResources", memory_log_file,
+                                  memory_used);
+            ++number_of_resources;
+            ++number_of_resource_pointers;
+
+            // loop over all orders
+            for (uint_fast32_t ig = 0; ig < number_of_quadrature_tasks; ++ig) {
+              // set up the interaction task
+              add_memory_allocation(InteractionTask::get_memory_size(),
+                                    "InteractionTask", memory_log_file,
+                                    memory_used);
+              ++number_of_tasks;
+              number_of_resource_dependencies_readwrite +=
+                  InteractionTask::number_of_readwrite_resources();
+              number_of_resource_dependencies_readonly +=
+                  InteractionTask::number_of_readonly_resources();
+              // for safety, we overestimate the number of dependencies;
+              // we don't know for sure whether this task will have an
+              // additional dependency because it reuses a TMatrixResource
+              number_of_task_dependencies += 2;
+              ++number_of_task_pointers;
+
+              // set up the m=0 task
+              add_memory_allocation(TMatrixM0Task::get_memory_size(),
+                                    "TMatrixM0Task", memory_log_file,
+                                    memory_used);
+              ++number_of_tasks;
+              number_of_resource_dependencies_readwrite +=
+                  TMatrixM0Task::number_of_readwrite_resources();
+              number_of_resource_dependencies_readonly +=
+                  TMatrixM0Task::number_of_readonly_resources();
+              // again, we overestimate the number of dependencies
+              number_of_task_dependencies += 4 + (ig > 0);
+              ++number_of_task_pointers;
+            }
+
+            add_memory_allocation(AlignmentAverageTask::get_memory_size(),
+                                  "AlignmentAverageTask", memory_log_file,
+                                  memory_used);
+            ++number_of_tasks;
+            number_of_resource_dependencies_readwrite +=
+                AlignmentAverageTask::number_of_readwrite_resources();
+            number_of_resource_dependencies_readonly +=
+                AlignmentAverageTask::number_of_readonly_resources();
+            ++number_of_task_pointers;
+
+            if (do_extinction) {
+              add_memory_allocation(
+                  ExtinctionCoefficientTask::get_memory_size(),
+                  "ExtinctionCoefficientTask", memory_log_file, memory_used);
+              ++number_of_tasks;
+              number_of_resource_dependencies_readwrite +=
+                  ExtinctionCoefficientTask::number_of_readwrite_resources();
+              number_of_resource_dependencies_readonly +=
+                  ExtinctionCoefficientTask::number_of_readonly_resources();
+              number_of_task_dependencies += 2;
+              ++number_of_task_pointers;
+
+              // link the extinction task to the extinction averaging task
+              ++number_of_task_dependencies;
+            }
+
+            if (do_absorption) {
+              add_memory_allocation(
+                  AbsorptionCoefficientTask::get_memory_size(),
+                  "AbsorptionCoefficientTask", memory_log_file, memory_used);
+              ++number_of_tasks;
+              number_of_resource_dependencies_readwrite +=
+                  AbsorptionCoefficientTask::number_of_readwrite_resources();
+              number_of_resource_dependencies_readonly +=
+                  AbsorptionCoefficientTask::number_of_readonly_resources();
+              number_of_task_dependencies += 2;
+              ++number_of_task_pointers;
+
+              // link the absorption task to the absorption averaging task
+              ++number_of_task_dependencies;
+            }
+
+            if (do_scattering) {
+              add_memory_allocation(ScatteringMatrixTask::get_memory_size(),
+                                    "ScatteringMatrixTask", memory_log_file,
+                                    memory_used);
+              ++number_of_tasks;
+              number_of_resource_dependencies_readwrite +=
+                  ScatteringMatrixTask::number_of_readwrite_resources();
+              number_of_resource_dependencies_readonly +=
+                  ScatteringMatrixTask::number_of_readonly_resources();
+              number_of_task_dependencies += 2;
+              ++number_of_task_pointers;
+
+              // link the scattering task to the scattering averaging task
+              ++number_of_task_dependencies;
+            }
+
+            add_memory_allocation(ResetTMatrixResourceTask::get_memory_size(),
+                                  "ResetTMatrixResourceTask", memory_log_file,
+                                  memory_used);
+            ++number_of_tasks;
+            number_of_resource_dependencies_readwrite +=
+                ResetTMatrixResourceTask::number_of_readwrite_resources();
+            number_of_resource_dependencies_readonly +=
+                ResetTMatrixResourceTask::number_of_readonly_resources();
+            ++number_of_task_dependencies;
+            ++number_of_task_pointers;
+
+            add_memory_allocation(ResetTMatrixResourceTask::get_memory_size(),
+                                  "ResetTMatrixResourceTask", memory_log_file,
+                                  memory_used);
+            ++number_of_tasks;
+            number_of_resource_dependencies_readwrite +=
+                ResetTMatrixResourceTask::number_of_readwrite_resources();
+            number_of_resource_dependencies_readonly +=
+                ResetTMatrixResourceTask::number_of_readonly_resources();
+            ++number_of_task_dependencies;
+            if (do_extinction) {
+              ++number_of_task_dependencies;
+            }
+            if (do_absorption) {
+              ++number_of_task_dependencies;
+            }
+            if (do_scattering) {
+              ++number_of_task_dependencies;
+            }
+            ++number_of_task_pointers;
+
+            add_memory_allocation(
+                ResetInteractionResourceTask::get_memory_size(),
+                "ResetInteractionResourceTask", memory_log_file, memory_used);
+            ++number_of_tasks;
+            number_of_resource_dependencies_readwrite +=
+                ResetInteractionResourceTask::number_of_readwrite_resources();
+            number_of_resource_dependencies_readonly +=
+                ResetInteractionResourceTask::number_of_readonly_resources();
+            ++number_of_task_dependencies;
+            ++number_of_task_pointers;
+
+            // loop over all m values to set up m=/=0 tasks
+            for (uint_fast32_t i = 0; i < _maximum_order; ++i) {
+              add_memory_allocation(TMatrixMAllTask::get_memory_size(),
+                                    "TMatrixMAllTask", memory_log_file,
+                                    memory_used);
+              ++number_of_tasks;
+              number_of_resource_dependencies_readwrite +=
+                  TMatrixMAllTask::number_of_readwrite_resources();
+              number_of_resource_dependencies_readonly +=
+                  TMatrixMAllTask::number_of_readonly_resources();
+              number_of_task_dependencies += 2;
+              ++number_of_task_pointers;
+            }
+          }
+        }
+      }
+    }
+
+    // account for auxiliary space per thread
+    add_memory_allocation(
+        TMatrixAuxiliarySpaceManager::get_memory_size(
+            quicksched.get_number_of_threads(), _maximum_order),
+        "TMatrixAuxiliarySpaceManager", memory_log_file, memory_used);
+
+    // account for the pointer storage
+    add_memory_allocation(number_of_task_pointers * sizeof(Task *), "Task*",
+                          memory_log_file, memory_used);
+    add_memory_allocation(number_of_resource_pointers * sizeof(Resource *),
+                          "Resource*", memory_log_file, memory_used);
+    add_memory_allocation(number_of_result_pointers * sizeof(Result *),
+                          "Result*", memory_log_file, memory_used);
+
+    // we are done accounting for all necessary objects
+    // first allocate QuickSched memory for all objects so far
+    const size_t quicksched_memory_required = quicksched.reserve_memory(
+        number_of_tasks, number_of_resources, number_of_task_dependencies,
+        number_of_resource_dependencies_readwrite,
+        number_of_resource_dependencies_readonly);
+    add_memory_allocation(quicksched_memory_required, "QuickSched",
+                          memory_log_file, memory_used);
+
+    // now allocate a single chunk of T-matrix and interaction resources to
+    // get the per chunk memory requirements
+    const size_t memory_size_required = memory_used;
+    add_memory_allocation(2 * TMatrixResource::get_memory_size(_maximum_order),
+                          "TMatrixResource", memory_log_file, memory_used);
+    add_memory_allocation(
+        InteractionResource::get_memory_size(_maximum_order, maximum_ngauss),
+        "InteractionResource", memory_log_file, memory_used);
+    number_of_resources += 3;
+    // additional resource pointers
+    add_memory_allocation(3 * sizeof(Resource *), "Resource*", memory_log_file,
+                          memory_used);
+    number_of_resource_pointers += 3;
+    const size_t quicksched_memory_new = quicksched.reserve_memory(
+        number_of_tasks, number_of_resources, number_of_task_dependencies,
+        number_of_resource_dependencies_readwrite,
+        number_of_resource_dependencies_readonly);
+    add_memory_allocation(quicksched_memory_new - quicksched_memory_required,
+                          "QuickSched", memory_log_file, memory_used);
+    const size_t memory_per_Tmatrix = memory_used - memory_size_required;
+    // now figure out how many extra T-matrices we can store
+    const size_t memory_left = _maximum_memory_usage - memory_used;
+    const uint_fast32_t number_of_extra_tmatrices =
+        std::min(memory_left / memory_per_Tmatrix, total_number_of_Tmatrices);
+    add_memory_allocation(2 * number_of_extra_tmatrices *
+                              TMatrixResource::get_memory_size(_maximum_order),
+                          "TMatrixResource", memory_log_file, memory_used);
+    add_memory_allocation(number_of_extra_tmatrices *
+                              InteractionResource::get_memory_size(
+                                  _maximum_order, maximum_ngauss),
+                          "InteractionResource", memory_log_file, memory_used);
+    number_of_resources += 3 * number_of_extra_tmatrices;
+    add_memory_allocation(3 * number_of_extra_tmatrices * sizeof(Resource *),
+                          "Resource*", memory_log_file, memory_used);
+    number_of_resource_pointers += 3 * number_of_extra_tmatrices;
+    const size_t quicksched_memory_final = quicksched.reserve_memory(
+        number_of_tasks, number_of_resources, number_of_task_dependencies,
+        number_of_resource_dependencies_readwrite,
+        number_of_resource_dependencies_readonly);
+    add_memory_allocation(quicksched_memory_final - quicksched_memory_new,
+                          "QuickSched", memory_log_file, memory_used);
+    const uint_fast32_t number_of_tmatrices = number_of_extra_tmatrices + 1;
+    if (verbose) {
+      ctm_warning("Total memory usage: %s",
+                  Utilities::human_readable_bytes(memory_used).c_str());
+      ctm_warning("Space to store %" PRIuFAST32 " T-matrices.",
+                  number_of_tmatrices);
+
+      ctm_warning("Need to create %lu tasks, %lu resources, %lu task "
+                  "dependencies, %lu read/write resource dependencies and %lu "
+                  "read only resource dependencies",
+                  number_of_tasks, number_of_resources,
+                  number_of_task_dependencies,
+                  number_of_resource_dependencies_readwrite,
+                  number_of_resource_dependencies_readonly);
+    }
+
+    // now actually allocate and create everything
+
+    // start with allocating the pointer vectors
+    tasks.resize(number_of_task_pointers, nullptr);
+    resources.resize(number_of_resource_pointers, nullptr);
+    results.resize(number_of_result_pointers, nullptr);
+    // we will use running indices to fill them
+    size_t running_task_index = 0;
+    size_t running_resource_index = 0;
+    size_t running_result_index = 0;
+
+    // allocate auxiliary space per thread
+    space_manager = new TMatrixAuxiliarySpaceManager(
+        quicksched.get_number_of_threads(), _maximum_order);
+
+    // step 1: set up the tasks that need to be done regardless of what the
+    // parameter values are:
+
+    //  - N based resources
+    NBasedResources *nbased_resources = new NBasedResources(_maximum_order);
+    tasks[running_task_index] = nbased_resources;
+    ++running_task_index;
+    quicksched.register_resource(*nbased_resources);
+    quicksched.register_task(*nbased_resources);
+    nbased_resources->link_resources(quicksched);
+
+    //  - quadrature points
+    std::vector<GaussBasedResources *> quadrature_points(
+        number_of_quadrature_tasks, nullptr);
+    for (uint_fast32_t i = 0; i < number_of_quadrature_tasks; ++i) {
+      const uint_fast32_t this_ngauss =
+          minimum_ngauss + i * _gauss_legendre_factor;
+      GaussBasedResources *this_quadrature_points =
+          new GaussBasedResources(this_ngauss);
+      quicksched.register_resource(*this_quadrature_points);
+      quicksched.register_task(*this_quadrature_points);
+      this_quadrature_points->link_resources(quicksched);
+      quadrature_points[i] = this_quadrature_points;
+      tasks[running_task_index] = this_quadrature_points;
+      ++running_task_index;
+    }
+
+    //  - extinction coefficient grid
+    ExtinctionCoefficientGrid *extinction_grid = nullptr;
+    if (do_extinction) {
+      extinction_grid =
+          new ExtinctionCoefficientGrid(number_of_angles, &theta[0]);
+      quicksched.register_resource(*extinction_grid);
+      quicksched.register_task(*extinction_grid);
+      extinction_grid->link_resources(quicksched);
+      tasks[running_task_index] = extinction_grid;
+      ++running_task_index;
+    }
+    //  - absorption coefficient grid
+    AbsorptionCoefficientGrid *absorption_grid = nullptr;
+    if (do_absorption) {
+      absorption_grid =
+          new AbsorptionCoefficientGrid(number_of_angles, &theta[0], ngauss);
+      quicksched.register_resource(*absorption_grid);
+      quicksched.register_task(*absorption_grid);
+      absorption_grid->link_resources(quicksched);
+      tasks[running_task_index] = absorption_grid;
+      ++running_task_index;
+    }
+    //  - scattering matrix grid
+    ScatteringMatrixGrid *scattering_grid = nullptr;
+    if (do_scattering) {
+      scattering_grid = new ScatteringMatrixGrid(M_PI_2, number_of_angles,
+                                                 2 * number_of_angles);
+      quicksched.register_resource(*scattering_grid);
+      quicksched.register_task(*scattering_grid);
+      scattering_grid->link_resources(quicksched);
+      tasks[running_task_index] = scattering_grid;
+      ++running_task_index;
+    }
+
+    //  - special Wigner D functions
+    ExtinctionSpecialWignerDResources *extinction_special_wigner = nullptr;
+    if (do_extinction) {
+      extinction_special_wigner = new ExtinctionSpecialWignerDResources(
+          _maximum_order, *extinction_grid);
+      quicksched.register_resource(*extinction_special_wigner);
+      quicksched.register_task(*extinction_special_wigner);
+      extinction_special_wigner->link_resources(quicksched);
+      quicksched.link_tasks(*extinction_grid, *extinction_special_wigner);
+      tasks[running_task_index] = extinction_special_wigner;
+      ++running_task_index;
+    }
+
+    AbsorptionSpecialWignerDResources *absorption_special_wigner = nullptr;
+    if (do_absorption) {
+      absorption_special_wigner = new AbsorptionSpecialWignerDResources(
+          _maximum_order, *absorption_grid);
+      quicksched.register_resource(*absorption_special_wigner);
+      quicksched.register_task(*absorption_special_wigner);
+      absorption_special_wigner->link_resources(quicksched);
+      quicksched.link_tasks(*absorption_grid, *absorption_special_wigner);
+      tasks[running_task_index] = absorption_special_wigner;
+      ++running_task_index;
+    }
+
+    ScatteringMatrixSpecialWignerDResources *scattering_special_wigner =
+        nullptr;
+    if (do_scattering) {
+      scattering_special_wigner = new ScatteringMatrixSpecialWignerDResources(
+          _maximum_order, *scattering_grid);
+      quicksched.register_resource(*scattering_special_wigner);
+      quicksched.register_task(*scattering_special_wigner);
+      scattering_special_wigner->link_resources(quicksched);
+      quicksched.link_tasks(*scattering_grid, *scattering_special_wigner);
+      tasks[running_task_index] = scattering_special_wigner;
+      ++running_task_index;
+    }
+
+    //  - Wigner D functions
+    std::vector<WignerDResources *> wignerdm0(number_of_quadrature_tasks,
+                                              nullptr);
+    for (uint_fast32_t i = 0; i < number_of_quadrature_tasks; ++i) {
+      const uint_fast32_t this_order = _minimum_order + i;
+      const uint_fast32_t this_ngauss =
+          minimum_ngauss + i * _gauss_legendre_factor;
+      WignerDResources *this_wignerdm0 = new WignerDResources(
+          this_order, this_ngauss, *quadrature_points[i], this_order < 100);
+      quicksched.register_resource(*this_wignerdm0);
+      quicksched.register_task(*this_wignerdm0);
+      this_wignerdm0->link_resources(quicksched);
+      quicksched.link_tasks(*quadrature_points[i], *this_wignerdm0);
+      wignerdm0[i] = this_wignerdm0;
+      tasks[running_task_index] = this_wignerdm0;
+      ++running_task_index;
+    }
+
+    // step 2: compute shape quadrature points and generate shape based
+    // resources that are shared between all parameter values
+    std::vector<ParticleGeometryResource *> geometries(number_of_geometry_tasks,
+                                                       nullptr);
+    for (uint_fast32_t is = 0; is < number_of_shapes; ++is) {
+      for (uint_fast32_t ig = 0; ig < number_of_quadrature_tasks; ++ig) {
+        const uint_fast32_t this_ngauss =
+            minimum_ngauss + ig * _gauss_legendre_factor;
         ParticleGeometryResource *this_geometry =
             new ParticleGeometryResource(_shape_distribution.get_shape(is),
                                          this_ngauss, *quadrature_points[ig]);
@@ -484,79 +928,36 @@ public:
         // columns (second index) correspond to different quadrature points
         const uint_fast32_t index = is * number_of_quadrature_tasks + ig;
         geometries[index] = this_geometry;
-        tasks[shape_offset + index] = this_geometry;
+        tasks[running_task_index] = this_geometry;
+        ++running_task_index;
       }
-    }
-
-    // make sure we have enough memory left to store results
-    if (do_extinction) {
-      add_memory_allocation(
-          total_number_of_Tmatrices *
-              ExtinctionCoefficientResult::get_memory_size(number_of_angles),
-          "ExtinctionCoefficientResult", memory_log_file, memory_used);
-    }
-    if (do_absorption) {
-      add_memory_allocation(
-          total_number_of_Tmatrices *
-              AbsorptionCoefficientResult::get_memory_size(number_of_angles),
-          "AbsorptionCoefficientResult", memory_log_file, memory_used);
-    }
-    if (do_scattering) {
-      add_memory_allocation(total_number_of_Tmatrices *
-                                ScatteringMatrixResult::get_memory_size(
-                                    scattering_grid->get_number_of_angles()),
-                            "ScatteringMatrixResult", memory_log_file,
-                            memory_used);
     }
 
     // step 4: loop over all parameter values and set up parameter specific
     // tasks
-    // first: figure out how much space is left for interaction and T-matrix
-    // resources
-    const uint_fast32_t memory_left = _maximum_memory_usage - memory_used;
-    const uint_fast32_t tmatrix_memory_requirement =
-        InteractionResource::get_memory_size(_maximum_order, maximum_ngauss) +
-        2 * TMatrixResource::get_memory_size(_maximum_order);
-    // compute the number of T-matrices that we can store simultaneously
-    // if this number is larger than what we need, we only allocate what
-    // we need
-    const uint_fast32_t number_of_tmatrices = std::min(
-        memory_left / tmatrix_memory_requirement, total_number_of_Tmatrices);
-    // make sure the number we can allocate is larger than the number of
-    // shapes (not strictly necessary, but we do this for now)
-    //    ctm_assert(number_of_tmatrices >= number_of_shapes);
-
-    // we are done using memory: output the total
-    add_memory_allocation(number_of_tmatrices * tmatrix_memory_requirement,
-                          "TMatrixResources", memory_log_file, memory_used);
-    if (verbose) {
-      ctm_warning("Total memory usage: %s",
-                  Utilities::human_readable_bytes(memory_used).c_str());
-      ctm_warning("Space to store %" PRIuFAST32 " T-matrices.",
-                  number_of_tmatrices);
-    }
 
     // now actually allocate the resources
     std::vector<InteractionResource *> interaction_resources(
         number_of_tmatrices, nullptr);
     std::vector<TMatrixResource *> tmatrices(2 * number_of_tmatrices, nullptr);
-    const uint_fast32_t tmatrix_offset = resources.size();
-    resources.resize(tmatrix_offset + 3 * number_of_tmatrices, nullptr);
     for (uint_fast32_t i = 0; i < number_of_tmatrices; ++i) {
       interaction_resources[i] =
           new InteractionResource(_maximum_order, maximum_ngauss);
       quicksched.register_resource(*interaction_resources[i]);
-      resources[tmatrix_offset + 3 * i] = interaction_resources[i];
+      resources[running_resource_index] = interaction_resources[i];
+      ++running_resource_index;
 
       tmatrices[2 * i] = new TMatrixResource(_maximum_order);
-      resources[tmatrix_offset + 3 * i + 1] = tmatrices[2 * i];
+      resources[running_resource_index] = tmatrices[2 * i];
+      ++running_resource_index;
       quicksched.register_resource(*tmatrices[2 * i]);
       for (uint_fast32_t m = 0; m < _maximum_order + 1; ++m) {
         quicksched.register_resource(tmatrices[2 * i]->get_m_resource(m),
                                      tmatrices[2 * i]);
       }
       tmatrices[2 * i + 1] = new TMatrixResource(_maximum_order);
-      resources[tmatrix_offset + 3 * i + 2] = tmatrices[2 * i + 1];
+      resources[running_resource_index] = tmatrices[2 * i + 1];
+      ++running_resource_index;
       quicksched.register_resource(*tmatrices[2 * i + 1]);
       for (uint_fast32_t m = 0; m < _maximum_order + 1; ++m) {
         quicksched.register_resource(tmatrices[2 * i + 1]->get_m_resource(m),
@@ -576,7 +977,7 @@ public:
     // last used the resource and create a task dependency between the old
     // task that used the resource and the new task.
     std::vector<Task *> unlock_tasks(number_of_tmatrices, nullptr);
-    uint_fast32_t running_resource_index = 0;
+    uint_fast32_t resource_reuse_index = 0;
 
     // big loop over all parameter values
     // for each parameter value we allocate interaction variables and a
@@ -602,24 +1003,6 @@ public:
       unaveraged_scattering_results.resize(total_number_of_Tmatrices, nullptr);
     }
     uint_fast32_t unaveraged_scattering_result_index = 0;
-    const uint_fast32_t resource_offset = resources.size();
-    resources.resize(resource_offset + total_number_of_interactions +
-                         2 * total_number_of_Tmatrices,
-                     nullptr);
-    uint_fast32_t resource_index = resource_offset;
-    results.resize(number_of_results * total_number_of_interactions, nullptr);
-    uint_fast32_t result_index = 0;
-    const uint_fast32_t task_offset = tasks.size();
-    // for each T-matrix,
-    // we need to add interaction and m=0 tasks for each quadrature point
-    // we need to add m=/=0 tasks for each order
-    // we need to add 1 alignment task and 3 reset tasks
-    // we need to add an additional calculation task for each result
-    tasks.resize(task_offset +
-                     number_of_results * total_number_of_interactions +
-                     total_number_of_Tmatrices * tasks_per_Tmatrix,
-                 nullptr);
-    uint_fast32_t task_index = task_offset;
     // loop over compositions
     for (uint_fast32_t icomp = 0; icomp < number_of_compositions; ++icomp) {
       // get the grain type that corresponds to this composition
@@ -650,8 +1033,8 @@ public:
           interaction_variables[interaction_index_new] =
               this_interaction_variables;
           ++interaction_index_new;
-          resources[resource_index] = this_interaction_variables;
-          ++resource_index;
+          resources[running_resource_index] = this_interaction_variables;
+          ++running_resource_index;
 
           ExtinctionCoefficientResult *this_extinction_result = nullptr;
           ExtinctionShapeAveragingTask *extinction_averaging_task = nullptr;
@@ -659,15 +1042,15 @@ public:
             this_extinction_result = new ExtinctionCoefficientResult(
                 grain_type, particle_size, wavelength, number_of_angles);
             quicksched.register_resource(*this_extinction_result);
-            results[result_index] = this_extinction_result;
-            ++result_index;
+            results[running_result_index] = this_extinction_result;
+            ++running_result_index;
 
             extinction_averaging_task = new ExtinctionShapeAveragingTask(
                 _shape_distribution, *this_extinction_result);
             quicksched.register_task(*extinction_averaging_task);
             extinction_averaging_task->link_resources(quicksched);
-            tasks[task_index] = extinction_averaging_task;
-            ++task_index;
+            tasks[running_task_index] = extinction_averaging_task;
+            ++running_task_index;
           }
 
           AbsorptionCoefficientResult *this_absorption_result = nullptr;
@@ -676,15 +1059,15 @@ public:
             this_absorption_result = new AbsorptionCoefficientResult(
                 grain_type, particle_size, wavelength, number_of_angles);
             quicksched.register_resource(*this_absorption_result);
-            results[result_index] = this_absorption_result;
-            ++result_index;
+            results[running_result_index] = this_absorption_result;
+            ++running_result_index;
 
             absorption_averaging_task = new AbsorptionShapeAveragingTask(
                 _shape_distribution, *this_absorption_result);
             quicksched.register_task(*absorption_averaging_task);
             absorption_averaging_task->link_resources(quicksched);
-            tasks[task_index] = absorption_averaging_task;
-            ++task_index;
+            tasks[running_task_index] = absorption_averaging_task;
+            ++running_task_index;
           }
 
           ScatteringMatrixResult *this_scattering_result = nullptr;
@@ -695,15 +1078,15 @@ public:
                 grain_type, particle_size, wavelength,
                 scattering_grid->get_number_of_angles());
             quicksched.register_resource(*this_scattering_result);
-            results[result_index] = this_scattering_result;
-            ++result_index;
+            results[running_result_index] = this_scattering_result;
+            ++running_result_index;
 
             scattering_averaging_task = new ScatteringMatrixShapeAveragingTask(
                 _shape_distribution, *this_scattering_result);
             quicksched.register_task(*scattering_averaging_task);
             scattering_averaging_task->link_resources(quicksched);
-            tasks[task_index] = scattering_averaging_task;
-            ++task_index;
+            tasks[running_task_index] = scattering_averaging_task;
+            ++running_task_index;
           }
 
           // loop over all shapes
@@ -720,8 +1103,9 @@ public:
                   [unaveraged_extinction_result_index] =
                       this_unaveraged_extinction_result;
               ++unaveraged_extinction_result_index;
-              resources[resource_index] = this_unaveraged_extinction_result;
-              ++resource_index;
+              resources[running_resource_index] =
+                  this_unaveraged_extinction_result;
+              ++running_resource_index;
             }
 
             AbsorptionCoefficientResult *this_unaveraged_absorption_result =
@@ -735,8 +1119,9 @@ public:
                   [unaveraged_absorption_result_index] =
                       this_unaveraged_absorption_result;
               ++unaveraged_absorption_result_index;
-              resources[resource_index] = this_unaveraged_absorption_result;
-              ++resource_index;
+              resources[running_resource_index] =
+                  this_unaveraged_absorption_result;
+              ++running_resource_index;
             }
 
             ScatteringMatrixResult *this_unaveraged_scattering_result = nullptr;
@@ -749,8 +1134,9 @@ public:
                   [unaveraged_scattering_result_index] =
                       this_unaveraged_scattering_result;
               ++unaveraged_scattering_result_index;
-              resources[resource_index] = this_unaveraged_scattering_result;
-              ++resource_index;
+              resources[running_resource_index] =
+                  this_unaveraged_scattering_result;
+              ++running_resource_index;
             }
 
             const OrientationDistribution &this_orientation =
@@ -765,15 +1151,15 @@ public:
             converged_size_resources[converged_size_index] =
                 this_converged_size;
             ++converged_size_index;
-            resources[resource_index] = this_converged_size;
-            ++resource_index;
+            resources[running_resource_index] = this_converged_size;
+            ++running_resource_index;
 
             InteractionResource *this_interaction_resource =
-                interaction_resources[running_resource_index];
+                interaction_resources[resource_reuse_index];
             TMatrixResource *this_single_Tmatrix =
-                tmatrices[2 * running_resource_index];
+                tmatrices[2 * resource_reuse_index];
             TMatrixResource *this_ensemble_Tmatrix =
-                tmatrices[2 * running_resource_index + 1];
+                tmatrices[2 * resource_reuse_index + 1];
 
             // we need to store the previous m=0 task to set up a dependency
             TMatrixM0Task *previous_m0task = nullptr;
@@ -794,12 +1180,12 @@ public:
               quicksched.register_task(*this_interaction);
               this_interaction->link_resources(quicksched);
               quicksched.link_tasks(this_geometry, *this_interaction);
-              if (unlock_tasks[running_resource_index] != nullptr) {
-                quicksched.link_tasks(*unlock_tasks[running_resource_index],
+              if (unlock_tasks[resource_reuse_index] != nullptr) {
+                quicksched.link_tasks(*unlock_tasks[resource_reuse_index],
                                       *this_interaction);
               }
-              tasks[task_index] = this_interaction;
-              ++task_index;
+              tasks[running_task_index] = this_interaction;
+              ++running_task_index;
 
               // set up the m=0 task
               TMatrixM0Task *this_m0task = new TMatrixM0Task(
@@ -817,13 +1203,13 @@ public:
               if (previous_m0task != nullptr) {
                 quicksched.link_tasks(*previous_m0task, *this_interaction);
               } else {
-                if (unlock_tasks[running_resource_index] != nullptr) {
-                  quicksched.link_tasks(*unlock_tasks[running_resource_index],
+                if (unlock_tasks[resource_reuse_index] != nullptr) {
+                  quicksched.link_tasks(*unlock_tasks[resource_reuse_index],
                                         *this_m0task);
                 }
               }
-              tasks[task_index] = this_m0task;
-              ++task_index;
+              tasks[running_task_index] = this_m0task;
+              ++running_task_index;
               previous_m0task = this_m0task;
             }
 
@@ -831,8 +1217,8 @@ public:
                 this_orientation, *this_single_Tmatrix, *this_ensemble_Tmatrix);
             quicksched.register_task(*alignment_task);
             alignment_task->link_resources(quicksched);
-            tasks[task_index] = alignment_task;
-            ++task_index;
+            tasks[running_task_index] = alignment_task;
+            ++running_task_index;
 
             ExtinctionCoefficientTask *extinction_task = nullptr;
             if (do_extinction) {
@@ -846,8 +1232,8 @@ public:
               quicksched.link_tasks(*alignment_task, *extinction_task);
               quicksched.link_tasks(*extinction_special_wigner,
                                     *extinction_task);
-              tasks[task_index] = extinction_task;
-              ++task_index;
+              tasks[running_task_index] = extinction_task;
+              ++running_task_index;
 
               extinction_averaging_task->add_input_coefficient(
                   quicksched, ishape, this_unaveraged_extinction_result);
@@ -867,8 +1253,8 @@ public:
               quicksched.link_tasks(*alignment_task, *absorption_task);
               quicksched.link_tasks(*absorption_special_wigner,
                                     *absorption_task);
-              tasks[task_index] = absorption_task;
-              ++task_index;
+              tasks[running_task_index] = absorption_task;
+              ++running_task_index;
 
               absorption_averaging_task->add_input_coefficient(
                   quicksched, ishape, this_unaveraged_absorption_result);
@@ -888,8 +1274,8 @@ public:
               quicksched.link_tasks(*alignment_task, *scattering_task);
               quicksched.link_tasks(*scattering_special_wigner,
                                     *scattering_task);
-              tasks[task_index] = scattering_task;
-              ++task_index;
+              tasks[running_task_index] = scattering_task;
+              ++running_task_index;
 
               scattering_averaging_task->add_input_matrices(
                   quicksched, ishape, this_unaveraged_scattering_result);
@@ -901,16 +1287,16 @@ public:
                 new ResetTMatrixResourceTask(*this_single_Tmatrix);
             quicksched.register_task(*reset_task1);
             reset_task1->link_resources(quicksched);
-            tasks[task_index] = reset_task1;
-            ++task_index;
+            tasks[running_task_index] = reset_task1;
+            ++running_task_index;
             quicksched.link_tasks(*alignment_task, *reset_task1);
 
             ResetTMatrixResourceTask *reset_task2 =
                 new ResetTMatrixResourceTask(*this_ensemble_Tmatrix);
             quicksched.register_task(*reset_task2);
             reset_task2->link_resources(quicksched);
-            tasks[task_index] = reset_task2;
-            ++task_index;
+            tasks[running_task_index] = reset_task2;
+            ++running_task_index;
             // this one is not stricly necessary but makes it easier to keep
             // track of unlock tasks
             quicksched.link_tasks(*reset_task1, *reset_task2);
@@ -928,8 +1314,8 @@ public:
                 new ResetInteractionResourceTask(*this_interaction_resource);
             quicksched.register_task(*reset_task3);
             reset_task3->link_resources(quicksched);
-            tasks[task_index] = reset_task3;
-            ++task_index;
+            tasks[running_task_index] = reset_task3;
+            ++running_task_index;
             // this one is not stricly necessary but makes it easier to keep
             // track of unlock tasks
             quicksched.link_tasks(*reset_task2, *reset_task3);
@@ -946,13 +1332,13 @@ public:
               // link to the last m=0 task
               quicksched.link_tasks(*previous_m0task, *this_malltask);
               quicksched.link_tasks(*this_malltask, *alignment_task);
-              tasks[task_index] = this_malltask;
-              ++task_index;
+              tasks[running_task_index] = this_malltask;
+              ++running_task_index;
             }
 
-            unlock_tasks[running_resource_index] = reset_task3;
-            ++running_resource_index;
-            running_resource_index %= number_of_tmatrices;
+            unlock_tasks[resource_reuse_index] = reset_task3;
+            ++resource_reuse_index;
+            resource_reuse_index %= number_of_tmatrices;
           }
         }
       }
