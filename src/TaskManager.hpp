@@ -77,6 +77,256 @@ private:
   /*! @brief Requested wavelengths (in m). */
   std::vector<float_type> _wavelengths;
 
+  /**
+   * @brief Class used to keep track of memory allocations.
+   */
+  class MemoryManager {
+  private:
+    /*! @brief Maximum allowed memory usage (in bytes). */
+    const size_t _maximum_memory;
+
+    /*! @brief Memory log file (if any). */
+    std::ofstream *_memory_log_file;
+
+    // memory management variables
+    /*! @brief Memory already used (in bytes). */
+    size_t _memory_used;
+
+    // quicksched counter variables
+    /*! @brief Number of QuickSched tasks. */
+    size_t _number_of_tasks;
+
+    /*! @brief Number of QuickSched resources. */
+    size_t _number_of_resources;
+
+    /*! @brief Number of QuickSched task dependencies. */
+    size_t _number_of_task_dependencies;
+
+    /*! @brief Number of QuickSched read/write resource dependencies. */
+    size_t _number_of_resource_dependencies_readwrite;
+
+    /*! @brief Number of QuickSched read only resource dependencies. */
+    size_t _number_of_resource_dependencies_readonly;
+
+    // pointer vector counter variables
+
+    /*! @brief Number of Task pointers to store. */
+    size_t _number_of_task_pointers;
+
+    /*! @brief Number of Resource pointers to store. */
+    size_t _number_of_resource_pointers;
+
+    /*! @brief Number of Result pointers to store. */
+    size_t _number_of_result_pointers;
+
+    /*! @brief QuickSched memory usage. */
+    size_t _quicksched_memory_usage;
+
+  public:
+    /**
+     * @brief Constructor.
+     *
+     * @param maximum_memory Maximum allowed memory usage (in bytes).
+     * @param write_memory_log Write a memory log file?
+     * @param memory_log_file_name Name of the memory log file (if any).
+     */
+    inline MemoryManager(const size_t maximum_memory,
+                         const bool write_memory_log = false,
+                         const std::string memory_log_file_name = "")
+        : _maximum_memory(maximum_memory), _memory_log_file(nullptr),
+          _memory_used(0), _number_of_tasks(0), _number_of_resources(0),
+          _number_of_task_dependencies(0),
+          _number_of_resource_dependencies_readwrite(0),
+          _number_of_resource_dependencies_readonly(0),
+          _number_of_task_pointers(0), _number_of_resource_pointers(0),
+          _number_of_result_pointers(0), _quicksched_memory_usage(0) {
+
+      if (write_memory_log) {
+        _memory_log_file = new std::ofstream(memory_log_file_name);
+        *_memory_log_file << "# label\tallocation (bytes)\n";
+        _memory_log_file->flush();
+      }
+    }
+
+    /**
+     * @brief Account for the given additional memory usage.
+     *
+     * @param size Additional memory usage size (in bytes).
+     * @param label Label to mention in log file and error messages.
+     */
+    inline void add_memory_allocation(const size_t size,
+                                      const std::string label) {
+
+      if (_memory_log_file) {
+        *_memory_log_file << label << "\t" << size << "\n";
+        _memory_log_file->flush();
+      }
+      _memory_used += size;
+      ctm_assert_message(_memory_used < _maximum_memory, "%s, %zu bytes",
+                         label.c_str(), size);
+    }
+
+    /**
+     * @brief Account for the given template Computable with the given
+     * argument(s) and number of dependencies.
+     *
+     * @param label Label to show in the memory log and error messages.
+     * @param number_of_dependent_tasks Number of QuickSched task dependencies
+     * for this Computable.
+     * @param args Additional arguments passed on to the
+     * Computable::get_memory_size() function.
+     * @tparam COMPUTABLE Computable class name.
+     * @tparam ADDITIONAL_ARGUMENTS Variadic template to deal with arbitrary
+     * additional parameters.
+     */
+    template <class COMPUTABLE, typename... ADDITIONAL_ARGUMENTS>
+    inline void
+    account_for_computable(const std::string label,
+                           const uint_fast32_t number_of_dependent_tasks,
+                           const ADDITIONAL_ARGUMENTS &... args) {
+
+      add_memory_allocation(COMPUTABLE::get_memory_size(args...), label);
+      ++_number_of_tasks;
+      ++_number_of_resources;
+      _number_of_resource_dependencies_readwrite +=
+          COMPUTABLE::number_of_readwrite_resources();
+      _number_of_resource_dependencies_readonly +=
+          COMPUTABLE::number_of_readonly_resources();
+      _number_of_task_dependencies += number_of_dependent_tasks;
+      ++_number_of_task_pointers;
+    }
+
+    /**
+     * @brief Account for the given template Task with the given argument(s) and
+     * number of dependencies.
+     *
+     * @param label Label to show in the memory log and error messages.
+     * @param number_of_dependent_tasks Number of QuickSched task dependencies
+     * for this Task.
+     * @param args Additional arguments passed on to the Task::get_memory_size()
+     * function.
+     * @tparam TASK Task class name.
+     * @tparam ADDITIONAL_ARGUMENTS Variadic template to deal with arbitrary
+     * additional parameters.
+     */
+    template <class TASK, typename... ADDITIONAL_ARGUMENTS>
+    inline void account_for_task(const std::string label,
+                                 const uint_fast32_t number_of_dependent_tasks,
+                                 const ADDITIONAL_ARGUMENTS &... args) {
+
+      add_memory_allocation(TASK::get_memory_size(args...), label);
+      ++_number_of_tasks;
+      _number_of_resource_dependencies_readwrite +=
+          TASK::number_of_readwrite_resources();
+      _number_of_resource_dependencies_readonly +=
+          TASK::number_of_readonly_resources();
+      _number_of_task_dependencies += number_of_dependent_tasks;
+      ++_number_of_task_pointers;
+    }
+
+    /**
+     * @brief Account for the given template Resource with the given
+     * argument(s).
+     *
+     * @param label Label to show in the memory log and error messages.
+     * @param args Additional arguments passed on to the
+     * Resource::get_memory_size() function.
+     * @tparam RESOURCE Resource class name.
+     * @tparam ADDITIONAL_ARGUMENTS Variadic template to deal with arbitrary
+     * additional parameters.
+     */
+    template <class RESOURCE, typename... ADDITIONAL_ARGUMENTS>
+    inline void account_for_resource(const std::string label,
+                                     const ADDITIONAL_ARGUMENTS &... args) {
+
+      add_memory_allocation(RESOURCE::get_memory_size(args...), label);
+      ++_number_of_resources;
+      ++_number_of_resource_pointers;
+    }
+
+    /**
+     * @brief Account for the given template Result with the given
+     * argument(s).
+     *
+     * @param label Label to show in the memory log and error messages.
+     * @param args Additional arguments passed on to the
+     * Result::get_memory_size() function.
+     * @tparam RESULT Result class name.
+     * @tparam ADDITIONAL_ARGUMENTS Variadic template to deal with arbitrary
+     * additional parameters.
+     */
+    template <class RESULT, typename... ADDITIONAL_ARGUMENTS>
+    inline void account_for_result(const std::string label,
+                                   const ADDITIONAL_ARGUMENTS &... args) {
+
+      add_memory_allocation(RESULT::get_memory_size(args...), label);
+      ++_number_of_resources;
+      ++_number_of_result_pointers;
+    }
+
+    /**
+     * @brief Get the number of task pointers.
+     *
+     * @return Number of task pointers.
+     */
+    inline size_t get_number_of_task_pointers() const {
+      return _number_of_task_pointers;
+    }
+
+    /**
+     * @brief Get the number of resource pointers.
+     *
+     * @return Number of resource pointers.
+     */
+    inline size_t get_number_of_resource_pointers() const {
+      return _number_of_resource_pointers;
+    }
+
+    /**
+     * @brief Get the number of result pointers.
+     *
+     * @return Number of result pointers.
+     */
+    inline size_t get_number_of_result_pointers() const {
+      return _number_of_result_pointers;
+    }
+
+    /**
+     * @brief Get the total memory usage.
+     *
+     * @return Total memory usage (in bytes).
+     */
+    inline size_t get_memory_used() const { return _memory_used; }
+
+    /**
+     * @brief Allocate sufficient memory to fit all QuickSched objects.
+     *
+     * @param quicksched QuickSched class wrapper.
+     */
+    inline void allocate_quicksched_memory(QuickSched &quicksched) {
+      const size_t quicksched_memory = quicksched.reserve_memory(
+          _number_of_tasks, _number_of_resources, _number_of_task_dependencies,
+          _number_of_resource_dependencies_readwrite,
+          _number_of_resource_dependencies_readonly);
+      add_memory_allocation(quicksched_memory - _quicksched_memory_usage,
+                            "QuickSched");
+      _quicksched_memory_usage = quicksched_memory;
+    }
+
+    /**
+     * @brief Display QuickSched object totals.
+     */
+    inline void output_totals() const {
+      ctm_warning("Need to create %lu tasks, %lu resources, %lu task "
+                  "dependencies, %lu read/write resource dependencies and %lu "
+                  "read only resource dependencies",
+                  _number_of_tasks, _number_of_resources,
+                  _number_of_task_dependencies,
+                  _number_of_resource_dependencies_readwrite,
+                  _number_of_resource_dependencies_readonly);
+    }
+  };
+
 public:
   /**
    * @brief Constructor.
@@ -139,27 +389,6 @@ public:
    */
   inline void add_wavelength(const float_type wavelength) {
     _wavelengths.push_back(wavelength);
-  }
-
-  /**
-   * @brief Account for the given additional memory usage.
-   *
-   * @param size Additional memory usage size (in bytes).
-   * @param label Label to mention in log file and error messages.
-   * @param memory_log Memory log file to write to (or nullptr for no log).
-   * @param cumulative_size Cumulative size of all allocations.
-   */
-  inline void add_memory_allocation(const size_t size, const std::string label,
-                                    std::ofstream *memory_log,
-                                    size_t &cumulative_size) const {
-
-    if (memory_log) {
-      *memory_log << label << "\t" << size << "\n";
-      memory_log->flush();
-    }
-    cumulative_size += size;
-    ctm_assert_message(cumulative_size < _maximum_memory_usage, "%s, %zu bytes",
-                       label.c_str(), size);
   }
 
   /**
@@ -255,144 +484,60 @@ public:
     // we need to keep track of memory to make sure we respect the user
     // defined limit
     // we will do a dummy creation of all tasks
-    std::ofstream *memory_log_file = nullptr;
-    if (write_memory_log) {
-      memory_log_file = new std::ofstream(memory_log_file_name);
-      *memory_log_file << "# label\tallocation (bytes)\n";
-      memory_log_file->flush();
-    }
-    // memory management variables
-    size_t memory_used = 0;
-    // quicksched counter variables
-    size_t number_of_tasks = 0;
-    size_t number_of_resources = 0;
-    size_t number_of_task_dependencies = 0;
-    size_t number_of_resource_dependencies_readwrite = 0;
-    size_t number_of_resource_dependencies_readonly = 0;
-    // pointer vector counter variables
-    size_t number_of_task_pointers = 0;
-    size_t number_of_resource_pointers = 0;
-    size_t number_of_result_pointers = 0;
+    MemoryManager memory_manager(_maximum_memory_usage, write_memory_log,
+                                 memory_log_file_name);
     // NBasedResources:
     //  task + resource
-    add_memory_allocation(NBasedResources::get_memory_size(_maximum_order),
-                          "NBasedResources", memory_log_file, memory_used);
-    ++number_of_tasks;
-    ++number_of_resources;
-    number_of_resource_dependencies_readwrite +=
-        NBasedResources::number_of_readwrite_resources();
-    number_of_resource_dependencies_readonly +=
-        NBasedResources::number_of_readonly_resources();
-    ++number_of_task_pointers;
+    memory_manager.account_for_computable<NBasedResources>("NBasedResources", 0,
+                                                           _maximum_order);
     // GaussBasedResources:
     //  task + resource
     for (uint_fast32_t i = 0; i < number_of_quadrature_tasks; ++i) {
       const uint_fast32_t this_ngauss =
           minimum_ngauss + i * _gauss_legendre_factor;
-      add_memory_allocation(GaussBasedResources::get_memory_size(this_ngauss),
-                            "GaussBasedResources", memory_log_file,
-                            memory_used);
-      ++number_of_tasks;
-      ++number_of_resources;
-      number_of_resource_dependencies_readwrite +=
-          GaussBasedResources::number_of_readwrite_resources();
-      number_of_resource_dependencies_readonly +=
-          GaussBasedResources::number_of_readonly_resources();
-      ++number_of_task_pointers;
+      memory_manager.account_for_computable<GaussBasedResources>(
+          "GaussBasedResources", 0, this_ngauss);
     }
     // number of ExtinctionCoefficientGrids:
     //  task + resource
     if (do_extinction) {
-      add_memory_allocation(
-          ExtinctionCoefficientGrid::get_memory_size(number_of_angles),
-          "ExtinctionCoefficientGrid", memory_log_file, memory_used);
-      ++number_of_tasks;
-      ++number_of_resources;
-      number_of_resource_dependencies_readwrite +=
-          ExtinctionCoefficientGrid::number_of_readwrite_resources();
-      number_of_resource_dependencies_readonly +=
-          ExtinctionCoefficientGrid::number_of_readonly_resources();
-      ++number_of_task_pointers;
+      memory_manager.account_for_computable<ExtinctionCoefficientGrid>(
+          "ExtinctionCoefficientGrid", 0, number_of_angles);
     }
     // number of AbsorptionCoefficientGrids:
     //  task + resource
     if (do_absorption) {
-      add_memory_allocation(
-          AbsorptionCoefficientGrid::get_memory_size(number_of_angles, ngauss),
-          "AbsorptionCoefficientGrid", memory_log_file, memory_used);
-      ++number_of_tasks;
-      ++number_of_resources;
-      number_of_resource_dependencies_readwrite +=
-          AbsorptionCoefficientGrid::number_of_readwrite_resources();
-      number_of_resource_dependencies_readonly +=
-          AbsorptionCoefficientGrid::number_of_readonly_resources();
-      ++number_of_task_pointers;
+      memory_manager.account_for_computable<AbsorptionCoefficientGrid>(
+          "AbsorptionCoefficientGrid", 0, number_of_angles, ngauss);
     }
     // number of ScatteringMatrixGrids:
     //  task + resource
     if (do_scattering) {
-      add_memory_allocation(ScatteringMatrixGrid::get_memory_size(
-                                M_PI_2, number_of_angles, 2 * number_of_angles),
-                            "ScatteringMatrixGrid", memory_log_file,
-                            memory_used);
-      ++number_of_tasks;
-      ++number_of_resources;
-      number_of_resource_dependencies_readwrite +=
-          ScatteringMatrixGrid::number_of_readwrite_resources();
-      number_of_resource_dependencies_readonly +=
-          ScatteringMatrixGrid::number_of_readonly_resources();
-      ++number_of_task_pointers;
+      memory_manager.account_for_computable<ScatteringMatrixGrid>(
+          "ScatteringMatrixGrid", 0, M_PI_2, number_of_angles,
+          2 * number_of_angles);
     }
     // number of ExtinctionSpecialWignerDResources:
     //  task + resource + 1 task dependency
     if (do_extinction) {
-      add_memory_allocation(ExtinctionSpecialWignerDResources::get_memory_size(
-                                _maximum_order, number_of_angles),
-                            "ExtinctionSpecialWignerDResources",
-                            memory_log_file, memory_used);
-      ++number_of_tasks;
-      ++number_of_resources;
-      number_of_resource_dependencies_readwrite +=
-          ExtinctionSpecialWignerDResources::number_of_readwrite_resources();
-      number_of_resource_dependencies_readonly +=
-          ExtinctionSpecialWignerDResources::number_of_readonly_resources();
-      ++number_of_task_dependencies;
-      ++number_of_task_pointers;
+      memory_manager.account_for_computable<ExtinctionSpecialWignerDResources>(
+          "ExtinctionSpecialWignerDResources", 1, _maximum_order,
+          number_of_angles);
     }
     // number of AbsorptionSpecialWignerDResources:
     //  task + resource + 1 task dependency
     if (do_absorption) {
-      add_memory_allocation(AbsorptionSpecialWignerDResources::get_memory_size(
-                                _maximum_order, number_of_angles),
-                            "AbsorptionSpecialWignerDResources",
-                            memory_log_file, memory_used);
-      ++number_of_tasks;
-      ++number_of_resources;
-      number_of_resource_dependencies_readwrite +=
-          AbsorptionSpecialWignerDResources::number_of_readwrite_resources();
-      number_of_resource_dependencies_readonly +=
-          AbsorptionSpecialWignerDResources::number_of_readonly_resources();
-      ++number_of_task_dependencies;
-      ++number_of_task_pointers;
+      memory_manager.account_for_computable<AbsorptionSpecialWignerDResources>(
+          "AbsorptionSpecialWignerDResources", 1, _maximum_order,
+          number_of_angles);
     }
     // number of ScatteringMatrixSpecialWignerDResources:
     //  task + resource + 1 task dependency
     if (do_scattering) {
-      add_memory_allocation(
-          ScatteringMatrixSpecialWignerDResources::get_memory_size(
-              _maximum_order, number_of_angles),
-          "ScatteringMatrixSpecialWignerDResources", memory_log_file,
-          memory_used);
-      ++number_of_tasks;
-      ++number_of_resources;
-      number_of_resource_dependencies_readwrite +=
-          ScatteringMatrixSpecialWignerDResources::
-              number_of_readwrite_resources();
-      number_of_resource_dependencies_readonly +=
-          ScatteringMatrixSpecialWignerDResources::
-              number_of_readonly_resources();
-      ++number_of_task_dependencies;
-      ++number_of_task_pointers;
+      memory_manager
+          .account_for_computable<ScatteringMatrixSpecialWignerDResources>(
+              "ScatteringMatrixSpecialWignerDResources", 1, _maximum_order,
+              number_of_angles);
     }
     // number of WignerDResources:
     //  task + resource + 1 task dependency
@@ -400,17 +545,8 @@ public:
       const uint_fast32_t this_order = _minimum_order + i;
       const uint_fast32_t this_ngauss =
           minimum_ngauss + i * _gauss_legendre_factor;
-      add_memory_allocation(WignerDResources::get_memory_size(
-                                this_order, this_ngauss, this_order < 100),
-                            "WignerDResources", memory_log_file, memory_used);
-      ++number_of_tasks;
-      ++number_of_resources;
-      number_of_resource_dependencies_readwrite +=
-          WignerDResources::number_of_readwrite_resources();
-      number_of_resource_dependencies_readonly +=
-          WignerDResources::number_of_readonly_resources();
-      ++number_of_task_dependencies;
-      ++number_of_task_pointers;
+      memory_manager.account_for_computable<WignerDResources>(
+          "WignerDResources", 1, this_order, this_ngauss, this_order < 100);
     }
     // number of ParticleGeometryResources:
     //  task + resource + 1 task dependency
@@ -418,17 +554,8 @@ public:
       for (uint_fast32_t ig = 0; ig < number_of_quadrature_tasks; ++ig) {
         const uint_fast32_t this_ngauss =
             minimum_ngauss + ig * _gauss_legendre_factor;
-        add_memory_allocation(
-            ParticleGeometryResource::get_memory_size(this_ngauss),
-            "ParticleGeometryResource", memory_log_file, memory_used);
-        ++number_of_tasks;
-        ++number_of_resources;
-        number_of_resource_dependencies_readwrite +=
-            ParticleGeometryResource::number_of_readwrite_resources();
-        number_of_resource_dependencies_readonly +=
-            ParticleGeometryResource::number_of_readonly_resources();
-        ++number_of_task_dependencies;
-        ++number_of_task_pointers;
+        memory_manager.account_for_computable<ParticleGeometryResource>(
+            "ParticleGeometryResource", 1, this_ngauss);
       }
     }
     // at this point, we have accounted for all computables that need to be
@@ -444,252 +571,102 @@ public:
         // loop over all wavelengths
         for (uint_fast32_t ilambda = 0; ilambda < number_of_wavelengths;
              ++ilambda) {
-          add_memory_allocation(InteractionVariables::get_memory_size(),
-                                "InteractionVariables", memory_log_file,
-                                memory_used);
-          ++number_of_resources;
-          ++number_of_resource_pointers;
+          memory_manager.account_for_resource<InteractionVariables>(
+              "InteractionVariables");
 
           if (do_extinction) {
-            add_memory_allocation(
-                ExtinctionCoefficientGrid::get_memory_size(number_of_angles),
-                "ExtinctionCoefficientGrid", memory_log_file, memory_used);
-            ++number_of_resources;
-            ++number_of_result_pointers;
+            memory_manager.account_for_result<ExtinctionCoefficientResult>(
+                "ExtinctionCoefficientResult", number_of_angles);
 
-            add_memory_allocation(ExtinctionShapeAveragingTask::get_memory_size(
-                                      _shape_distribution),
-                                  "ExtinctionShapeAveragingTask",
-                                  memory_log_file, memory_used);
-            ++number_of_tasks;
-            number_of_resource_dependencies_readwrite +=
-                ExtinctionShapeAveragingTask::number_of_readwrite_resources();
-            number_of_resource_dependencies_readonly +=
-                ExtinctionShapeAveragingTask::number_of_readonly_resources();
-            ++number_of_task_pointers;
+            memory_manager.account_for_task<ExtinctionShapeAveragingTask>(
+                "ExtinctionShapeAveragingTask", 0, _shape_distribution);
           }
 
           if (do_absorption) {
-            add_memory_allocation(
-                AbsorptionCoefficientResult::get_memory_size(number_of_angles),
-                "AbsorptionCoefficientResult", memory_log_file, memory_used);
-            ++number_of_resources;
-            ++number_of_result_pointers;
+            memory_manager.account_for_result<AbsorptionCoefficientResult>(
+                "AbsorptionCoefficientResult", number_of_angles);
 
-            add_memory_allocation(AbsorptionShapeAveragingTask::get_memory_size(
-                                      _shape_distribution),
-                                  "AbsorptionShapeAveragingTask",
-                                  memory_log_file, memory_used);
-            ++number_of_tasks;
-            number_of_resource_dependencies_readwrite +=
-                AbsorptionShapeAveragingTask::number_of_readwrite_resources();
-            number_of_resource_dependencies_readonly +=
-                AbsorptionShapeAveragingTask::number_of_readonly_resources();
-            ++number_of_task_pointers;
+            memory_manager.account_for_task<AbsorptionShapeAveragingTask>(
+                "AbsorptionShapeAveragingTask", 0, _shape_distribution);
           }
 
           if (do_scattering) {
-            add_memory_allocation(
-                ScatteringMatrixResult::get_memory_size(number_of_angles),
-                "ScatteringMatrixResult", memory_log_file, memory_used);
-            ++number_of_resources;
-            ++number_of_result_pointers;
+            memory_manager.account_for_result<ScatteringMatrixResult>(
+                "ScatteringMatrixResult", number_of_angles);
 
-            add_memory_allocation(
-                ScatteringMatrixShapeAveragingTask::get_memory_size(
-                    _shape_distribution),
-                "ScatteringMatrixShapeAveragingTask", memory_log_file,
-                memory_used);
-            ++number_of_tasks;
-            number_of_resource_dependencies_readwrite +=
-                ScatteringMatrixShapeAveragingTask::
-                    number_of_readwrite_resources();
-            number_of_resource_dependencies_readonly +=
-                ScatteringMatrixShapeAveragingTask::
-                    number_of_readonly_resources();
-            ++number_of_task_pointers;
+            memory_manager.account_for_task<ScatteringMatrixShapeAveragingTask>(
+                "ScatteringMatrixShapeAveragingTask", 0, _shape_distribution);
           }
 
           // loop over all shapes
           for (uint_fast32_t ishape = 0; ishape < number_of_shapes; ++ishape) {
 
             if (do_extinction) {
-              add_memory_allocation(
-                  ExtinctionCoefficientResult::get_memory_size(
-                      number_of_angles),
-                  "ExtinctionCoefficientResult", memory_log_file, memory_used);
-              ++number_of_resources;
-              ++number_of_resource_pointers;
+              memory_manager.account_for_resource<ExtinctionCoefficientResult>(
+                  "ExtinctionCoefficientResult", number_of_angles);
             }
 
             if (do_absorption) {
-              add_memory_allocation(
-                  AbsorptionCoefficientResult::get_memory_size(
-                      number_of_angles),
-                  "AbsorptionCoefficientResult", memory_log_file, memory_used);
-              ++number_of_resources;
-              ++number_of_resource_pointers;
+              memory_manager.account_for_resource<AbsorptionCoefficientResult>(
+                  "AbsorptionCoefficientResult", number_of_angles);
             }
 
             if (do_scattering) {
-              add_memory_allocation(
-                  ScatteringMatrixResult::get_memory_size(number_of_angles),
-                  "ScatteringMatrixResult", memory_log_file, memory_used);
-              ++number_of_resources;
-              ++number_of_resource_pointers;
+              memory_manager.account_for_resource<ScatteringMatrixResult>(
+                  "ScatteringMatrixResult", number_of_angles);
             }
 
             // allocate the corresponding interaction variables and control
             // object
-            add_memory_allocation(ConvergedSizeResources::get_memory_size(),
-                                  "ConvergedSizeResources", memory_log_file,
-                                  memory_used);
-            ++number_of_resources;
-            ++number_of_resource_pointers;
+            memory_manager.account_for_resource<ConvergedSizeResources>(
+                "ConvergedSizeResources");
 
             // loop over all orders
             for (uint_fast32_t ig = 0; ig < number_of_quadrature_tasks; ++ig) {
-              // set up the interaction task
-              add_memory_allocation(InteractionTask::get_memory_size(),
-                                    "InteractionTask", memory_log_file,
-                                    memory_used);
-              ++number_of_tasks;
-              number_of_resource_dependencies_readwrite +=
-                  InteractionTask::number_of_readwrite_resources();
-              number_of_resource_dependencies_readonly +=
-                  InteractionTask::number_of_readonly_resources();
               // for safety, we overestimate the number of dependencies;
               // we don't know for sure whether this task will have an
               // additional dependency because it reuses a TMatrixResource
-              number_of_task_dependencies += 2;
-              ++number_of_task_pointers;
+              memory_manager.account_for_task<InteractionTask>(
+                  "InteractionTask", 2);
 
-              // set up the m=0 task
-              add_memory_allocation(TMatrixM0Task::get_memory_size(),
-                                    "TMatrixM0Task", memory_log_file,
-                                    memory_used);
-              ++number_of_tasks;
-              number_of_resource_dependencies_readwrite +=
-                  TMatrixM0Task::number_of_readwrite_resources();
-              number_of_resource_dependencies_readonly +=
-                  TMatrixM0Task::number_of_readonly_resources();
+              // account for the m=0 task
               // again, we overestimate the number of dependencies
-              number_of_task_dependencies += 4 + (ig > 0);
-              ++number_of_task_pointers;
+              memory_manager.account_for_task<TMatrixM0Task>("TMatrixM0Task",
+                                                             4 + (ig > 0));
             }
 
-            add_memory_allocation(AlignmentAverageTask::get_memory_size(),
-                                  "AlignmentAverageTask", memory_log_file,
-                                  memory_used);
-            ++number_of_tasks;
-            number_of_resource_dependencies_readwrite +=
-                AlignmentAverageTask::number_of_readwrite_resources();
-            number_of_resource_dependencies_readonly +=
-                AlignmentAverageTask::number_of_readonly_resources();
-            ++number_of_task_pointers;
+            memory_manager.account_for_task<AlignmentAverageTask>(
+                "AlignmentAverageTask", 0);
 
             if (do_extinction) {
-              add_memory_allocation(
-                  ExtinctionCoefficientTask::get_memory_size(),
-                  "ExtinctionCoefficientTask", memory_log_file, memory_used);
-              ++number_of_tasks;
-              number_of_resource_dependencies_readwrite +=
-                  ExtinctionCoefficientTask::number_of_readwrite_resources();
-              number_of_resource_dependencies_readonly +=
-                  ExtinctionCoefficientTask::number_of_readonly_resources();
-              number_of_task_dependencies += 2;
-              ++number_of_task_pointers;
-
-              // link the extinction task to the extinction averaging task
-              ++number_of_task_dependencies;
+              memory_manager.account_for_task<ExtinctionCoefficientTask>(
+                  "ExtinctionCoefficientTask", 3);
             }
 
             if (do_absorption) {
-              add_memory_allocation(
-                  AbsorptionCoefficientTask::get_memory_size(),
-                  "AbsorptionCoefficientTask", memory_log_file, memory_used);
-              ++number_of_tasks;
-              number_of_resource_dependencies_readwrite +=
-                  AbsorptionCoefficientTask::number_of_readwrite_resources();
-              number_of_resource_dependencies_readonly +=
-                  AbsorptionCoefficientTask::number_of_readonly_resources();
-              number_of_task_dependencies += 2;
-              ++number_of_task_pointers;
-
-              // link the absorption task to the absorption averaging task
-              ++number_of_task_dependencies;
+              memory_manager.account_for_task<AbsorptionCoefficientTask>(
+                  "AbsorptionCoefficientTask", 3);
             }
 
             if (do_scattering) {
-              add_memory_allocation(ScatteringMatrixTask::get_memory_size(),
-                                    "ScatteringMatrixTask", memory_log_file,
-                                    memory_used);
-              ++number_of_tasks;
-              number_of_resource_dependencies_readwrite +=
-                  ScatteringMatrixTask::number_of_readwrite_resources();
-              number_of_resource_dependencies_readonly +=
-                  ScatteringMatrixTask::number_of_readonly_resources();
-              number_of_task_dependencies += 2;
-              ++number_of_task_pointers;
-
-              // link the scattering task to the scattering averaging task
-              ++number_of_task_dependencies;
+              memory_manager.account_for_task<ScatteringMatrixTask>(
+                  "ScatteringMatrixTask", 3);
             }
 
-            add_memory_allocation(ResetTMatrixResourceTask::get_memory_size(),
-                                  "ResetTMatrixResourceTask", memory_log_file,
-                                  memory_used);
-            ++number_of_tasks;
-            number_of_resource_dependencies_readwrite +=
-                ResetTMatrixResourceTask::number_of_readwrite_resources();
-            number_of_resource_dependencies_readonly +=
-                ResetTMatrixResourceTask::number_of_readonly_resources();
-            ++number_of_task_dependencies;
-            ++number_of_task_pointers;
+            memory_manager.account_for_task<ResetTMatrixResourceTask>(
+                "ResetTMatrixResourceTask", 1);
 
-            add_memory_allocation(ResetTMatrixResourceTask::get_memory_size(),
-                                  "ResetTMatrixResourceTask", memory_log_file,
-                                  memory_used);
-            ++number_of_tasks;
-            number_of_resource_dependencies_readwrite +=
-                ResetTMatrixResourceTask::number_of_readwrite_resources();
-            number_of_resource_dependencies_readonly +=
-                ResetTMatrixResourceTask::number_of_readonly_resources();
-            ++number_of_task_dependencies;
-            if (do_extinction) {
-              ++number_of_task_dependencies;
-            }
-            if (do_absorption) {
-              ++number_of_task_dependencies;
-            }
-            if (do_scattering) {
-              ++number_of_task_dependencies;
-            }
-            ++number_of_task_pointers;
+            memory_manager.account_for_task<ResetTMatrixResourceTask>(
+                "ResetTMatrixResourceTask",
+                1 + do_extinction + do_absorption + do_scattering);
 
-            add_memory_allocation(
-                ResetInteractionResourceTask::get_memory_size(),
-                "ResetInteractionResourceTask", memory_log_file, memory_used);
-            ++number_of_tasks;
-            number_of_resource_dependencies_readwrite +=
-                ResetInteractionResourceTask::number_of_readwrite_resources();
-            number_of_resource_dependencies_readonly +=
-                ResetInteractionResourceTask::number_of_readonly_resources();
-            ++number_of_task_dependencies;
-            ++number_of_task_pointers;
+            memory_manager.account_for_task<ResetInteractionResourceTask>(
+                "ResetInteractionResourceTask", 1);
 
             // loop over all m values to set up m=/=0 tasks
             for (uint_fast32_t i = 0; i < _maximum_order; ++i) {
-              add_memory_allocation(TMatrixMAllTask::get_memory_size(),
-                                    "TMatrixMAllTask", memory_log_file,
-                                    memory_used);
-              ++number_of_tasks;
-              number_of_resource_dependencies_readwrite +=
-                  TMatrixMAllTask::number_of_readwrite_resources();
-              number_of_resource_dependencies_readonly +=
-                  TMatrixMAllTask::number_of_readonly_resources();
-              number_of_task_dependencies += 2;
-              ++number_of_task_pointers;
+              memory_manager.account_for_task<TMatrixMAllTask>(
+                  "TMatrixMAllTask", 2);
             }
           }
         }
@@ -697,91 +674,74 @@ public:
     }
 
     // account for auxiliary space per thread
-    add_memory_allocation(
+    memory_manager.add_memory_allocation(
         TMatrixAuxiliarySpaceManager::get_memory_size(
             quicksched.get_number_of_threads(), _maximum_order),
-        "TMatrixAuxiliarySpaceManager", memory_log_file, memory_used);
+        "TMatrixAuxiliarySpaceManager");
 
     // account for the pointer storage
-    add_memory_allocation(number_of_task_pointers * sizeof(Task *), "Task*",
-                          memory_log_file, memory_used);
-    add_memory_allocation(number_of_resource_pointers * sizeof(Resource *),
-                          "Resource*", memory_log_file, memory_used);
-    add_memory_allocation(number_of_result_pointers * sizeof(Result *),
-                          "Result*", memory_log_file, memory_used);
+    memory_manager.add_memory_allocation(
+        memory_manager.get_number_of_task_pointers() * sizeof(Task *), "Task*");
+    memory_manager.add_memory_allocation(
+        memory_manager.get_number_of_resource_pointers() * sizeof(Resource *),
+        "Resource*");
+    memory_manager.add_memory_allocation(
+        memory_manager.get_number_of_result_pointers() * sizeof(Result *),
+        "Result*");
 
     // we are done accounting for all necessary objects
     // first allocate QuickSched memory for all objects so far
-    const size_t quicksched_memory_required = quicksched.reserve_memory(
-        number_of_tasks, number_of_resources, number_of_task_dependencies,
-        number_of_resource_dependencies_readwrite,
-        number_of_resource_dependencies_readonly);
-    add_memory_allocation(quicksched_memory_required, "QuickSched",
-                          memory_log_file, memory_used);
+    memory_manager.allocate_quicksched_memory(quicksched);
 
     // now allocate a single chunk of T-matrix and interaction resources to
     // get the per chunk memory requirements
-    const size_t memory_size_required = memory_used;
-    add_memory_allocation(2 * TMatrixResource::get_memory_size(_maximum_order),
-                          "TMatrixResource", memory_log_file, memory_used);
-    add_memory_allocation(
-        InteractionResource::get_memory_size(_maximum_order, maximum_ngauss),
-        "InteractionResource", memory_log_file, memory_used);
-    number_of_resources += 3;
+    const size_t memory_size_required = memory_manager.get_memory_used();
+    memory_manager.account_for_resource<TMatrixResource>("TMatrixResource",
+                                                         _maximum_order);
+    memory_manager.account_for_resource<TMatrixResource>("TMatrixResource",
+                                                         _maximum_order);
+    memory_manager.account_for_resource<InteractionResource>(
+        "InteractionResource", _maximum_order, maximum_ngauss);
     // additional resource pointers
-    add_memory_allocation(3 * sizeof(Resource *), "Resource*", memory_log_file,
-                          memory_used);
-    number_of_resource_pointers += 3;
-    const size_t quicksched_memory_new = quicksched.reserve_memory(
-        number_of_tasks, number_of_resources, number_of_task_dependencies,
-        number_of_resource_dependencies_readwrite,
-        number_of_resource_dependencies_readonly);
-    add_memory_allocation(quicksched_memory_new - quicksched_memory_required,
-                          "QuickSched", memory_log_file, memory_used);
-    const size_t memory_per_Tmatrix = memory_used - memory_size_required;
+    memory_manager.add_memory_allocation(3 * sizeof(Resource *), "Resource*");
+    memory_manager.allocate_quicksched_memory(quicksched);
+    const size_t memory_per_Tmatrix =
+        memory_manager.get_memory_used() - memory_size_required;
     // now figure out how many extra T-matrices we can store
-    const size_t memory_left = _maximum_memory_usage - memory_used;
+    const size_t memory_left =
+        _maximum_memory_usage - memory_manager.get_memory_used();
     const uint_fast32_t number_of_extra_tmatrices =
         std::min(memory_left / memory_per_Tmatrix, total_number_of_Tmatrices);
-    add_memory_allocation(2 * number_of_extra_tmatrices *
-                              TMatrixResource::get_memory_size(_maximum_order),
-                          "TMatrixResource", memory_log_file, memory_used);
-    add_memory_allocation(number_of_extra_tmatrices *
-                              InteractionResource::get_memory_size(
-                                  _maximum_order, maximum_ngauss),
-                          "InteractionResource", memory_log_file, memory_used);
-    number_of_resources += 3 * number_of_extra_tmatrices;
-    add_memory_allocation(3 * number_of_extra_tmatrices * sizeof(Resource *),
-                          "Resource*", memory_log_file, memory_used);
-    number_of_resource_pointers += 3 * number_of_extra_tmatrices;
-    const size_t quicksched_memory_final = quicksched.reserve_memory(
-        number_of_tasks, number_of_resources, number_of_task_dependencies,
-        number_of_resource_dependencies_readwrite,
-        number_of_resource_dependencies_readonly);
-    add_memory_allocation(quicksched_memory_final - quicksched_memory_new,
-                          "QuickSched", memory_log_file, memory_used);
+    for (uint_fast32_t itmatrix = 0; itmatrix < number_of_extra_tmatrices;
+         ++itmatrix) {
+      memory_manager.account_for_resource<TMatrixResource>("TMatrixResource",
+                                                           _maximum_order);
+      memory_manager.account_for_resource<TMatrixResource>("TMatrixResource",
+                                                           _maximum_order);
+      memory_manager.account_for_resource<InteractionResource>(
+          "InteractionResource", _maximum_order, maximum_ngauss);
+    }
+    memory_manager.add_memory_allocation(3 * sizeof(Resource *), "Resource*");
+    memory_manager.allocate_quicksched_memory(quicksched);
+
     const uint_fast32_t number_of_tmatrices = number_of_extra_tmatrices + 1;
     if (verbose) {
-      ctm_warning("Total memory usage: %s",
-                  Utilities::human_readable_bytes(memory_used).c_str());
+      ctm_warning(
+          "Total memory usage: %s",
+          Utilities::human_readable_bytes(memory_manager.get_memory_used())
+              .c_str());
       ctm_warning("Space to store %" PRIuFAST32 " T-matrices.",
                   number_of_tmatrices);
 
-      ctm_warning("Need to create %lu tasks, %lu resources, %lu task "
-                  "dependencies, %lu read/write resource dependencies and %lu "
-                  "read only resource dependencies",
-                  number_of_tasks, number_of_resources,
-                  number_of_task_dependencies,
-                  number_of_resource_dependencies_readwrite,
-                  number_of_resource_dependencies_readonly);
+      memory_manager.output_totals();
     }
 
     // now actually allocate and create everything
 
     // start with allocating the pointer vectors
-    tasks.resize(number_of_task_pointers, nullptr);
-    resources.resize(number_of_resource_pointers, nullptr);
-    results.resize(number_of_result_pointers, nullptr);
+    tasks.resize(memory_manager.get_number_of_task_pointers(), nullptr);
+    resources.resize(memory_manager.get_number_of_resource_pointers(), nullptr);
+    results.resize(memory_manager.get_number_of_result_pointers(), nullptr);
     // we will use running indices to fill them
     size_t running_task_index = 0;
     size_t running_resource_index = 0;
