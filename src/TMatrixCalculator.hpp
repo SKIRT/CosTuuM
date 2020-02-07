@@ -245,9 +245,9 @@ public:
           for (uint_fast32_t N = n12min; N < n12max + 1; ++N) {
             // now that we have n1, n2 and N, we can compute the Clebsch-Gordan
             // coefficients for this element of the sum
-            const std::vector<float_type> CGcoeff =
-                SpecialFunctions::get_clebsch_gordan_coefficients<float_type>(
-                    n1, n2, N);
+            std::vector<float_type> CGcoeff((N + 1) * (2 * n1 + 1), 0.);
+            SpecialFunctions::get_clebsch_gordan_coefficients<float_type>(
+                n1, n2, N, CGcoeff);
             // we can also get the expansion coefficient
             const float_type pN = orientation_distribution.get_coefficient(N);
             // second summation in Mishchenko (1991), eq. 3.27

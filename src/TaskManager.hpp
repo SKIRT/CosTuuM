@@ -1181,7 +1181,8 @@ public:
             // create an alignment task to perform the averaging over the
             // shape distribution
             AlignmentAverageTask *alignment_task = new AlignmentAverageTask(
-                this_orientation, *this_single_Tmatrix, *this_ensemble_Tmatrix);
+                this_orientation, *this_single_Tmatrix, *space_manager,
+                *this_ensemble_Tmatrix);
             quicksched.register_task(*alignment_task);
             alignment_task->link_resources(quicksched);
             tasks[running_task_index] = alignment_task;

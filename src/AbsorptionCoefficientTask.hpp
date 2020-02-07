@@ -589,12 +589,21 @@ public:
    * @param itheta_in Index of the input zenith angle.
    * @param cosphi_in Cosine of the input azimuth angle, @f$\cos(\phi{}_i)@f$.
    * @param sinphi_in Sine of the input azimuth angle, @f$\sin(\phi{}_i)@f$.
-   * @return Scattering matrix for this scattering event.
+   * @param S Scattering matrix for this scattering event (of size at least 4).
    */
-  inline Matrix<std::complex<float_type>> get_forward_scattering_matrix(
-      const uint_fast8_t grid_in, const uint_fast32_t itheta_in,
-      const uint_fast8_t grid_out, const uint_fast32_t itheta_out,
-      const float_type cosphi_in, const float_type sinphi_in) const {
+  inline void get_forward_scattering_matrix(const uint_fast8_t grid_in,
+                                            const uint_fast32_t itheta_in,
+                                            const uint_fast8_t grid_out,
+                                            const uint_fast32_t itheta_out,
+                                            const float_type cosphi_in,
+                                            const float_type sinphi_in,
+                                            std::complex<float_type> *S) const {
+
+    // initialize the scattering matrix
+    S[0] = 0.;
+    S[1] = 0.;
+    S[2] = 0.;
+    S[3] = 0.;
 
     const uint_fast32_t nmax = _Tmatrix.get_nmax();
 
@@ -604,7 +613,6 @@ public:
     // e^{im(phi_out-phi_in)} is computed recursively, starting with the value
     // for m=0: 1
     std::complex<float_type> expimphi_p_out_m_in(1., 0.);
-    Matrix<std::complex<float_type>> S(2, 2);
     // instead of summing over n and n', we sum over m, since then we can reuse
     // the e^{im(phi_out-phi_in)}, pi and tau factors
     for (uint_fast32_t m = 0; m < nmax + 1; ++m) {
@@ -647,8 +655,8 @@ public:
           // simplify the expression for S
           if (m == 0) {
             const std::complex<float_type> factor = c_nnn * tau_n * tau_nn;
-            S(0, 0) += factor * T22nmnnm;
-            S(1, 1) += factor * T11nmnnm;
+            S[0] += factor * T22nmnnm;
+            S[3] += factor * T11nmnnm;
           } else {
             // in the general case m=/=0, we also need the T12 and T21 elements
             // for this m, n and n'
@@ -668,26 +676,24 @@ public:
             const float_type tau_pi = tau_n * pi_nn;
             const float_type tau_tau = tau_n * tau_nn;
 
-            S(0, 0) += real_factor * (T11nmnnm * pi_pi + T21nmnnm * tau_pi +
-                                      T12nmnnm * pi_tau + T22nmnnm * tau_tau);
-            S(0, 1) += imag_factor * (T11nmnnm * pi_tau + T21nmnnm * tau_tau +
-                                      T12nmnnm * pi_pi + T22nmnnm * tau_pi);
-            S(1, 0) -= imag_factor * (T11nmnnm * tau_pi + T21nmnnm * pi_pi +
-                                      T12nmnnm * tau_tau + T22nmnnm * pi_tau);
-            S(1, 1) += real_factor * (T11nmnnm * tau_tau + T21nmnnm * pi_tau +
-                                      T12nmnnm * tau_pi + T22nmnnm * pi_pi);
+            S[0] += real_factor * (T11nmnnm * pi_pi + T21nmnnm * tau_pi +
+                                   T12nmnnm * pi_tau + T22nmnnm * tau_tau);
+            S[1] += imag_factor * (T11nmnnm * pi_tau + T21nmnnm * tau_tau +
+                                   T12nmnnm * pi_pi + T22nmnnm * tau_pi);
+            S[2] -= imag_factor * (T11nmnnm * tau_pi + T21nmnnm * pi_pi +
+                                   T12nmnnm * tau_tau + T22nmnnm * pi_tau);
+            S[3] += real_factor * (T11nmnnm * tau_tau + T21nmnnm * pi_tau +
+                                   T12nmnnm * tau_pi + T22nmnnm * pi_pi);
           }
         }
       }
     }
     // now divide all expressions by the wavenumber
     const float_type kinv = 1. / _interaction_variables.get_wavenumber();
-    S(0, 0) *= kinv;
-    S(0, 1) *= kinv;
-    S(1, 0) *= kinv;
-    S(1, 1) *= kinv;
-
-    return S;
+    S[0] *= kinv;
+    S[1] *= kinv;
+    S[2] *= kinv;
+    S[3] *= kinv;
   }
 
   /**
@@ -702,13 +708,18 @@ public:
 
     for (uint_fast32_t itheta_out = 0; itheta_out < ntheta; ++itheta_out) {
 
-      Matrix<std::complex<float_type>> S =
-          get_forward_scattering_matrix(0, itheta_out, 0, itheta_out, 1., 0.);
+      std::complex<float_type> S[4];
+      get_forward_scattering_matrix(0, itheta_out, 0, itheta_out, 1., 0., S);
 
+      // note that
+      //  S[0] = S(0,0)
+      //  S[1] = S(0,1)
+      //  S[2] = S(1,0)
+      //  S[3] = S(1,1)
       const float_type prefactor =
           2. * M_PI / _interaction_variables.get_wavenumber();
-      _result._Qabs[itheta_out] = prefactor * (S(0, 0) + S(1, 1)).imag();
-      _result._Qabspol[itheta_out] = prefactor * (S(0, 0) - S(1, 1)).imag();
+      _result._Qabs[itheta_out] = prefactor * (S[0] + S[3]).imag();
+      _result._Qabspol[itheta_out] = prefactor * (S[0] - S[3]).imag();
 
       if (_account_for_scattering) {
         const float_type half(0.5);
@@ -717,23 +728,26 @@ public:
             const float_type cos_phi_in = _grid._cos_phi_in[iphi_in];
             const float_type sin_phi_in = _grid._sin_phi_in[iphi_in];
 
-            Matrix<std::complex<float_type>> Stp =
-                get_forward_scattering_matrix(1, itheta_in, 0, itheta_out,
-                                              cos_phi_in, sin_phi_in);
+            std::complex<float_type> Stp[4];
+            get_forward_scattering_matrix(1, itheta_in, 0, itheta_out,
+                                          cos_phi_in, sin_phi_in, Stp);
 
             const float_type weight = _grid._cos_theta_in_weights[itheta_in] *
                                       _grid._phi_in_weights[iphi_in];
+            // note that
+            //  Stp[0] = Stp(0,0)
+            //  Stp[1] = Stp(0,1)
+            //  Stp[2] = Stp(1,0)
+            //  Stp[3] = Stp(1,1)
             const float_type Z00 =
-                (half *
-                 (Stp(0, 0) * conj(Stp(0, 0)) + Stp(0, 1) * conj(Stp(0, 1)) +
-                  Stp(1, 0) * conj(Stp(1, 0)) + Stp(1, 1) * conj(Stp(1, 1))))
+                (half * (Stp[0] * conj(Stp[0]) + Stp[1] * conj(Stp[1]) +
+                         Stp[2] * conj(Stp[2]) + Stp[3] * conj(Stp[3])))
                     .real();
             _result._Qabs[itheta_out] -= Z00 * weight;
 
             const float_type Z10 =
-                (half *
-                 (Stp(0, 0) * conj(Stp(0, 0)) + Stp(0, 1) * conj(Stp(0, 1)) -
-                  Stp(1, 0) * conj(Stp(1, 0)) - Stp(1, 1) * conj(Stp(1, 1))))
+                (half * (Stp[0] * conj(Stp[0]) + Stp[1] * conj(Stp[1]) -
+                         Stp[2] * conj(Stp[2]) - Stp[3] * conj(Stp[3])))
                     .real();
             _result._Qabspol[itheta_out] -= Z10 * weight;
           }

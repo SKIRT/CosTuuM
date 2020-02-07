@@ -23,6 +23,10 @@ private:
   /*! @brief Input T-matrix. */
   const TMatrixResource &_input_Tmatrix;
 
+  /*! @brief Auxiliary space manager used to obtain space to store intermediate
+   *  calculations. */
+  TMatrixAuxiliarySpaceManager &_aux_manager;
+
   /*! @brief Output T-matrix. */
   TMatrixResource &_output_Tmatrix;
 
@@ -32,13 +36,18 @@ public:
    *
    * @param orientation_distribution Orientation distribution.
    * @param input_Tmatrix Input T-matrix.
+   * @param aux_manager Auxiliary space manager used to obtain space to store
+   * intermediate calculations.
    * @param output_Tmatrix Output T-matrix.
    */
   inline AlignmentAverageTask(
       const OrientationDistribution &orientation_distribution,
-      const TMatrixResource &input_Tmatrix, TMatrixResource &output_Tmatrix)
+      const TMatrixResource &input_Tmatrix,
+      TMatrixAuxiliarySpaceManager &aux_manager,
+      TMatrixResource &output_Tmatrix)
       : _orientation_distribution(orientation_distribution),
-        _input_Tmatrix(input_Tmatrix), _output_Tmatrix(output_Tmatrix) {}
+        _input_Tmatrix(input_Tmatrix), _aux_manager(aux_manager),
+        _output_Tmatrix(output_Tmatrix) {}
 
   virtual ~AlignmentAverageTask() {}
 
@@ -92,6 +101,10 @@ public:
     // first make sure the _nmax value for the new T-matrix is set
     _output_Tmatrix._nmax = nmax;
 
+    // get the array in which to temporarily store Clebsch-Gordan coefficients
+    std::vector<float_type> &CGcoeff =
+        _aux_manager.get_space(thread_id)._clebsch_gordan;
+
     if (_orientation_distribution.compute_alignment()) {
       // check that we precomputed enough expansion coefficients in the
       // expansion of the orientation distribution
@@ -119,9 +132,11 @@ public:
             for (uint_fast32_t N = n12min; N < n12max + 1; ++N) {
               // now that we have n1, n2 and N, we can compute the
               // Clebsch-Gordan coefficients for this element of the sum
-              const std::vector<float_type> CGcoeff =
-                  SpecialFunctions::get_clebsch_gordan_coefficients<float_type>(
-                      n1, n2, N);
+              //              const std::vector<float_type> CGcoeff =
+              //                  SpecialFunctions::get_clebsch_gordan_coefficients<float_type>(
+              //                      n1, n2, N);
+              SpecialFunctions::get_clebsch_gordan_coefficients<float_type>(
+                  n1, n2, N, CGcoeff);
               // we can also get the expansion coefficient
               const float_type pN =
                   _orientation_distribution.get_coefficient(N);

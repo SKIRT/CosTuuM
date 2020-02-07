@@ -14,6 +14,7 @@
 #include "TaskManager.hpp"
 
 #include <Python.h>
+#include <sys/resource.h>
 /*! @brief Use the NumPy 1.7 API. */
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include <numpy/arrayobject.h>
@@ -1190,6 +1191,15 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   quicksched.execute_tasks();
   Py_END_ALLOW_THREADS;
 
+  if (verbose) {
+    struct rusage resource_usage;
+    getrusage(RUSAGE_SELF, &resource_usage);
+    size_t memory_usage = static_cast<size_t>(resource_usage.ru_maxrss) *
+                          static_cast<size_t>(1024);
+    ctm_warning("Actual total memory usage: %s",
+                Utilities::human_readable_bytes(memory_usage).c_str());
+  }
+
   if (input_task_log_name) {
     std::ofstream taskfile(input_task_log_name);
     taskfile << "# thread\tstart\tend\ttype\ttask id\n";
@@ -1202,6 +1212,15 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
     typefile << "# type\tlabel\n";
     quicksched.print_type_dict(typefile);
   }
+
+  // we are done with the tasks and resources, delete them
+  for (uint_fast32_t i = 0; i < tasks.size(); ++i) {
+    delete tasks[i];
+  }
+  for (uint_fast32_t i = 0; i < resources.size(); ++i) {
+    delete resources[i];
+  }
+  delete space_manager;
 
   PyObject *first_return_value = nullptr;
   if (do_absorption || do_extinction) {
@@ -1322,17 +1341,11 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
     second_return_value = PyArray_Squeeze(result_array);
   }
 
-  for (uint_fast32_t i = 0; i < tasks.size(); ++i) {
-    delete tasks[i];
-  }
-  for (uint_fast32_t i = 0; i < resources.size(); ++i) {
-    delete resources[i];
-  }
+  // now we are also done with the results, delete them too
   delete result_key;
   for (uint_fast32_t i = 0; i < results.size(); ++i) {
     delete results[i];
   }
-  delete space_manager;
 
   if (first_return_value != nullptr && second_return_value != nullptr) {
     return Py_BuildValue("OO", first_return_value, second_return_value);

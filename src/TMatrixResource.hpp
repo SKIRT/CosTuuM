@@ -268,6 +268,9 @@ class TMatrixAuxiliarySpace {
   /*! @brief Grant access to @f$m>0@f$ computation task. */
   friend class TMatrixMAllTask;
 
+  /*! @brief Grant access to the alignment averaging task. */
+  friend class AlignmentAverageTask;
+
 private:
   /*! @brief Q factor terms involving MM interactions. */
   Matrix<std::complex<float_type>> _J11;
@@ -311,6 +314,9 @@ private:
   /*! @brief Temporary Wigner D function derivative array. */
   std::vector<float_type> _dwigner_d;
 
+  /*! @brief Temporary Clebsch-Gordan coefficient array. */
+  std::vector<float_type> _clebsch_gordan;
+
 public:
   /**
    * @brief Constructor.
@@ -328,7 +334,8 @@ public:
         _Q(2 * maximum_order, 2 * maximum_order),
         _RgQ(2 * maximum_order, 2 * maximum_order),
         _pivot_array(2 * maximum_order), _work(2 * maximum_order),
-        _wigner_d(maximum_order), _dwigner_d(maximum_order) {}
+        _wigner_d(maximum_order), _dwigner_d(maximum_order),
+        _clebsch_gordan((maximum_order + 1) * (2 * maximum_order + 1)) {}
 
   /**
    * @brief Get the size in memory of a hypothetical TMatrixAuxiliarySpace
@@ -354,6 +361,8 @@ public:
     size += 4 * maximum_order * sizeof(float_type);
     // wigner_d
     size += 2 * maximum_order * sizeof(float_type);
+    // clesch_gordan
+    size += (maximum_order + 1) * (2 * maximum_order + 1) * sizeof(float_type);
     return size;
   }
 
@@ -378,6 +387,9 @@ public:
     for (uint_fast32_t i = 0; i < _wigner_d.size(); ++i) {
       _wigner_d[i] = 0.;
       _dwigner_d[i] = 0.;
+    }
+    for (uint_fast32_t i = 0; i < _clebsch_gordan.size(); ++i) {
+      _clebsch_gordan[i] = 0.;
     }
   }
 };

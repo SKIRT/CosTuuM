@@ -1100,13 +1100,16 @@ public:
    * @param n1 First angular momentum quantum number, @f$n_1@f$.
    * @param n2 Second angular momentum quantum number, @f$n_2@f$.
    * @param N Total angular momentum quantum number, @f$N@f$.
-   * @return Corresponding Clebsch-Gordan coefficients for @f$M = 0@f$.
+   * @param C Vector to store the coefficients in (of size at least
+   * @f$(N+1) (2n_1+1)@f$).
+   * @return Number of coefficients stored in the result vector.
    * @tparam DATA_TYPE Data type of input and output values.
    */
   template <typename DATA_TYPE>
-  static inline std::vector<DATA_TYPE>
+  static inline uint_fast32_t
   get_clebsch_gordan_coefficients(const int_fast32_t n1, const int_fast32_t n2,
-                                  const int_fast32_t N) {
+                                  const int_fast32_t N,
+                                  std::vector<DATA_TYPE> &C) {
 
     // sanity checks on input values
     ctm_assert(n1 >= 0);
@@ -1122,7 +1125,6 @@ public:
     // (potentially overestimating the number of coefficients) and store
     // 2 * n1 + 1 coefficients per M, some of which will still be zero
     const int_fast32_t nsize = 2 * n1 + 1;
-    std::vector<DATA_TYPE> C((N + 1) * nsize, 0.);
 
     // first use the upper row recursion relation to get the coefficients
     // for M = N
@@ -1209,12 +1211,13 @@ public:
     }
 
     const int_fast32_t nmin = std::min(n1, n2);
-    std::vector<DATA_TYPE> CM0(2 * nmin + 1, 0.);
     for (int_fast32_t i = 0; i < 2 * nmin + 1; ++i) {
       const int_fast32_t m1 = i - nmin;
-      CM0[i] = C[m1 + n1];
+      // we only overwrite values that are no longer needed
+      C[i] = C[m1 + n1];
     }
-    return CM0;
+
+    return 2 * nmin + 1;
   }
 };
 
