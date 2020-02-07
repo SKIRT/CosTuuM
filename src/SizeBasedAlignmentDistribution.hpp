@@ -42,15 +42,25 @@ public:
    * @param aligned_orientation_distribution_type Type of orientation
    * distribution for aligned particles. Needs to be documented properly.
    * @param nmax Maximum order of spherical basis function expansions.
+   * @param oblate_aligned_orientation_distribution Orientation distribution
+   * for oblate aligned grains (if a custom type was chosen).
+   * @param prolate_aligned_orientation_distribution Orientation distribution
+   * for prolate aligned grains (if a custom type was chosen).
    */
   inline SizeBasedAlignmentDistribution(
       const float_type minimum_size,
       const int_fast32_t aligned_orientation_distribution_type,
-      uint_fast32_t nmax)
+      uint_fast32_t nmax,
+      OrientationDistribution *oblate_aligned_orientation_distribution =
+          nullptr,
+      OrientationDistribution *prolate_aligned_orientation_distribution =
+          nullptr)
       : _minimum_size(minimum_size),
         _non_aligned_orientation_distribution(nullptr),
-        _oblate_aligned_orientation_distribution(nullptr),
-        _prolate_aligned_orientation_distribution(nullptr) {
+        _oblate_aligned_orientation_distribution(
+            oblate_aligned_orientation_distribution),
+        _prolate_aligned_orientation_distribution(
+            prolate_aligned_orientation_distribution) {
 
     _non_aligned_orientation_distribution =
         new OrientationDistribution(2 * nmax);
@@ -73,6 +83,9 @@ public:
           new DisabledAlignmentOrientationDistribution();
       _prolate_aligned_orientation_distribution =
           new DisabledAlignmentOrientationDistribution();
+    } else if (aligned_orientation_distribution_type == 3) {
+      ctm_assert(_oblate_aligned_orientation_distribution != nullptr);
+      ctm_assert(_prolate_aligned_orientation_distribution != nullptr);
     } else {
       ctm_error("Unknown orientation distribution!");
     }

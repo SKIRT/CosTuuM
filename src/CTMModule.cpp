@@ -489,6 +489,7 @@ PyMODINIT_FUNC PyInit_CosTuuM() {
   PyModule_AddIntConstant(m, "DAVIS_GREENSTEIN_ALIGNMENT", 0);
   PyModule_AddIntConstant(m, "MISHCHENKO_ALIGNMENT", 1);
   PyModule_AddIntConstant(m, "DISABLE_ALIGNMENT", 2);
+  PyModule_AddIntConstant(m, "CUSTOM_ALIGNMENT", 3);
 
   // add constants for the different material types that can be used
   PyModule_AddIntConstant(m, "CARBON", 0);
@@ -505,6 +506,7 @@ PyMODINIT_FUNC PyInit_CosTuuM() {
   PyOrientationDistribution::initialize(m);
   PyMishchenkoOrientationDistribution::initialize(m);
   PyDavisGreensteinOrientationDistribution::initialize(m);
+  PyCustomOrientationDistribution::initialize(m);
 
   // return the module object
   return m;

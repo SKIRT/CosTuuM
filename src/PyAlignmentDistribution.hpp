@@ -10,6 +10,7 @@
 #define PYALIGNMENTDISTRIBUTION_HPP
 
 #include "Configuration.hpp"
+#include "PyOrientationDistribution.hpp"
 #include "SizeBasedAlignmentDistribution.hpp"
 
 #include <Python.h>
@@ -86,6 +87,10 @@ public:
    * Optional arguments are:
    *  - maximum_order: Maximum order of spherical basis function expansions
    *    (default: 100).
+   *  - oblate_orientation_distribution: Orientation distribution for oblate
+   *    aligned grains.
+   *  - prolate_orientation_distribution: Orientation distribution for prolate
+   *    aligned grains.
    *
    * @param self AlignmentDistribution wrapper object that is being initialised.
    * @param args Positional arguments.
@@ -101,6 +106,8 @@ public:
 
     // optional arguments
     uint_fast32_t maximum_order = 100;
+    PyOrientationDistribution *oblate_orientation_distribution = nullptr;
+    PyOrientationDistribution *prolate_orientation_distribution = nullptr;
 
     /// parse arguments
     // list of keywords (in the expected order)
@@ -109,7 +116,10 @@ public:
     // not doing this results in compilation warnings
     static char *kwlist[] = {strdup("minimum_size"),
                              strdup("aligned_orientation_distribution_type"),
-                             strdup("maximum_order"), nullptr};
+                             strdup("maximum_order"),
+                             strdup("oblate_orientation_distribution"),
+                             strdup("prolate_orientation_distribution"),
+                             nullptr};
 
     // allocate temporary variables to store double precision arguments
     double minimum_size_d;
@@ -120,8 +130,10 @@ public:
     // d is a double
     // I is an integer
     if (!PyArg_ParseTupleAndKeywords(
-            args, kwargs, "di|I", kwlist, &minimum_size_d,
-            &aligned_orientation_distribution_type_i, &maximum_order_i)) {
+            args, kwargs, "di|IOO", kwlist, &minimum_size_d,
+            &aligned_orientation_distribution_type_i, &maximum_order_i,
+            &oblate_orientation_distribution,
+            &prolate_orientation_distribution)) {
       // PyArg_ParseTupleAndKeywords will return 0 if a required argument was
       // missing, if an argument of the wrong type was provided or if the number
       // of arguments does not match the expectation
@@ -139,9 +151,18 @@ public:
         aligned_orientation_distribution_type_i;
     maximum_order = maximum_order_i;
 
+    if (oblate_orientation_distribution) {
+      Py_INCREF(oblate_orientation_distribution);
+    }
+    if (prolate_orientation_distribution) {
+      Py_INCREF(prolate_orientation_distribution);
+    }
+
     // create the object
     self->_alignment_distribution = new SizeBasedAlignmentDistribution(
-        minimum_size, aligned_orientation_distribution_type, maximum_order);
+        minimum_size, aligned_orientation_distribution_type, maximum_order,
+        oblate_orientation_distribution->_orientation_distribution,
+        prolate_orientation_distribution->_orientation_distribution);
 
     return 0;
   }

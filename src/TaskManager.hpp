@@ -714,8 +714,8 @@ public:
     // now figure out how many extra T-matrices we can store
     const size_t memory_left =
         _maximum_memory_usage - memory_manager.get_memory_used();
-    const uint_fast32_t number_of_extra_tmatrices =
-        std::min(memory_left / memory_per_Tmatrix, total_number_of_Tmatrices);
+    const uint_fast32_t number_of_extra_tmatrices = std::min(
+        memory_left / memory_per_Tmatrix, total_number_of_Tmatrices - 1);
     for (uint_fast32_t itmatrix = 0; itmatrix < number_of_extra_tmatrices;
          ++itmatrix) {
       memory_manager.account_for_resource<TMatrixResource>("TMatrixResource",

@@ -178,16 +178,20 @@ public:
 
   /**
    * @brief Initialise the coefficients of the distribution.
+   *
+   * @param absolute_error Absolute error for numerical quadratures.
+   * @param relative_error Relative error for numerical quadratures.
    */
-  inline void initialise() {
+  inline void initialise(const float_type absolute_error = 1.e-10,
+                         const float_type relative_error = 1.e-5) {
 
     // compute the normalisation factor
     {
       IntegrandArguments arguments(0, *this);
       const float_type norm =
           SpecialFunctions::gauss_legendre_quadrature<float_type>(
-              normalisation_integrand, 0., M_PI, &arguments, 100, 1000, 1.e-10,
-              1.e-5);
+              normalisation_integrand, 0., M_PI, &arguments, 100, 1000,
+              absolute_error, relative_error);
       _normalisation_factor = 1. / norm;
     }
 
@@ -196,7 +200,7 @@ public:
       _coefficients[i] =
           SpecialFunctions::gauss_legendre_quadrature<float_type>(
               integrand, 0., M_PI, &arguments, 2 * (i + 1), 100 * (i + 1),
-              1.e-10, 1.e-5);
+              absolute_error, relative_error);
     }
   }
 

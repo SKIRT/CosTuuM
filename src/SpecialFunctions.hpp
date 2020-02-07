@@ -780,7 +780,12 @@ public:
     }
 
     if (order == maximum_order) {
-      ctm_warning("Tolerance for quadrature could not be reached!");
+      ctm_warning("Tolerance for quadrature could not be reached (absolute "
+                  "difference: %g, relative difference: %g, targets: %g %g!",
+                  to_double(absolute_difference),
+                  to_double(relative_difference),
+                  to_double(desired_absolute_difference),
+                  to_double(desired_relative_difference));
     }
 
     return old_quadrature;

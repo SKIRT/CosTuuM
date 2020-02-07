@@ -29,6 +29,10 @@ static PyTypeObject MishchenkoOrientationDistributionType = {
 static PyTypeObject DavisGreensteinOrientationDistributionType = {
     PyVarObject_HEAD_INIT(nullptr, 0)};
 
+///*! @brief Type for CustomOrientationDistribution wrapper objects. */
+static PyTypeObject CustomOrientationDistributionType = {
+    PyVarObject_HEAD_INIT(nullptr, 0)};
+
 /**
  * @brief C struct wrapper around an OrientationDistribution object.
  */
@@ -432,6 +436,216 @@ public:
     PyModule_AddObject(module, "DavisGreensteinOrientationDistribution",
                        reinterpret_cast<PyObject *>(
                            &DavisGreensteinOrientationDistributionType));
+  }
+};
+
+/**
+ * @brief OrientationDistribution implementation that uses a user-provided
+ * distribution function.
+ */
+class CustomOrientationDistribution : public OrientationDistribution {
+private:
+  /*! @brief Python distribution function. */
+  PyObject *_python_function;
+
+  /*! @brief Additional arguments for the Python distribution function. */
+  PyObject *_additional_arguments;
+
+public:
+  /**
+   * @brief Constructor.
+   *
+   * @param nmax Highest order for which we store a coefficient.
+   * @param python_function Python distribution function.
+   * @param additional_arguments Additional arguments for the Python function.
+   */
+  inline CustomOrientationDistribution(const uint_fast32_t nmax,
+                                       PyObject *python_function,
+                                       PyObject *additional_arguments = nullptr)
+      : OrientationDistribution(nmax), _python_function(python_function),
+        _additional_arguments(additional_arguments) {
+    // tell Python we store a copy of the function object
+    Py_INCREF(_python_function);
+    if (_additional_arguments) {
+      Py_INCREF(_additional_arguments);
+    }
+    initialise(1.e-4, 1.e-4);
+  }
+
+  /**
+   * @brief Virtual destructor.
+   */
+  virtual ~CustomOrientationDistribution() {
+    // tell Python we are done with our local copy of the function object
+    Py_DECREF(_python_function);
+    if (_additional_arguments) {
+      Py_DECREF(_additional_arguments);
+    }
+  }
+
+  /**
+   * @brief Virtual function that contains an actual expression for the
+   * orientation distribution function as a function of the zenith angle
+   * @f$\beta{}@f$.
+   *
+   * The zenith angle @f$\beta{}@f$ represents the angle between the average
+   * orientation of the rotation axis of the spheroidal dust particles and the
+   * specific orientation for which we want to know the probability.
+   * A distribution function @f$p(\beta{}) = \delta{}(\beta{})@f$ e.g. would
+   * correspond to perfect alignment of all dust particles.
+   *
+   * The additional cosine and sine arguments are provided because they often
+   * appear in more complicated expressions for @f$p(\beta{})@f$, and also
+   * because they are computed in the integrand anyway.
+   *
+   * @param beta Zenith angle @f$\beta{} \in{} [0, \pi{}]@f$.
+   * @param cosbeta Cosine of the zenith angle, @f$\cos(\beta{})@f$.
+   * @param sinbeta Sine of the zenith angle, @f$\sin(\beta{})@f$.
+   * @return Orientation distribution function for that value of
+   * @f$\beta{}@f$, @f$p(\beta{})@f$.
+   */
+  virtual float_type operator()(const float_type beta, const float_type cosbeta,
+                                const float_type sinbeta) const {
+
+    // wrappers for float_type values
+    const double beta_d = static_cast<double>(beta);
+    // build the argument list for the Python function call
+    PyObject *arglist;
+
+    if (_additional_arguments) {
+      arglist = Py_BuildValue("(dO)", beta_d, _additional_arguments);
+    } else {
+      arglist = Py_BuildValue("(d)", beta_d);
+    }
+    // place the Python function call
+    PyObject *result = PyEval_CallObject(_python_function, arglist);
+    // we are done with the argument list
+    Py_DECREF(arglist);
+
+    if (result == nullptr) {
+      ctm_warning("Error during function call!");
+    }
+
+    // parse the result
+    double result_value;
+    // first check what kind of result we got
+    if (!PyFloat_Check(result)) {
+      // we did not get a float. Check if we got a NumPy array instead
+      if (PyArray_Check(result)) {
+        // we did
+        PyArrayObject *array = reinterpret_cast<PyArrayObject *>(result);
+        // check if we got a scalar array
+        if (!PyArray_CheckScalar(array)) {
+          // nope. Bail out.
+          ctm_error("Function returns an array!");
+        }
+        // check if the array has float elements
+        if (!PyArray_ISFLOAT(array)) {
+          // nope. That doesn't work.
+          ctm_error("Function does not return a float!");
+        }
+        // get the value by casting the array to a double
+        double *results = reinterpret_cast<double *>(PyArray_BYTES(array));
+        result_value = results[0];
+      } else {
+        // nope. Give up.
+        ctm_error("Function does not return a float!");
+      }
+    } else {
+      // get the real and imaginary parts of the complex number
+      result_value = PyFloat_AsDouble(result);
+    }
+
+    // we are done with the result
+    Py_DECREF(result);
+
+    return result_value;
+  }
+};
+
+/**
+ * @brief C wrapper for the CustomOrientationDistribution implementation.
+ */
+class PyCustomOrientationDistribution : public PyOrientationDistribution {
+public:
+  /**
+   * @brief init() function for a CustomOrientationDistribution object.
+   *
+   * Required arguments are:
+   *  - function: Python function that returns the value of the orientation
+   *    distribution for a given input zenith angle.
+   *
+   * Optional arguments are:
+   *  - order: Order of coefficient expansion for the distribution
+   *    (default: 100).
+   *  - additional_arguments: Additional arguments for the Python function.
+   *
+   * @param self OrientationDistribution wrapper object that is being
+   * initialised.
+   * @param args Positional arguments.
+   * @param kwargs Keyword arguments.
+   * @return 0 on success, 1 on failure.
+   */
+  static int init(PyOrientationDistribution *self, PyObject *args,
+                  PyObject *kwargs) {
+
+    // required arguments
+    PyObject *function;
+
+    // optional arguments
+    uint_fast32_t order = 100;
+    PyObject *additional_arguments = nullptr;
+
+    // list of keywords
+    static char *kwlist[] = {strdup("function"), strdup("order"),
+                             strdup("additional_arguments"), nullptr};
+
+    // temporary variables for integer arguments
+    unsigned int order_i = order;
+    // parse positional and keyword arguments
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|IO", kwlist, &function,
+                                     &order_i, &additional_arguments)) {
+      // again, we do not call ctm_error to avoid killing the Python interpreter
+      ctm_warning("Wrong arguments provided!");
+      return 1;
+    }
+    // unpack integer arguments
+    order = order_i;
+
+    self->_orientation_distribution = new CustomOrientationDistribution(
+        order, function, additional_arguments);
+
+    return 0;
+  }
+
+  /**
+   * @brief Initialize the PyCustomOrientationDistribution object and add it to
+   * the given module.
+   *
+   * @param module Module to add the object to.
+   */
+  inline static void initialize(PyObject *module) {
+
+    std::stringstream object_name;
+    object_name << PyModule_GetName(module);
+    object_name << ".CustomOrientationDistribution";
+    // set the required fields in the ObjectType struct
+    CustomOrientationDistributionType.tp_name = object_name.str().c_str();
+    CustomOrientationDistributionType.tp_basicsize =
+        sizeof(PyCustomOrientationDistribution);
+    CustomOrientationDistributionType.tp_dealloc = (destructor)dealloc;
+    CustomOrientationDistributionType.tp_methods =
+        OrientationDistributionMethods;
+    CustomOrientationDistributionType.tp_init = (initproc)init;
+    CustomOrientationDistributionType.tp_new = alloc;
+
+    // finalize creation of the CustomOrientationDistributionType
+    PyType_Ready(&CustomOrientationDistributionType);
+    // add a CustomOrientationDistributionType to the module
+    Py_INCREF(&CustomOrientationDistributionType);
+    PyModule_AddObject(
+        module, "CustomOrientationDistribution",
+        reinterpret_cast<PyObject *>(&CustomOrientationDistributionType));
   }
 };
 
