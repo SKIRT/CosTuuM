@@ -88,8 +88,16 @@ public:
                                            const float_type cos2beta)
       : OrientationDistribution(nmax), _p2(1.5 * cos2beta - 0.5) {
 
-    // initialise the distribution coefficients
-    initialise();
+    ctm_assert(cos2beta >= 0.2);
+    ctm_assert(cos2beta <= 0.6);
+
+    // note that we choose not to compute the coefficients using the integral,
+    // since we already know what the values of the coefficients should be...
+    for (uint_fast32_t i = 0; i < _coefficients.size(); ++i) {
+      _coefficients[i] = 0.;
+    }
+    _coefficients[0] = 1.;
+    _coefficients[2] = _p2;
   }
 
   virtual ~MishchenkoOrientationDistribution() {}
