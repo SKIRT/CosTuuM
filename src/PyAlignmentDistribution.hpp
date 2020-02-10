@@ -151,13 +151,6 @@ public:
         aligned_orientation_distribution_type_i;
     maximum_order = maximum_order_i;
 
-    if (oblate_orientation_distribution) {
-      Py_INCREF(oblate_orientation_distribution);
-    }
-    if (prolate_orientation_distribution) {
-      Py_INCREF(prolate_orientation_distribution);
-    }
-
     // create the object
     self->_alignment_distribution = new SizeBasedAlignmentDistribution(
         minimum_size, aligned_orientation_distribution_type, maximum_order,

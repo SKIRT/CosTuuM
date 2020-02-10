@@ -174,6 +174,23 @@ public:
   inline OrientationDistribution(const uint_fast32_t nmax)
       : _normalisation_factor(1.), _coefficients(nmax + 1, 0.) {}
 
+  /**
+   * @brief Copy constructor.
+   *
+   * Note that distributions constructed using this constructor will not provide
+   * a valid operator() function.
+   *
+   * @param original Original OrientationDistribution that is being copied.
+   */
+  inline OrientationDistribution(const OrientationDistribution &original)
+      : _normalisation_factor(0.),
+        _coefficients(original._coefficients.size()) {
+
+    for (uint_fast32_t i = 0; i < _coefficients.size(); ++i) {
+      _coefficients[i] = original._coefficients[i];
+    }
+  }
+
   virtual ~OrientationDistribution() {}
 
   /**

@@ -57,10 +57,8 @@ public:
           nullptr)
       : _minimum_size(minimum_size),
         _non_aligned_orientation_distribution(nullptr),
-        _oblate_aligned_orientation_distribution(
-            oblate_aligned_orientation_distribution),
-        _prolate_aligned_orientation_distribution(
-            prolate_aligned_orientation_distribution) {
+        _oblate_aligned_orientation_distribution(nullptr),
+        _prolate_aligned_orientation_distribution(nullptr) {
 
     _non_aligned_orientation_distribution =
         new OrientationDistribution(2 * nmax);
@@ -84,8 +82,12 @@ public:
       _prolate_aligned_orientation_distribution =
           new DisabledAlignmentOrientationDistribution();
     } else if (aligned_orientation_distribution_type == 3) {
-      ctm_assert(_oblate_aligned_orientation_distribution != nullptr);
-      ctm_assert(_prolate_aligned_orientation_distribution != nullptr);
+      ctm_assert(oblate_aligned_orientation_distribution != nullptr);
+      _oblate_aligned_orientation_distribution =
+          new OrientationDistribution(*oblate_aligned_orientation_distribution);
+      ctm_assert(prolate_aligned_orientation_distribution != nullptr);
+      _prolate_aligned_orientation_distribution = new OrientationDistribution(
+          *prolate_aligned_orientation_distribution);
     } else {
       ctm_error("Unknown orientation distribution!");
     }
