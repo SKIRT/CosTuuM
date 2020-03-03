@@ -212,7 +212,10 @@ public:
       _normalisation_factor = 1. / norm;
     }
 
-    for (uint_fast32_t i = 0; i < _coefficients.size(); ++i) {
+    // the value of the zeroth order coefficient is always 1, because of the
+    // orthogonality of the Legendre polynomials
+    _coefficients[0] = 1.;
+    for (uint_fast32_t i = 1; i < _coefficients.size(); ++i) {
       IntegrandArguments arguments(i, *this);
       _coefficients[i] =
           SpecialFunctions::gauss_legendre_quadrature<float_type>(
