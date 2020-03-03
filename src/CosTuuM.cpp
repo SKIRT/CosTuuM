@@ -63,8 +63,7 @@ int main(int argc, char **argv) {
   /// dust particle
   // size of the particle (in same units as the wavelength)
   const float_type axi = params.get_physical_value<QUANTITY_LENGTH>(
-                             "DustParticle:size", "10. micron") *
-                         1.e6;
+      "DustParticle:size", "10. micron");
   // ratio between the equal surface area sphere radius and equal volume sphere
   // radius (is recomputed if not equal to 1)
   float_type ratio_of_radii = 1.;
@@ -81,10 +80,8 @@ int main(int argc, char **argv) {
 
   /// radiation
   // wavelength of incoming radiation (in same units as the particle size)
-  const float_type wavelength =
-      params.get_physical_value<QUANTITY_LENGTH>(
-          "Radiation:incoming wavelength", "6.283185307 micron") *
-      1.e6;
+  const float_type wavelength = params.get_physical_value<QUANTITY_LENGTH>(
+      "Radiation:incoming wavelength", "6.283185307 micron");
 
   /// calculation
   // tolerance for the calculation
@@ -137,6 +134,11 @@ int main(int argc, char **argv) {
       ratio_of_radii, axis_ratio, axi, wavelength, maximum_order, tolerance,
       ndgs, mr, maximum_ngauss);
 
+  //  OrientationDistribution distribution(2 * active_Tmatrix->get_nmax());
+  //  TMatrix *average_Tmatrix =
+  //  TMatrixCalculator::apply_orientation_distribution(
+  //        *active_Tmatrix, distribution);
+
   /// compute a scattering event using the T-matrix
 
   Matrix<float_type> Z = active_Tmatrix->get_scattering_matrix(
@@ -163,7 +165,7 @@ int main(int argc, char **argv) {
   ctm_warning("K[3,:] = %g %g %g %g", double(K(3, 0)), double(K(3, 1)),
               double(K(3, 2)), double(K(3, 3)));
 
-  Z.binary_dump(parser.get_value<std::string>("output"));
+  K.binary_dump(parser.get_value<std::string>("output"));
 
   // clean up
   delete active_Tmatrix;

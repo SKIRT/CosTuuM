@@ -102,7 +102,45 @@ set(TESTDRAINEDUSTPROPERTIES_SOURCES
 add_unit_test(NAME testDraineDustProperties
               SOURCES ${TESTDRAINEDUSTPROPERTIES_SOURCES})
 
+## Unit test for Quicksched library dependency
+if(HAVE_TASKS)
+  set(TESTQUICKSCHED_SOURCES
+      testQuickSched.cpp
+  )
+  add_unit_test(NAME testQuickSched
+                SOURCES ${TESTQUICKSCHED_SOURCES}
+                LIBS ${LIBQUICKSCHED})
+endif(HAVE_TASKS)
+
+## Unit test for task based TMatrix calculation
+if(HAVE_TASKS)
+  set(TESTTASKBASEDTMATRIXCALCULATION_SOURCES
+      testTaskBasedTMatrixCalculation.cpp
+  )
+  add_unit_test(NAME testTaskBasedTMatrixCalculation
+                SOURCES ${TESTTASKBASEDTMATRIXCALCULATION_SOURCES}
+                LIBS ${LIBQUICKSCHED})
+endif(HAVE_TASKS)
+
+## Unit test for DraineHensleyShapeDistribution
+set(TESTDRAINEHENSLEYSHAPEDISTRIBUTION_SOURCES
+    testDraineHensleyShapeDistribution.cpp
+)
+add_unit_test(NAME testDraineHensleyShapeDistribution
+              SOURCES ${TESTDRAINEHENSLEYSHAPEDISTRIBUTION_SOURCES})
+
+## Unit test for TaskManager
+if(HAVE_TASKS)
+  set(TESTTASKMANAGER_SOURCES
+      testTaskManager.cpp
+  )
+  add_unit_test(NAME testTaskManager
+                SOURCES ${TESTTASKMANAGER_SOURCES}
+                LIBS ${LIBQUICKSCHED})
+endif(HAVE_TASKS)
+
 ### Done adding unit tests. Create the 'make check' target #####################
 ### Do not touch these lines unless you know what you're doing! ################
+add_custom_target(buildTests DEPENDS ${TESTNAMES})
 add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
                         DEPENDS ${TESTNAMES})

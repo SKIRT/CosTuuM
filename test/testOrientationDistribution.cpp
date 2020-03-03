@@ -26,6 +26,7 @@ using namespace std;
 int main(int argc, char **argv) {
 
   OrientationDistribution od(100);
+  od.initialise();
 
   std::ofstream ofile("test_orientationdistribution.txt");
   ofile << "# n\tp_n\n";

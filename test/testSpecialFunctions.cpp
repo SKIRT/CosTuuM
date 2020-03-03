@@ -302,6 +302,26 @@ int main(int argc, char **argv) {
     gfile << x[i] << "\t" << w[i] << "\n";
   }
 
+  // test spherical shell integration with Gauss-Legendre quadrature
+  {
+    const uint_fast32_t ngauss = 100;
+    std::vector<float_type> cos_theta(ngauss), cos_theta_weights(ngauss);
+    std::vector<float_type> phi(ngauss), phi_weights(ngauss);
+    SpecialFunctions::get_gauss_legendre_points_and_weights<float_type>(
+        ngauss, cos_theta, cos_theta_weights);
+    SpecialFunctions::get_gauss_legendre_points_and_weights_ab<float_type>(
+        ngauss, 0., 2. * M_PI, phi, phi_weights);
+    float_type result = 0.;
+    for (uint_fast32_t i = 0; i < ngauss; ++i) {
+      for (uint_fast32_t j = 0; j < ngauss; ++j) {
+        result += cos_theta_weights[i] * phi_weights[j] *
+                  (acos(cos_theta[i]) + phi[j]);
+      }
+    }
+    ctm_warning("Result: %g", double(result));
+    assert_values_equal_rel(double(result), 6. * M_PI * M_PI, 1.e-15);
+  }
+
   /// Clebsch-Gordan coefficients
   /// We test our implementation against the values for all coefficients
   /// with n1 = 1 and n2 = 1 provided on Wikipedia:
@@ -419,53 +439,50 @@ int main(int argc, char **argv) {
     ctm_warning("Random large value: %g", double(large_coefficient));
     assert_condition(double(large_coefficient) == double(large_coefficient));
 
+    std::vector<float_type> CG(40401, 0.);
     // test the other Clebsch-Gordan function for normal input values
-    std::vector<float_type> C112 =
-        SpecialFunctions::get_clebsch_gordan_coefficients<float_type>(1, 1, 2);
-    assert_condition(C112.size() == 3);
-    assert_condition(C112[0] == C1m11120);
-    assert_condition(C112[1] == C101020);
-    assert_condition(C112[2] == C111m120);
+    uint_fast32_t CGsize =
+        SpecialFunctions::get_clebsch_gordan_coefficients<float_type>(1, 1, 2,
+                                                                      CG);
+    assert_condition(CGsize == 3);
+    assert_condition(CG[0] == C1m11120);
+    assert_condition(CG[1] == C101020);
+    assert_condition(CG[2] == C111m120);
 
     // test the other Clebsch-Gordan function for unequal n1 and n2
-    std::vector<float_type> C213 =
-        SpecialFunctions::get_clebsch_gordan_coefficients<float_type>(2, 1, 3);
-    assert_condition(C213.size() == 3);
-    assert_values_equal_rel(double(C213[0]), std::sqrt(1. / 5.), 1.e-10);
-    assert_values_equal_rel(double(C213[1]), std::sqrt(3. / 5.), 1.e-10);
-    assert_values_equal_rel(double(C213[2]), std::sqrt(1. / 5.), 1.e-10);
+    CGsize = SpecialFunctions::get_clebsch_gordan_coefficients<float_type>(
+        2, 1, 3, CG);
+    assert_condition(CGsize == 3);
+    assert_values_equal_rel(double(CG[0]), std::sqrt(1. / 5.), 1.e-10);
+    assert_values_equal_rel(double(CG[1]), std::sqrt(3. / 5.), 1.e-10);
+    assert_values_equal_rel(double(CG[2]), std::sqrt(1. / 5.), 1.e-10);
 
-    std::vector<float_type> C212 =
-        SpecialFunctions::get_clebsch_gordan_coefficients<float_type>(2, 1, 2);
-    assert_condition(C213.size() == 3);
-    assert_values_equal_rel(double(C212[0]), -std::sqrt(0.5), 1.e-10);
-    assert_values_equal_tol(double(C212[1]), 0., 1.e-10);
-    assert_values_equal_rel(double(C212[2]), std::sqrt(0.5), 1.e-10);
+    CGsize = SpecialFunctions::get_clebsch_gordan_coefficients<float_type>(
+        2, 1, 2, CG);
+    assert_condition(CGsize == 3);
+    assert_values_equal_rel(double(CG[0]), -std::sqrt(0.5), 1.e-10);
+    assert_values_equal_tol(double(CG[1]), 0., 1.e-10);
+    assert_values_equal_rel(double(CG[2]), std::sqrt(0.5), 1.e-10);
 
-    std::vector<float_type> C122 =
-        SpecialFunctions::get_clebsch_gordan_coefficients<float_type>(1, 2, 2);
-    assert_condition(C213.size() == 3);
-    assert_values_equal_rel(double(C122[0]), -std::sqrt(0.5), 1.e-10);
-    assert_values_equal_tol(double(C122[1]), 0., 1.e-10);
-    assert_values_equal_rel(double(C122[2]), std::sqrt(0.5), 1.e-10);
+    CGsize = SpecialFunctions::get_clebsch_gordan_coefficients<float_type>(
+        1, 2, 2, CG);
+    assert_condition(CGsize == 3);
+    assert_values_equal_rel(double(CG[0]), -std::sqrt(0.5), 1.e-10);
+    assert_values_equal_tol(double(CG[1]), 0., 1.e-10);
+    assert_values_equal_rel(double(CG[2]), std::sqrt(0.5), 1.e-10);
 
     // test the normalisation and symmetry of the Clebsch-Gordan function for
     // large n
-    std::vector<float_type> large_coefficients =
-        SpecialFunctions::get_clebsch_gordan_coefficients<float_type>(100, 120,
-                                                                      220);
+    CGsize = SpecialFunctions::get_clebsch_gordan_coefficients<float_type>(
+        100, 120, 220, CG);
     float_type norm = 0.;
-    for (uint_fast32_t i = 0; i < large_coefficients.size(); ++i) {
-      norm += large_coefficients[i] * large_coefficients[i];
-      ctm_warning(
-          "large coefficient %" PRIuFAST32 ": %g (%g)", i,
-          double(large_coefficients[i]),
-          double(large_coefficients[large_coefficients.size() - 1 - i]));
-      if (i != large_coefficients.size() / 2) {
-        assert_values_equal_rel(
-            double(large_coefficients[i]),
-            double(large_coefficients[large_coefficients.size() - 1 - i]),
-            1.e-10);
+    for (uint_fast32_t i = 0; i < CGsize; ++i) {
+      norm += CG[i] * CG[i];
+      ctm_warning("large coefficient %" PRIuFAST32 ": %g (%g)", i,
+                  double(CG[i]), double(CG[CGsize - 1 - i]));
+      if (i != CGsize / 2) {
+        assert_values_equal_rel(double(CG[i]), double(CG[CGsize - 1 - i]),
+                                1.e-10);
       }
     }
     assert_values_equal_rel(double(norm), 1., 1.e-10);

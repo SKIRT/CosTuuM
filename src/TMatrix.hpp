@@ -415,9 +415,6 @@ private:
   /*! @brief Number of Gauss-Legendre quadrature points, @f$n_{GL}@f$. */
   const uint_fast32_t _ngauss;
 
-  /*! @brief Precomputed factors @f$n(n+1)@f$ (array of size @f$n_{max}@f$). */
-  std::vector<float_type> _an;
-
   /*! @brief Precomputed factors @f$\sqrt{\frac{2n+1}{n(n+1)}}@f$ (array of size
    *  @f$n_{max}@f$). */
   std::vector<float_type> _dd;
@@ -518,9 +515,8 @@ public:
                  const std::complex<float_type> refractive_index,
                  const float_type R_V, const float_type axis_ratio,
                  const uint_fast32_t nmax, const uint_fast32_t ngauss)
-      : _nmax(nmax), _ngauss(ngauss), _an(nmax, float_type(0.)),
-        _dd(nmax, float_type(0.)), _ann(nmax, nmax),
-        _costheta(2 * ngauss, float_type(0.)),
+      : _nmax(nmax), _ngauss(ngauss), _dd(nmax, float_type(0.)),
+        _ann(nmax, nmax), _costheta(2 * ngauss, float_type(0.)),
         _sinthetainv(2 * ngauss, float_type(0.)),
         _sintheta2inv(2 * ngauss, float_type(0.)),
         _weights(2 * ngauss, float_type(0.)), _r2(2 * ngauss, float_type(0.)),
@@ -540,7 +536,6 @@ public:
 
     for (uint_fast32_t ni = 0; ni < nmax; ++ni) {
       const float_type nn((ni + 2.) * (ni + 1.));
-      _an[ni] = nn;
       const float_type d = sqrt((2. * (ni + 1.) + 1.) / nn);
       _dd[ni] = d;
       for (uint_fast32_t nj = 0; nj < ni + 1; ++nj) {
@@ -553,17 +548,18 @@ public:
         2 * ngauss, _costheta, _weights);
     for (uint_fast32_t ig = 0; ig < ngauss; ++ig) {
       const float_type this_sintheta2inv =
-          1. / (1. - _costheta[ig] * _costheta[ig]);
+          1. / ((1. - _costheta[ig]) * (1. + _costheta[ig]));
       _sintheta2inv[ig] = this_sintheta2inv;
       _sintheta2inv[2 * ngauss - ig - 1] = this_sintheta2inv;
       const float_type this_sinthetainv = sqrt(this_sintheta2inv);
       _sinthetainv[ig] = this_sinthetainv;
       _sinthetainv[2 * ngauss - ig - 1] = this_sinthetainv;
     }
-    SpecialFunctions::get_r_dr_spheroid(_costheta, R_V, axis_ratio, _r2,
-                                        _dr_over_r);
+    SpecialFunctions::get_r_dr_spheroid(&_costheta[0], _costheta.size(),
+                                        axis_ratio, &_r2[0], &_dr_over_r[0]);
     const std::complex<float_type> mrinv = float_type(1.) / refractive_index;
     for (uint_fast32_t i = 0; i < 2 * ngauss; ++i) {
+      _r2[i] *= R_V * R_V;
       const float_type r = sqrt(_r2[i]);
       _kr[i] = _k * r;
       _krmr[i] = refractive_index * _kr[i];
@@ -581,7 +577,6 @@ public:
 
     const uint_fast32_t nmax2 = 2 * nmax;
 
-    std::vector<int_fast8_t> signs(nmax2);
     Matrix<float_type> wigner_d(2 * ngauss, nmax);
     Matrix<float_type> dwigner_d(2 * ngauss, nmax);
     std::vector<float_type> wr2(ngauss);
@@ -592,19 +587,15 @@ public:
     Matrix<std::complex<float_type>> Q(nmax2, nmax2);
     Matrix<std::complex<float_type>> RgQ(nmax2, nmax2);
 
-    int_fast8_t si = 1;
-    for (uint_fast32_t m = 0; m < nmax2; ++m) {
-      si = -si;
-      signs[m] = si;
-    }
     for (uint_fast32_t ig = 1; ig < ngauss + 1; ++ig) {
       const uint_fast32_t i1 = ngauss + ig;
       const uint_fast32_t i2 = ngauss - ig + 1;
       std::vector<float_type> dv1(nmax), dv2(nmax);
       SpecialFunctions::wigner_dn_0m(_costheta[i1 - 1], nmax, 0, &dv1[0],
                                      &dv2[0]);
+      int_fast8_t si = 1;
       for (uint_fast32_t n = 0; n < nmax; ++n) {
-        si = signs[n];
+        si = -si;
         wigner_d(i1 - 1, n) = dv1[n];
         wigner_d(i2 - 1, n) = si * dv1[n];
         dwigner_d(i1 - 1, n) = dv2[n];
@@ -616,14 +607,14 @@ public:
     }
     for (uint_fast32_t n1 = 1; n1 < nmax + 1; ++n1) {
       // n1 * (n1 + 1)
-      const float_type n1n1p1 = _an[n1 - 1];
+      const float_type n1n1p1 = n1 * (n1 + 1.);
       for (uint_fast32_t n2 = 1; n2 < nmax + 1; ++n2) {
         // n2 * (n2 + 1)
-        const float_type n2n2p1 = _an[n2 - 1];
+        const float_type n2n2p1 = n2 * (n2 + 1.);
 
         std::complex<float_type> this_J12, this_J21, this_RgJ12, this_RgJ21;
         // filter out half the components because of symmetry
-        if (signs[n1 + n2 - 1] > 0) {
+        if ((n1 + n2) % 2 == 0) {
           for (uint_fast32_t ig = 1; ig < ngauss + 1; ++ig) {
             const float_type wigner_n1 = wigner_d(ig - 1, n1 - 1);
             const float_type dwigner_n1 = dwigner_d(ig - 1, n1 - 1);
@@ -726,7 +717,7 @@ public:
     }
 
     // func_TT
-    Q.plu_inverse();
+    Q.plu_inverse(nmax2);
 
     for (uint_fast32_t i = 0; i < nmax; ++i) {
       for (uint_fast32_t j = 0; j < nmax; ++j) {
@@ -756,11 +747,9 @@ public:
     for (uint_fast32_t m = 1; m < _nmax + 1; ++m) {
 
       const float_type m2 = m * m;
-      const uint_fast32_t nmax2 = 2 * _nmax;
       const uint_fast32_t nm = _nmax + 1 - m;
       const uint_fast32_t nm2 = 2 * nm;
 
-      std::vector<int_fast8_t> signs(nmax2);
       Matrix<float_type> wigner_d(2 * _ngauss, _nmax);
       Matrix<float_type> dwigner_d(2 * _ngauss, _nmax);
       std::vector<float_type> wr2(_ngauss);
@@ -777,23 +766,19 @@ public:
       std::vector<float_type> ds(_ngauss);
       std::vector<float_type> dss(_ngauss);
 
-      int_fast8_t si = 1;
-      for (uint_fast32_t n = 0; n < nmax2; ++n) {
-        si = -si;
-        signs[n] = si;
-      }
       for (uint_fast32_t ig = 1; ig < _ngauss + 1; ++ig) {
         const uint_fast32_t i1 = _ngauss + ig;
         const uint_fast32_t i2 = _ngauss + 1 - ig;
         std::vector<float_type> dv1(_nmax), dv2(_nmax);
         SpecialFunctions::wigner_dn_0m(_costheta[i1 - 1], _nmax, m, &dv1[0],
                                        &dv2[0]);
+        int_fast8_t sign = 1;
         for (uint_fast32_t n = 0; n < _nmax; ++n) {
-          si = signs[n];
+          sign = -sign;
           wigner_d(i1 - 1, n) = dv1[n];
-          wigner_d(i2 - 1, n) = si * dv1[n];
+          wigner_d(i2 - 1, n) = sign * dv1[n];
           dwigner_d(i1 - 1, n) = dv2[n];
-          dwigner_d(i2 - 1, n) = -si * dv2[n];
+          dwigner_d(i2 - 1, n) = -sign * dv2[n];
         }
       }
       for (uint_fast32_t ig = 0; ig < _ngauss; ++ig) {
@@ -804,14 +789,14 @@ public:
       }
       for (uint_fast32_t n1 = m; n1 < _nmax + 1; ++n1) {
         // n1 * (n1 + 1)
-        const float_type n1n1p1 = _an[n1 - 1];
+        const float_type n1n1p1 = n1 * (n1 + 1.);
         for (uint_fast32_t n2 = m; n2 < _nmax + 1; ++n2) {
           // n2 * (n2 + 1)
-          const float_type n2n2p1 = _an[n2 - 1];
+          const float_type n2n2p1 = n2 * (n2 + 1.);
 
           std::complex<float_type> this_J11, this_J12, this_J21, this_J22,
               this_RgJ11, this_RgJ12, this_RgJ21, this_RgJ22;
-          const int_fast8_t si = signs[n1 + n2 - 1];
+          const int_fast8_t si = ((n1 + n2) % 2 == 0) ? 1 : -1;
           for (uint_fast32_t ig = 0; ig < _ngauss; ++ig) {
             const float_type wigner_n1 = wigner_d(ig, n1 - 1);
             const float_type dwigner_n1 = dwigner_d(ig, n1 - 1);
@@ -973,7 +958,7 @@ public:
         }
       }
 
-      Q.plu_inverse();
+      Q.plu_inverse(nm2);
 
       for (uint_fast32_t i = 0; i < nm; ++i) {
         for (uint_fast32_t j = 0; j < nm; ++j) {
@@ -1079,6 +1064,211 @@ public:
   /**
    * @brief Get the forward scattering matrix @f$S@f$ for a scattering event
    * from the given input angles to the given output angles at a particle with
+   * its symmetry axis fixed to the @f$z@f$-axis of the reference frame.
+   *
+   * @param costheta_in Cosine of the input zenith angle,
+   * @f$\cos(\theta{}_i)@f$.
+   * @param sintheta_in Sine of the input zenith angle,
+   * @f$\sin(\theta{}_i)@f$.
+   * @param sintheta_in_inv Inverse sine of the input zenith angle,
+   * @f$\frac{1}{\sin(\theta{}_i)}@f$.
+   * @param cosphi_in Cosine of the input azimuth angle,
+   * @f$\cos(\phi{}_i)@f$.
+   * @param sinphi_in Sine of the input azimuth angle,
+   * @f$\sin(\phi{}_i)@f$.
+   * @param costheta_out Cosine of the output zenith angle,
+   * @f$\cos(\theta{}_s)@f$.
+   * @param sintheta_out Sine of the output zenith angle,
+   * @f$\sin(\theta{}_s)@f$.
+   * @param sintheta_out_inv Inverse sine of the output zenith angle,
+   * @f$\frac{1}{\sin(\theta{}_s)}@f$.
+   * @param cosphi_out Cosine of the output azimuth angle,
+   * @f$\cos(\phi{}_s)@f$.
+   * @param sinphi_out Sine of the output azimuth angle,
+   * @f$\sin(\phi{}_s)@f$.
+   * @return Scattering matrix for this scattering event.
+   */
+  inline Matrix<std::complex<float_type>> get_forward_scattering_matrix(
+      const float_type costheta_in, const float_type sintheta_in,
+      const float_type sintheta_in_inv, const float_type cosphi_in,
+      const float_type sinphi_in, const float_type costheta_out,
+      const float_type sintheta_out, const float_type sintheta_out_inv,
+      const float_type cosphi_out, const float_type sinphi_out) const {
+
+    // precompute the c factors
+    const std::complex<float_type> icompl(0., 1.);
+    Matrix<std::complex<float_type>> c(_nmax, _nmax);
+    std::complex<float_type> icomp_pow_nn = icompl;
+    for (uint_fast32_t nn = 1; nn < _nmax + 1; ++nn) {
+      std::complex<float_type> icomp_pow_m_n_m_1(-1.);
+      for (uint_fast32_t n = 1; n < _nmax + 1; ++n) {
+        // icomp_pow_nn*icomp_pow_m_n_m_1 now equals i^(nn - n - 1)
+        c(n - 1, nn - 1) = icomp_pow_m_n_m_1 * icomp_pow_nn *
+                           float_type(sqrt((2. * n + 1.) * (2. * nn + 1.) /
+                                           (n * nn * (n + 1.) * (nn + 1.))));
+        icomp_pow_m_n_m_1 /= icompl;
+      }
+      icomp_pow_nn *= icompl;
+    }
+
+    // now compute the matrix S^P
+    // we precompute e^{i(phi_out-phi_in)}
+    const std::complex<float_type> expiphi_p_out_m_in(
+        cosphi_out * cosphi_in + sinphi_out * sinphi_in,
+        sinphi_out * cosphi_in - cosphi_out * sinphi_in);
+    // e^{im(phi_out-phi_in)} is computed recursively, starting with the value
+    // for m=0: 1
+    std::complex<float_type> expimphi_p_out_m_in(1., 0.);
+    Matrix<std::complex<float_type>> S(2, 2);
+    const TMatrix &T = *this;
+    // instead of summing over n and n', we sum over m, since then we can reuse
+    // the e^{im(phi_out-phi_in)}, pi and tau factors
+    for (uint_fast32_t m = 0; m < _nmax + 1; ++m) {
+      // only n and n' values larger than or equal to m have non-trivial
+      // contributions to the S matrix
+      const uint_fast32_t nmin = std::max(m, static_cast<uint_fast32_t>(1));
+
+      // precompute the pi and tau functions for this value of m
+      std::vector<float_type> pi_in(_nmax), tau_in(_nmax);
+      SpecialFunctions::wigner_dn_0m_sinx(costheta_in, sintheta_in,
+                                          sintheta_in_inv, _nmax, m, &pi_in[0],
+                                          &tau_in[0]);
+      std::vector<float_type> pi_out(_nmax), tau_out(_nmax);
+      SpecialFunctions::wigner_dn_0m_sinx(costheta_out, sintheta_out,
+                                          sintheta_out_inv, _nmax, m,
+                                          &pi_out[0], &tau_out[0]);
+
+      // we get the real and imaginary part of e^{im\phi{}} and multiply with
+      // 2 to account for both m and -m
+      const float_type fcos = 2. * expimphi_p_out_m_in.real();
+      const float_type fsin = 2. * expimphi_p_out_m_in.imag();
+      // recurse the exponential for the next iteration
+      expimphi_p_out_m_in *= expiphi_p_out_m_in;
+
+      // now perform the actual sums over n and n'
+      for (uint_fast32_t nn = nmin; nn < _nmax + 1; ++nn) {
+
+        // get the specific pi and tau for this n'
+        const float_type pi_nn = m * pi_in[nn - 1];
+        const float_type tau_nn = tau_in[nn - 1];
+
+        for (uint_fast32_t n = nmin; n < _nmax + 1; ++n) {
+
+          // get the specific pi and tau for this n
+          const float_type pi_n = m * pi_out[n - 1];
+          const float_type tau_n = tau_out[n - 1];
+
+          // get the c factor for these values of n and n'
+          const std::complex<float_type> c_nnn = c(n - 1, nn - 1);
+
+          // get the T11 and T22 elements for this m, n and n' (we need these
+          // in all cases)
+          const std::complex<float_type> T11nmnnm = T(0, n, m, 0, nn, m);
+          const std::complex<float_type> T22nmnnm = T(1, n, m, 1, nn, m);
+          // if m=0, the T12 and T21 matrices are trivially zero, and we can
+          // simplify the expression for S
+          if (m == 0) {
+            const std::complex<float_type> factor = c_nnn * tau_n * tau_nn;
+            S(0, 0) += factor * T22nmnnm;
+            S(1, 1) += factor * T11nmnnm;
+          } else {
+            // in the general case m=/=0, we also need the T12 and T21 elements
+            // for this m, n and n'
+            const std::complex<float_type> T12nmnnm = T(0, n, m, 1, nn, m);
+            const std::complex<float_type> T21nmnnm = T(1, n, m, 0, nn, m);
+
+            // due to m symmetry, S11 and S22 only have the cosine factor,
+            // while S12 and S21 only have the sine factor
+            const std::complex<float_type> real_factor = c_nnn * fcos;
+            const std::complex<float_type> imag_factor = c_nnn * fsin;
+
+            // precompute the pi and tau factor combinations
+            const float_type pi_pi = pi_n * pi_nn;
+            const float_type pi_tau = pi_n * tau_nn;
+            const float_type tau_pi = tau_n * pi_nn;
+            const float_type tau_tau = tau_n * tau_nn;
+
+            S(0, 0) += real_factor * (T11nmnnm * pi_pi + T21nmnnm * tau_pi +
+                                      T12nmnnm * pi_tau + T22nmnnm * tau_tau);
+            S(0, 1) += imag_factor * (T11nmnnm * pi_tau + T21nmnnm * tau_tau +
+                                      T12nmnnm * pi_pi + T22nmnnm * tau_pi);
+            S(1, 0) -= imag_factor * (T11nmnnm * tau_pi + T21nmnnm * pi_pi +
+                                      T12nmnnm * tau_tau + T22nmnnm * pi_tau);
+            S(1, 1) += real_factor * (T11nmnnm * tau_tau + T21nmnnm * pi_tau +
+                                      T12nmnnm * tau_pi + T22nmnnm * pi_pi);
+          }
+        }
+      }
+    }
+    // now divide all expressions by the wavenumber
+    const float_type kinv = 1. / _k;
+    S(0, 0) *= kinv;
+    S(0, 1) *= kinv;
+    S(1, 0) *= kinv;
+    S(1, 1) *= kinv;
+
+    return S;
+  }
+
+  /**
+   * @brief Get the forward scattering matrix @f$S@f$ for a scattering event
+   * from the given input angles to the given output angles at a particle with
+   * its symmetry axis fixed to the @f$z@f$-axis of the reference frame.
+   *
+   * @param theta_in_radians Zenith angle of the incoming photon,
+   * @f$\theta{}_i@f$ (in radians).
+   * @param phi_in_radians Azimuth angle of the incoming photon, @f$\phi{}_i@f$
+   * (in radians).
+   * @param theta_out_radians Zenith angle of the scattered photon,
+   * @f$\theta{}_s@f$ (in radians).
+   * @param phi_out_radians Azimuth angle fo the scattered photon,
+   * @f$\phi{}_s@f$ (in radians).
+   * @return Scattering matrix for this scattering event.
+   */
+  inline Matrix<std::complex<float_type>>
+  get_forward_scattering_matrix(const float_type theta_in_radians,
+                                const float_type phi_in_radians,
+                                const float_type theta_out_radians,
+                                const float_type phi_out_radians) const {
+
+    // Mishchenko includes some (buggy) corrections for small angles
+    // might be worth looking into this in a later stage...
+
+    // compute all sines and cosines in one go; we need all of them anyway
+    const float_type costheta_l_in = cos(theta_in_radians);
+    const float_type sintheta_l_in = sin(theta_in_radians);
+    const float_type costheta_l_out = cos(theta_out_radians);
+    const float_type sintheta_l_out = sin(theta_out_radians);
+    const float_type cosphi_l_in = cos(phi_in_radians);
+    const float_type sinphi_l_in = sin(phi_in_radians);
+    const float_type cosphi_l_out = cos(phi_out_radians);
+    const float_type sinphi_l_out = sin(phi_out_radians);
+
+    float_type sintheta_l_in_inv;
+    if (sintheta_l_in != 0.) {
+      sintheta_l_in_inv = 1. / sintheta_l_in;
+    } else {
+      // this value will not be used, but we set it to something anyway
+      sintheta_l_in_inv = 9000.;
+    }
+
+    float_type sintheta_l_out_inv;
+    if (sintheta_l_out != 0.) {
+      sintheta_l_out_inv = 1. / sintheta_l_out;
+    } else {
+      // this value will not be used, but we set it to something anyway
+      sintheta_l_out_inv = 9000.;
+    }
+
+    return get_forward_scattering_matrix(
+        costheta_l_in, sintheta_l_in, sintheta_l_in_inv, cosphi_l_in,
+        sinphi_l_in, costheta_l_out, sintheta_l_out, sintheta_l_out_inv,
+        cosphi_l_out, sinphi_l_out);
+  }
+
+  /**
+   * @brief Get the forward scattering matrix @f$S@f$ for a scattering event
+   * from the given input angles to the given output angles at a particle with
    * the given orientation.
    *
    * @param alpha_radians Azimuth angle of the particle's rotation axis,
@@ -1125,8 +1315,7 @@ public:
 
     const float_type costheta_p_in =
         costheta_l_in * cosbeta + sintheta_l_in * sinbeta * cosphirel_in;
-    const float_type sintheta_p_in =
-        sqrt((1. - costheta_p_in) * (1. + costheta_p_in));
+    const float_type sintheta_p_in = sin(acos(costheta_p_in));
     float_type cosphi_p_in, sinphi_p_in, sintheta_p_in_inv;
     if (sintheta_p_in != 0.) {
       sintheta_p_in_inv = 1. / sintheta_p_in;
@@ -1148,8 +1337,7 @@ public:
 
     const float_type costheta_p_out =
         costheta_l_out * cosbeta + sintheta_l_out * sinbeta * cosphirel_out;
-    const float_type sintheta_p_out =
-        sqrt((1. - costheta_p_out) * (1. + costheta_p_out));
+    const float_type sintheta_p_out = sin(acos(costheta_p_out));
     float_type cosphi_p_out, sinphi_p_out, sintheta_p_out_inv;
     if (sintheta_p_out != 0.) {
       sintheta_p_out_inv = 1. / sintheta_p_out;
@@ -1252,117 +1440,10 @@ public:
     R_out(1, 0) = -R_out(1, 0) * d;
     R_out(1, 1) = temp * d;
 
-    // precompute the c factors
-    const std::complex<float_type> icompl(0., 1.);
-    Matrix<std::complex<float_type>> c(_nmax, _nmax);
-    std::complex<float_type> icomp_pow_nn = icompl;
-    for (uint_fast32_t nn = 1; nn < _nmax + 1; ++nn) {
-      std::complex<float_type> icomp_pow_m_n_m_1(-1.);
-      for (uint_fast32_t n = 1; n < _nmax + 1; ++n) {
-        // icomp_pow_nn*icomp_pow_m_n_m_1 now equals i^(nn - n - 1)
-        c(n - 1, nn - 1) = icomp_pow_m_n_m_1 * icomp_pow_nn *
-                           float_type(sqrt((2. * n + 1.) * (2. * nn + 1.) /
-                                           (n * nn * (n + 1.) * (nn + 1.))));
-        icomp_pow_m_n_m_1 /= icompl;
-      }
-      icomp_pow_nn *= icompl;
-    }
-
-    // now compute the matrix S^P
-    // we precompute e^{i(phi_out-phi_in)}
-    const std::complex<float_type> expiphi_p_out_m_in(
-        cosphi_p_out * cosphi_p_in + sinphi_p_out * sinphi_p_in,
-        sinphi_p_out * cosphi_p_in - cosphi_p_out * sinphi_p_in);
-    // e^{im(phi_out-phi_in)} is computed recursively, starting with the value
-    // for m=0: 1
-    std::complex<float_type> expimphi_p_out_m_in(1., 0.);
-    Matrix<std::complex<float_type>> S(2, 2);
-    const TMatrix &T = *this;
-    // instead of summing over n and n', we sum over m, since then we can reuse
-    // the e^{im(phi_out-phi_in)}, pi and tau factors
-    for (uint_fast32_t m = 0; m < _nmax + 1; ++m) {
-      // only n and n' values larger than or equal to m have non-trivial
-      // contributions to the S matrix
-      const uint_fast32_t nmin = std::max(m, static_cast<uint_fast32_t>(1));
-
-      // precompute the pi and tau functions for this value of m
-      std::vector<float_type> pi_in(_nmax), tau_in(_nmax);
-      SpecialFunctions::wigner_dn_0m_sinx(costheta_p_in, sintheta_p_in,
-                                          sintheta_p_in_inv, _nmax, m,
-                                          &pi_in[0], &tau_in[0]);
-      std::vector<float_type> pi_out(_nmax), tau_out(_nmax);
-      SpecialFunctions::wigner_dn_0m_sinx(costheta_p_out, sintheta_p_out,
-                                          sintheta_p_out_inv, _nmax, m,
-                                          &pi_out[0], &tau_out[0]);
-
-      // we get the real and imaginary part of e^{im\phi{}} and multiply with
-      // 2 to account for both m and -m
-      const float_type fcos = 2. * expimphi_p_out_m_in.real();
-      const float_type fsin = 2. * expimphi_p_out_m_in.imag();
-      // recurse the exponential for the next iteration
-      expimphi_p_out_m_in *= expiphi_p_out_m_in;
-
-      // now perform the actual sums over n and n'
-      for (uint_fast32_t nn = nmin; nn < _nmax + 1; ++nn) {
-
-        // get the specific pi and tau for this n'
-        const float_type pi_nn = m * pi_in[nn - 1];
-        const float_type tau_nn = tau_in[nn - 1];
-
-        for (uint_fast32_t n = nmin; n < _nmax + 1; ++n) {
-
-          // get the specific pi and tau for this n
-          const float_type pi_n = m * pi_out[n - 1];
-          const float_type tau_n = tau_out[n - 1];
-
-          // get the c factor for these values of n and n'
-          const std::complex<float_type> c_nnn = c(n - 1, nn - 1);
-
-          // get the T11 and T22 elements for this m, n and n' (we need these
-          // in all cases)
-          const std::complex<float_type> T11nmnnm = T(0, n, m, 0, nn, m);
-          const std::complex<float_type> T22nmnnm = T(1, n, m, 1, nn, m);
-          // if m=0, the T12 and T21 matrices are trivially zero, and we can
-          // simplify the expression for S
-          if (m == 0) {
-            const std::complex<float_type> factor = c_nnn * tau_n * tau_nn;
-            S(0, 0) += factor * T22nmnnm;
-            S(1, 1) += factor * T11nmnnm;
-          } else {
-            // in the general case m=/=0, we also need the T12 and T21 elements
-            // for this m, n and n'
-            const std::complex<float_type> T12nmnnm = T(0, n, m, 1, nn, m);
-            const std::complex<float_type> T21nmnnm = T(1, n, m, 0, nn, m);
-
-            // due to m symmetry, S11 and S22 only have the cosine factor,
-            // while S12 and S21 only have the sine factor
-            const std::complex<float_type> real_factor = c_nnn * fcos;
-            const std::complex<float_type> imag_factor = c_nnn * fsin;
-
-            // precompute the pi and tau factor combinations
-            const float_type pi_pi = pi_n * pi_nn;
-            const float_type pi_tau = pi_n * tau_nn;
-            const float_type tau_pi = tau_n * pi_nn;
-            const float_type tau_tau = tau_n * tau_nn;
-
-            S(0, 0) += real_factor * (T11nmnnm * pi_pi + T21nmnnm * tau_pi +
-                                      T12nmnnm * pi_tau + T22nmnnm * tau_tau);
-            S(0, 1) += imag_factor * (T11nmnnm * pi_tau + T21nmnnm * tau_tau +
-                                      T12nmnnm * pi_pi + T22nmnnm * tau_pi);
-            S(1, 0) -= imag_factor * (T11nmnnm * tau_pi + T21nmnnm * pi_pi +
-                                      T12nmnnm * tau_tau + T22nmnnm * pi_tau);
-            S(1, 1) += real_factor * (T11nmnnm * tau_tau + T21nmnnm * pi_tau +
-                                      T12nmnnm * tau_pi + T22nmnnm * pi_pi);
-          }
-        }
-      }
-    }
-    // now divide all expressions by the wavenumber
-    const float_type kinv = 1. / _k;
-    S(0, 0) *= kinv;
-    S(0, 1) *= kinv;
-    S(1, 0) *= kinv;
-    S(1, 1) *= kinv;
+    Matrix<std::complex<float_type>> S = get_forward_scattering_matrix(
+        costheta_p_in, sintheta_p_in, sintheta_p_in_inv, cosphi_p_in,
+        sinphi_p_in, costheta_p_out, sintheta_p_out, sintheta_p_out_inv,
+        cosphi_p_out, sinphi_p_out);
 
     // perform the double 2x2 matrix product to convert S^P to S^L
     const std::complex<float_type> cS11 =
@@ -1911,6 +1992,44 @@ public:
   }
 
   /**
+   * @brief Get the three independent elements of the extinction matrix.
+   *
+   * The extinction matrix is assumed to have the form
+   * @f[
+   *  K = \begin{pmatrix}
+   *    C_{ext} & C_{pol} & 0 & 0 \\
+   *    C_{pol} & C_{ext} & 0 & 0 \\
+   *    0 & 0 & C_{ext} & C_{cpol} \\
+   *    0 & 0 & -C_{cpol} & C_{ext}
+   *  \end{pmatrix}.
+   * @f]
+   * This function returns the values @f$[C_{ext}, C_{pol}, C_{cpol}]@f$.
+   *
+   * @param alpha_radians Azimuth angle of the scattering particle (in radians).
+   * @param beta_radians Zenith angle of the scattering particle (in radians).
+   * @param theta_in_radians Zenith angle of the incoming radiation (in
+   * radians).
+   * @param phi_in_radians Azimuth angle of the incoming radiation (in radians).
+   * @param output Independent components of the extinction matrix, @f$[C_{ext},
+   * C_{pol}, C_{cpol}]@f$ (should be an array like pointer of size at least 3).
+   */
+  inline void get_reduced_extinction_matrix(const float_type alpha_radians,
+                                            const float_type beta_radians,
+                                            const float_type theta_in_radians,
+                                            const float_type phi_in_radians,
+                                            float_type output[3]) const {
+
+    Matrix<std::complex<float_type>> S = get_forward_scattering_matrix(
+        alpha_radians, beta_radians, theta_in_radians, phi_in_radians,
+        theta_in_radians, phi_in_radians);
+
+    const float_type prefactor = 2. * M_PI / _k;
+    output[0] = prefactor * (S(0, 0) + S(1, 1)).imag();
+    output[1] = prefactor * (S(0, 0) - S(1, 1)).imag();
+    output[2] = prefactor * (S(1, 1) - S(0, 0)).real();
+  }
+
+  /**
    * @brief Get the scattering coefficient for the T-matrix.
    *
    * @return Scattering coefficient.
@@ -1970,6 +2089,183 @@ public:
       }
     }
     return extinction_coefficient;
+  }
+
+  /**
+   * @brief Get the absorption cross sections @f$C_{abs}@f$ and @f$C_{abspol}@f$
+   * for the given zenith angle @f$\theta{}@f$.
+   *
+   * @param theta Input zenith angle, @f$\theta{}@f$ (in radians).
+   * @param ngauss Number of Gauss-Legendre quadrature points to use to compute
+   * the average integral for the scattering coefficients.
+   * @param do_Cabs Compute the absorption cross section @f$C_{abs}@f$?
+   * @param do_Cabspol Compute the linear polarization absorption cross section
+   * @f$C_{abspol}@f$?
+   * @param thetaGL Gauss-Legendre quadrature points for the zenith integration
+   * (in radians; of size ngauss).
+   * @param costhetaweightsGL Gauss-Legendre weights for the zenith integration
+   * (of size ngauss).
+   * @param phiGL Gauss-Legendre quadrature points for the azimuth integration
+   * (in radians; of size ngauss).
+   * @param phiweightsGL Gauss-Legendre weights for the azimuth integration
+   * (of size ngauss).
+   * @param result Array to store the result(s) in, in the order @f$C_{abs},
+   * C_{abspol}@f$. Only the elements that are requested are set.
+   */
+  inline void get_absorption_cross_sections(
+      const float_type theta, const uint_fast32_t ngauss, const bool do_Cabs,
+      const bool do_Cabspol, const std::vector<float_type> &thetaGL,
+      const std::vector<float_type> &costhetaweightsGL,
+      const std::vector<float_type> &phiGL,
+      const std::vector<float_type> &phiweightsGL, float_type *result) const {
+
+    Matrix<std::complex<float_type>> S =
+        get_forward_scattering_matrix(theta, 0., theta, 0.);
+
+    const float_type prefactor = 2. * M_PI / _k;
+    if (do_Cabs) {
+      result[0] = prefactor * (S(0, 0) + S(1, 1)).imag();
+    }
+    if (do_Cabspol) {
+      result[1] = prefactor * (S(0, 0) - S(1, 1)).imag();
+    }
+
+    const float_type half(0.5);
+    for (uint_fast32_t itheta = 0; itheta < ngauss; ++itheta) {
+      const float_type theta_in = thetaGL[itheta];
+      for (uint_fast32_t iphi = 0; iphi < ngauss; ++iphi) {
+        const float_type phi_in = phiGL[iphi];
+
+        Matrix<std::complex<float_type>> Stp =
+            get_forward_scattering_matrix(theta_in, phi_in, theta, 0.);
+
+        const float_type weight =
+            costhetaweightsGL[itheta] * phiweightsGL[iphi];
+        if (do_Cabs) {
+          const float_type Z00 =
+              (half *
+               (Stp(0, 0) * conj(Stp(0, 0)) + Stp(0, 1) * conj(Stp(0, 1)) +
+                Stp(1, 0) * conj(Stp(1, 0)) + Stp(1, 1) * conj(Stp(1, 1))))
+                  .real();
+          result[0] -= Z00 * weight;
+        }
+
+        if (do_Cabspol) {
+          const float_type Z10 =
+              (half *
+               (Stp(0, 0) * conj(Stp(0, 0)) + Stp(0, 1) * conj(Stp(0, 1)) -
+                Stp(1, 0) * conj(Stp(1, 0)) - Stp(1, 1) * conj(Stp(1, 1))))
+                  .real();
+          result[1] -= Z10 * weight;
+        }
+      }
+    }
+  }
+
+  /**
+   * @brief Get the absorption cross sectins @f$C_{abs}@f$ and @f$C_{abspol}@f$
+   * for the given zenith angle(s) @f$\theta{}@f$.
+   *
+   * @param theta Zenith angle(s), @f$\theta{}@f$ (in radians; of size ntheta).
+   * @param ntheta Number of input angles.
+   * @param ngauss Number of Gauss-Legendre quadrature points to use to compute
+   * the average integral for the scattering coefficients.
+   * @param Cabs Corresponding absorption cross sections, ordered per pair (in
+   * m^2; of size two times ntheta).
+   */
+  inline void get_absorption_cross_sections(const float_type *theta,
+                                            const uint_fast32_t ntheta,
+                                            const uint_fast32_t ngauss,
+                                            float_type *Cabs) const {
+
+    std::vector<float_type> thetaGL(ngauss), costhetaGL(ngauss),
+        costhetaweightsGL(ngauss);
+    SpecialFunctions::get_gauss_legendre_points_and_weights<float_type>(
+        ngauss, costhetaGL, costhetaweightsGL);
+    std::vector<float_type> phiGL(ngauss), phiweightsGL(ngauss);
+    SpecialFunctions::get_gauss_legendre_points_and_weights_ab<float_type>(
+        ngauss, 0., 2. * M_PI, phiGL, phiweightsGL);
+
+    for (uint_fast32_t igauss = 0; igauss < ngauss; ++igauss) {
+      thetaGL[igauss] = acos(costhetaGL[igauss]);
+    }
+
+    for (uint_fast32_t itheta = 0; itheta < ntheta; ++itheta) {
+      get_absorption_cross_sections(theta[itheta], ngauss, true, true, thetaGL,
+                                    costhetaweightsGL, phiGL, phiweightsGL,
+                                    &Cabs[2 * itheta]);
+    }
+  }
+
+  /**
+   * @brief Get the absorption cross section @f$C_{abs}@f$ for the given zenith
+   * angle(s) @f$\theta{}@f$.
+   *
+   * @param theta Zenith angle(s), @f$\theta{}@f$ (in radians; of size ntheta).
+   * @param ntheta Number of input angles.
+   * @param ngauss Number of Gauss-Legendre quadrature points to use to compute
+   * the average integral for the scattering coefficients.
+   * @param Cabs Corresponding absorption cross section(s) (in m^2; of size
+   * ntheta).
+   */
+  inline void get_absorption_cross_section(const float_type *theta,
+                                           const uint_fast32_t ntheta,
+                                           const uint_fast32_t ngauss,
+                                           float_type *Cabs) const {
+
+    std::vector<float_type> thetaGL(ngauss), costhetaGL(ngauss),
+        costhetaweightsGL(ngauss);
+    SpecialFunctions::get_gauss_legendre_points_and_weights<float_type>(
+        ngauss, costhetaGL, costhetaweightsGL);
+    std::vector<float_type> phiGL(ngauss), phiweightsGL(ngauss);
+    SpecialFunctions::get_gauss_legendre_points_and_weights_ab<float_type>(
+        ngauss, 0., 2. * M_PI, phiGL, phiweightsGL);
+
+    for (uint_fast32_t igauss = 0; igauss < ngauss; ++igauss) {
+      thetaGL[igauss] = acos(costhetaGL[igauss]);
+    }
+
+    for (uint_fast32_t itheta = 0; itheta < ntheta; ++itheta) {
+      get_absorption_cross_sections(theta[itheta], ngauss, true, false, thetaGL,
+                                    costhetaweightsGL, phiGL, phiweightsGL,
+                                    &Cabs[itheta]);
+    }
+  }
+
+  /**
+   * @brief Get the absorption cross section, appropriately averaged over the
+   * outgoing angle @f$\theta{}@f$.
+   *
+   * @param ngauss Number of Gauss-Legendre quadrature points to use to compute
+   * the average integral.
+   * @return Average absorption cross section (in m^2).
+   */
+  inline float_type
+  get_average_absorption_cross_section(const uint_fast32_t ngauss) const {
+
+    std::vector<float_type> thetaGL(ngauss), costhetaGL(ngauss),
+        costhetaweightsGL(ngauss);
+    SpecialFunctions::get_gauss_legendre_points_and_weights<float_type>(
+        ngauss, costhetaGL, costhetaweightsGL);
+    std::vector<float_type> phiGL(ngauss), phiweightsGL(ngauss);
+    SpecialFunctions::get_gauss_legendre_points_and_weights_ab<float_type>(
+        ngauss, 0., 2. * M_PI, phiGL, phiweightsGL);
+
+    for (uint_fast32_t igauss = 0; igauss < ngauss; ++igauss) {
+      thetaGL[igauss] = acos(costhetaGL[igauss]);
+    }
+
+    float_type result = 0.;
+    for (uint_fast32_t igauss = 0; igauss < ngauss; ++igauss) {
+      const float_type theta = thetaGL[igauss];
+      float_type Kabs;
+      get_absorption_cross_sections(theta, ngauss, true, false, thetaGL,
+                                    costhetaweightsGL, phiGL, phiweightsGL,
+                                    &Kabs);
+      result += Kabs * costhetaweightsGL[igauss];
+    }
+
+    return 0.5 * result;
   }
 };
 

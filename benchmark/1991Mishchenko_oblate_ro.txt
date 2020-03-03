@@ -1,0 +1,20 @@
+# Lower rightmost column from Table 1 in Mishchenko, 1991, ApJ, 367, 561
+# The scattering particle is an oblate spheroid with axis ratio d = 2.
+# and equal-volume sphere radius r_ev = 0.2 um.
+# Listed below are the three independent components for the extinction
+# matrix
+#     (Cext Cpol 0      0    )
+# K = (Cpol Cext 0      0    )
+#     (0    0    Cext   Ccpol)
+#     (0    0    -Ccpol Cext )
+# assuming random orientations, i.e. the grains are (not) aligned according to
+# p(beta) = 1/2
+# The actual components listed are
+# Qx = Cx / (pi*r_ev^2)
+# There is only one angle listed, as there is no angular dependence in this case
+
+# lambda (um)	Qext	Qpol	Qcpol
+0.2	2.62	0	0.
+0.55	3.72	0.	0.
+1.	1.04	0.	0.
+5.	2.34e-2	0.	0.

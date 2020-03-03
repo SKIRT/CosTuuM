@@ -9,26 +9,13 @@
 #define DRAINEDUSTPROPERTIES_HPP
 
 #include "DraineDustPropertiesDataLocation.hpp"
+#include "DustProperties.hpp"
 #include "Table.hpp"
 
-#include <complex>
-
 /**
- * @brief Possible types of dust grains.
+ * @brief Draine and collaborators dust optical dust properties.
  */
-enum DustGrainTypes {
-  /*! @brief Carbon grains. */
-  DUSTGRAINTYPE_CARBON = 1,
-  /*! @brief Silicon grains. */
-  DUSTGRAINTYPE_SILICON,
-  /*! @brief Number of dust grain types. */
-  NUMBER_OF_DUSTGRAINTYPES
-};
-
-/**
- * @brief The DraineDustProperties class
- */
-class DraineDustProperties {
+class DraineDustProperties : public DustProperties {
 private:
   /*! @brief Fraction of carbon grains that is parallel aligned. */
   const float_type _fraction_parallel;
@@ -69,27 +56,39 @@ public:
                                    "callindex.out_silD03");
     // convert wavelength from micron to m
     _table_silicon.multiply_column<0>(1.e-6);
+    _table_silicon.add_column<1>(1.);
+    _table_silicon.add_column<3>(1.);
 
     _table_carbon_parallel_small.from_ascii_file(
         DRAINEDUSTPROPERTIESDATALOCATION "callindex.out_CpaD03_0.01");
     // convert wavelength from micron to m
     _table_carbon_parallel_small.multiply_column<0>(1.e-6);
+    _table_carbon_parallel_small.add_column<1>(1.);
+    _table_carbon_parallel_small.add_column<3>(1.);
 
     _table_carbon_parallel_large.from_ascii_file(
         DRAINEDUSTPROPERTIESDATALOCATION "callindex.out_CpaD03_0.10");
     // convert wavelength from micron to m
     _table_carbon_parallel_large.multiply_column<0>(1.e-6);
+    _table_carbon_parallel_large.add_column<1>(1.);
+    _table_carbon_parallel_large.add_column<3>(1.);
 
     _table_carbon_perpendicular_small.from_ascii_file(
         DRAINEDUSTPROPERTIESDATALOCATION "callindex.out_CpeD03_0.01");
     // convert wavelength from micron to m
     _table_carbon_perpendicular_small.multiply_column<0>(1.e-6);
+    _table_carbon_perpendicular_small.add_column<1>(1.);
+    _table_carbon_perpendicular_small.add_column<3>(1.);
 
     _table_carbon_perpendicular_large.from_ascii_file(
         DRAINEDUSTPROPERTIESDATALOCATION "callindex.out_CpeD03_0.10");
     // convert wavelength from micron to m
     _table_carbon_perpendicular_large.multiply_column<0>(1.e-6);
+    _table_carbon_perpendicular_large.add_column<1>(1.);
+    _table_carbon_perpendicular_large.add_column<3>(1.);
   }
+
+  virtual ~DraineDustProperties() {}
 
   /**
    * @brief Get the refractive index for the given wavelength, grain size and

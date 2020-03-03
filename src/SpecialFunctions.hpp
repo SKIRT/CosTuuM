@@ -28,6 +28,18 @@ const uint_fast32_t SPECIALFUNCTIONS_BESSEL_NMAX = 800;
  */
 class SpecialFunctions {
 
+private:
+  /**
+   * @brief Convert the given value to a double precision value.
+   *
+   * @param value Value to convert.
+   * @return Double precision equivalent.
+   */
+  template <typename DATA_TYPE>
+  static inline double to_double(const DATA_TYPE value) {
+    return double(value);
+  }
+
 public:
   /**
    * @brief Spherical Bessel function of the second kind for general real or
@@ -68,7 +80,7 @@ public:
    *
    * @param nmax Maximum order to compute (we compute all @f$y_n(z)@f$ for
    * @f$n\in{}[1,n_{max}]@f$).
-   * @param z Input values.
+   * @param z Input value.
    * @param y Array to store the Bessel function values in (of size nmax).
    * @param dy Array to store the first derivatives in (of size nmax).
    * @tparam DATA_TYPE Data type of input and output values.
@@ -102,6 +114,11 @@ public:
       y[i] = twoip1 * zinv * y[i - 1] - y[i - 2];
       dy[i] = y[i - 1] - ip1 * zinv * y[i];
     }
+
+    ctm_assert_message_no_nans(y, nmax, "nmax: %" PRIuFAST32 ", z: %g", nmax,
+                               to_double(z));
+    ctm_assert_message_no_nans(dy, nmax, "nmax: %" PRIuFAST32 ", z: %g", nmax,
+                               to_double(z));
   }
 
   /**
@@ -196,6 +213,11 @@ public:
       const DATA_TYPE ip1(i + 1.);
       dj[i] = j[i - 1] - ip1 * zinv * j[i];
     }
+
+    ctm_assert_message_no_nans(j, nmax, "nmax: %" PRIuFAST32 ", z: %g", nmax,
+                               to_double(z));
+    ctm_assert_message_no_nans(dj, nmax, "nmax: %" PRIuFAST32 ", z: %g", nmax,
+                               to_double(z));
     return;
   }
 
@@ -205,7 +227,7 @@ public:
    *
    * This function returns
    * @f[
-   *    d^n_{0m}(x) = (-1)^{-m} \sqrt{\frac{(n-m)!}{(n+m)!}} P^m_n(\cos(x)),
+   *    d^n_{0m}(x) = (-1)^{m} \sqrt{\frac{(n-m)!}{(n+m)!}} P^m_n(\cos(x)),
    * @f]
    * where @f$n \in{} [1, n_{max}]@f$, @f$m \in{} [-n, n]@f$ and
    * @f$P^m_n(x)@f$ is the associated Legendre polynomial of degree @f$n@f$ and
@@ -264,12 +286,14 @@ public:
   wigner_dn_0m(const DATA_TYPE cosx, const uint_fast32_t nmax,
                const uint_fast32_t m, DATA_TYPE *y, DATA_TYPE *dy) {
 
+    ctm_assert(m <= nmax);
+
     const DATA_TYPE zero(0.);
     const DATA_TYPE one(1.);
     const DATA_TYPE two(2.);
 
     // precompute sin(x) and its inverse
-    const DATA_TYPE sinx = sqrt(one - cosx * cosx);
+    const DATA_TYPE sinx = sqrt((one - cosx) * (one + cosx));
     const DATA_TYPE sinxinv = one / sinx;
     // branch out depending on the m value
     if (m == 0) {
@@ -756,7 +780,12 @@ public:
     }
 
     if (order == maximum_order) {
-      ctm_warning("Tolerance for quadrature could not be reached!");
+      ctm_warning("Tolerance for quadrature could not be reached (absolute "
+                  "difference: %g, relative difference: %g, targets: %g %g!",
+                  to_double(absolute_difference),
+                  to_double(relative_difference),
+                  to_double(desired_absolute_difference),
+                  to_double(desired_relative_difference));
     }
 
     return old_quadrature;
@@ -764,8 +793,8 @@ public:
 
   /**
    * @brief Get the radius (squared) and derivative w.r.t. azimuthal angle
-   * divided by the radius for an spheroid with the given equal volume sphere
-   * radius and axis ratio, for the given input azimuthal angles.
+   * divided by the radius for a spheroid with the given axis ratio, for the
+   * given input azimuthal angles.
    *
    * The equation of a spheroid is
    * @f[
@@ -796,43 +825,52 @@ public:
    *      = \frac{a\sin(\theta{})\cos(\theta{})(d^2-1)}{
    *        \left(\sin^2(\theta{}) + d^2\cos^2(\theta{})\right)^{\frac{3}{2}}}
    *      = r \frac{\sin(\theta{})\cos(\theta{})(d^2-1)}{
-   *        \sin^2(\theta{}) + d^2\cos^2(\theta{})}
+   *        \sin^2(\theta{}) + d^2\cos^2(\theta{})}.
    * @f]
+   *
+   * Note that the radii for a given axis ratio can be calculated for a
+   * representative radius @f$R_V=1@f$. The radii for another value of @f$R_V@f$
+   * can then be obtained by simply multiplying with that value of @f$R_V@f$.
+   * The derivatives that are output by this function are per construction
+   * independent of the value of @f$R_V@f$ and only depend on the axis ratio.
    *
    * @param costheta Cosine of the azimuthal angles, @f$\cos(\theta{})@f$. We
    * assume that values are given in order from low to high, and are symmetric
    * w.r.t. @f$0@f$.
-   * @param R_V Equal volume sphere radius, @f$R_V@f$.
+   * @param size Size of the input and output arrays.
    * @param axis_ratio Ratio of horizontal to vertical axis,
    * @f$d = \frac{a}{b}@f$.
    * @param r2 Output radii squared, @f$r^2(\theta{})@f$. This vector should be
    * preallocated with the correct size, i.e. the same size as the input vector.
+   * To obtain the actual radii for a particle with @f$R_V\neq{}1@f$, these
+   * values need to be multiplied with @f$R_V^2@f$.
    * @param dr_over_r Derivative over radius,
    * @f$\frac{1}{r(\theta{})}\frac{dr(\theta{})}{d\theta{}}@f$. This vector
    * should be preallocated with the correct size, i.e. the same size as the
-   * input vector.
+   * input vector. Given its definition, these values are independent of a
+   * specific choice of @f$R_V@f$.
    * @tparam DATA_TYPE Data type of input and output values.
    */
   template <typename DATA_TYPE>
-  static inline void
-  get_r_dr_spheroid(const std::vector<DATA_TYPE> &costheta, const DATA_TYPE R_V,
-                    const DATA_TYPE axis_ratio, std::vector<DATA_TYPE> &r2,
-                    std::vector<DATA_TYPE> &dr_over_r) {
+  static inline void get_r_dr_spheroid(const DATA_TYPE *costheta,
+                                       const uint_fast32_t size,
+                                       const DATA_TYPE axis_ratio,
+                                       DATA_TYPE *r2, DATA_TYPE *dr_over_r) {
 
     // compute the horizontal axis length
-    const DATA_TYPE a = R_V * cbrt(axis_ratio);
+    const DATA_TYPE a = cbrt(axis_ratio);
     const DATA_TYPE a2 = a * a;
     const DATA_TYPE axis_ratio2 = axis_ratio * axis_ratio;
     const DATA_TYPE axis_ratio2m1 = axis_ratio2 - 1.;
-    for (uint_fast32_t i = 0; i < costheta.size() / 2; ++i) {
+    for (uint_fast32_t i = 0; i < size / 2; ++i) {
       const DATA_TYPE costheta2 = costheta[i] * costheta[i];
-      const DATA_TYPE sintheta2 = 1. - costheta2;
+      const DATA_TYPE sintheta2 = (1. - costheta[i]) * (1. + costheta[i]);
       const DATA_TYPE sintheta = sqrt(sintheta2);
       const DATA_TYPE r2_over_a2 = 1. / (sintheta2 + axis_ratio2 * costheta2);
       r2[i] = a2 * r2_over_a2;
-      r2[costheta.size() - i - 1] = r2[i];
+      r2[size - i - 1] = r2[i];
       dr_over_r[i] = r2_over_a2 * costheta[i] * sintheta * axis_ratio2m1;
-      dr_over_r[costheta.size() - i - 1] = -dr_over_r[i];
+      dr_over_r[size - i - 1] = -dr_over_r[i];
     }
   }
 
@@ -962,8 +1000,8 @@ public:
 
       // Cplus = sqrt((n - m) * (n + m + 1))
       const DATA_TYPE Cplusn2m2 =
-          sqrt((n2 - N + m1temp + 1) * (n2 + N - m1temp));
-      const DATA_TYPE Cplusn1m1m1 = sqrt((n1 - m1temp) * (n1 + m1temp + 1));
+          sqrt((n2 - N + m1temp + 1.) * (n2 + N - m1temp));
+      const DATA_TYPE Cplusn1m1m1 = sqrt((n1 - m1temp) * (n1 + m1temp + 1.));
       const DATA_TYPE Cn1m1p1 = C[N * nsize + m1temp + 1 + n1];
       const DATA_TYPE Cnext = -Cplusn2m2 * Cn1m1p1 / Cplusn1m1m1;
 
@@ -992,7 +1030,7 @@ public:
     for (int_fast32_t Mtemp = N - 1; Mtemp >= 0; --Mtemp) {
 
       // precompute the inverse ladder coefficient, since it does not change
-      const DATA_TYPE Cmin_inverse = 1. / sqrt((N + Mtemp + 1) * (N - Mtemp));
+      const DATA_TYPE Cmin_inverse = 1. / sqrt((N + Mtemp + 1.) * (N - Mtemp));
 
       // the conditions for a valid element with M = Mtemp are
       // m1temp >= -n1, m1temp <= n1
@@ -1008,14 +1046,14 @@ public:
         DATA_TYPE term1 = 0.;
         if (m1temp + 1 <= n1) {
           // Cmin = sqrt((n + m) * (n - m + 1))
-          const DATA_TYPE Cminn1m1p1 = sqrt((n1 + m1temp + 1) * (n1 - m1temp));
+          const DATA_TYPE Cminn1m1p1 = sqrt((n1 + m1temp + 1.) * (n1 - m1temp));
           const DATA_TYPE Cn1m1p1 = C[(Mtemp + 1) * nsize + m1temp + 1 + n1];
           term1 = Cminn1m1p1 * Cn1m1p1;
         }
         DATA_TYPE term2 = 0.;
         if (m2temp + 1 <= n2) {
           // Cmin = sqrt((n + m) * (n - m + 1))
-          const DATA_TYPE Cminn2m2p1 = sqrt((n2 + m2temp + 1) * (n2 - m2temp));
+          const DATA_TYPE Cminn2m2p1 = sqrt((n2 + m2temp + 1.) * (n2 - m2temp));
           const DATA_TYPE Cn2m2p2 = C[(Mtemp + 1) * nsize + m1temp + n1];
           term2 = Cminn2m2p1 * Cn2m2p2;
         }
@@ -1067,13 +1105,16 @@ public:
    * @param n1 First angular momentum quantum number, @f$n_1@f$.
    * @param n2 Second angular momentum quantum number, @f$n_2@f$.
    * @param N Total angular momentum quantum number, @f$N@f$.
-   * @return Corresponding Clebsch-Gordan coefficients for @f$M = 0@f$.
+   * @param C Vector to store the coefficients in (of size at least
+   * @f$(N+1) (2n_1+1)@f$).
+   * @return Number of coefficients stored in the result vector.
    * @tparam DATA_TYPE Data type of input and output values.
    */
   template <typename DATA_TYPE>
-  static inline std::vector<DATA_TYPE>
+  static inline uint_fast32_t
   get_clebsch_gordan_coefficients(const int_fast32_t n1, const int_fast32_t n2,
-                                  const int_fast32_t N) {
+                                  const int_fast32_t N,
+                                  std::vector<DATA_TYPE> &C) {
 
     // sanity checks on input values
     ctm_assert(n1 >= 0);
@@ -1089,7 +1130,6 @@ public:
     // (potentially overestimating the number of coefficients) and store
     // 2 * n1 + 1 coefficients per M, some of which will still be zero
     const int_fast32_t nsize = 2 * n1 + 1;
-    std::vector<DATA_TYPE> C((N + 1) * nsize, 0.);
 
     // first use the upper row recursion relation to get the coefficients
     // for M = N
@@ -1107,8 +1147,8 @@ public:
 
       // Cplus = sqrt((n - m) * (n + m + 1))
       const DATA_TYPE Cplusn2m2 =
-          sqrt((n2 - N + m1temp + 1) * (n2 + N - m1temp));
-      const DATA_TYPE Cplusn1m1m1 = sqrt((n1 - m1temp) * (n1 + m1temp + 1));
+          sqrt((n2 - N + m1temp + 1.) * (n2 + N - m1temp));
+      const DATA_TYPE Cplusn1m1m1 = sqrt((n1 - m1temp) * (n1 + m1temp + 1.));
       const DATA_TYPE Cn1m1p1 = C[N * nsize + m1temp + 1 + n1];
       const DATA_TYPE Cnext = -Cplusn2m2 * Cn1m1p1 / Cplusn1m1m1;
 
@@ -1137,7 +1177,7 @@ public:
     for (int_fast32_t Mtemp = N - 1; Mtemp >= 0; --Mtemp) {
 
       // precompute the inverse ladder coefficient, since it does not change
-      const DATA_TYPE Cmin_inverse = 1. / sqrt((N + Mtemp + 1) * (N - Mtemp));
+      const DATA_TYPE Cmin_inverse = 1. / sqrt((N + Mtemp + 1.) * (N - Mtemp));
 
       // the conditions for a valid element with M = Mtemp are
       // m1temp >= -n1, m1temp <= n1
@@ -1153,14 +1193,14 @@ public:
         DATA_TYPE term1 = 0.;
         if (m1temp + 1 <= n1) {
           // Cmin = sqrt((n + m) * (n - m + 1))
-          const DATA_TYPE Cminn1m1p1 = sqrt((n1 + m1temp + 1) * (n1 - m1temp));
+          const DATA_TYPE Cminn1m1p1 = sqrt((n1 + m1temp + 1.) * (n1 - m1temp));
           const DATA_TYPE Cn1m1p1 = C[(Mtemp + 1) * nsize + m1temp + 1 + n1];
           term1 = Cminn1m1p1 * Cn1m1p1;
         }
         DATA_TYPE term2 = 0.;
         if (m2temp + 1 <= n2) {
           // Cmin = sqrt((n + m) * (n - m + 1))
-          const DATA_TYPE Cminn2m2p1 = sqrt((n2 + m2temp + 1) * (n2 - m2temp));
+          const DATA_TYPE Cminn2m2p1 = sqrt((n2 + m2temp + 1.) * (n2 - m2temp));
           const DATA_TYPE Cn2m2p2 = C[(Mtemp + 1) * nsize + m1temp + n1];
           term2 = Cminn2m2p1 * Cn2m2p2;
         }
@@ -1176,13 +1216,26 @@ public:
     }
 
     const int_fast32_t nmin = std::min(n1, n2);
-    std::vector<DATA_TYPE> CM0(2 * nmin + 1, 0.);
     for (int_fast32_t i = 0; i < 2 * nmin + 1; ++i) {
       const int_fast32_t m1 = i - nmin;
-      CM0[i] = C[m1 + n1];
+      // we only overwrite values that are no longer needed
+      C[i] = C[m1 + n1];
     }
-    return CM0;
+
+    return 2 * nmin + 1;
   }
 };
+
+/**
+ * @brief Convert the given complex value to a double precision value.
+ *
+ * @param value Value to convert.
+ * @return Double precision equivalent: real part.
+ */
+template <>
+inline double
+SpecialFunctions::to_double(const std::complex<float_type> value) {
+  return double(value.real());
+}
 
 #endif // SPECIALFUNCTIONS_HPP

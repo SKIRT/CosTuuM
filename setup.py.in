@@ -1,0 +1,53 @@
+# setup script for CTMmodule
+# this file is parsed by CMake to add information about the compiler and
+# the build environment and should not be edited directly
+# (instead edit setup.py.in)
+
+# import the setuptools module for module creation
+from setuptools import setup, Extension
+import os
+import glob
+import numpy
+
+# main module creation routine
+def main():
+
+    # set the C and C++ compilers to the ones found by CMake
+    os.environ["CC"] = "@CMAKE_C_COMPILER@"
+    os.environ["CXX"] = "@CMAKE_CXX_COMPILER@"
+
+    # find all the header files in the source folder to create a dependency
+    # list that ensures the module is recompiled if any of the header files
+    # changes
+    header_dependencies = glob.glob("@PROJECT_SOURCE_DIR@/src/*.hpp")
+
+    # create the module
+    setup(
+        name="CosTuuM",
+        version="1.0.0",
+        description="T-matrix module",
+        author="Bert Vandenbroucke",
+        author_email="bert.vandenbrucke@gmail.com",
+        ext_modules=[
+            Extension(
+                "CosTuuM",
+                ["@PROJECT_SOURCE_DIR@/src/CTMModule.cpp"],
+                include_dirs=[
+                    "@PROJECT_SOURCE_DIR@/src",
+                    "@PROJECT_BINARY_DIR@/src",
+                    "@PROJECT_SOURCE_DIR@/quicksched",
+                    numpy.get_include(),
+                ],
+                libraries=["@LIBQUICKSCHED_SHARED@"],
+                library_dirs=["@PROJECT_BINARY_DIR@/lib"],
+                runtime_library_dirs=["@PROJECT_BINARY_DIR@/lib"],
+                depends=header_dependencies,
+            )
+        ],
+        install_requires=["numpy"],
+    )
+
+
+# call the main function
+if __name__ == "__main__":
+    main()

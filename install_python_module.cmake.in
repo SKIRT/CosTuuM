@@ -1,0 +1,8 @@
+# script executed during installation of the CosTuuM Python module
+# this is a simple wrapper for setup.py install that uses the right
+# Python interpreter and setup script location
+
+# we install the module in the user home folder (--user)
+# and make sure modules that are already present are overwritten (--force)
+execute_process(COMMAND @PYTHON_EXECUTABLE@ @PROJECT_BINARY_DIR@/setup.py
+                          install --user --force)

@@ -47,7 +47,7 @@ public:
   virtual float_type operator()(const float_type beta, const float_type cosbeta,
                                 const float_type sinbeta) const {
 
-    return 0.2 + 0.2 * (cosbeta * cosbeta - 1.);
+    return 0.5;
   }
 
   /**
@@ -60,17 +60,18 @@ public:
    * @return Orientation distribution function for that value of
    * @f$\beta{}@f$, @f$p(\beta{})@f$.
    */
-  inline float_type operator()(const float_type beta) const {
+  float_type operator()(const float_type beta) const {
 
     const float_type cosbeta = cos(beta);
     const float_type sinbeta = sin(beta);
     return _normalisation_factor * (*this)(beta, cosbeta, sinbeta);
   }
 
-private:
+protected:
   /*! @brief Coefficients. */
   std::vector<float_type> _coefficients;
 
+private:
   /**
    * @brief Auxiliary class used to wrap integrand function arguments.
    */
@@ -171,15 +172,43 @@ public:
    * @param nmax Highest order for which we store a coefficient.
    */
   inline OrientationDistribution(const uint_fast32_t nmax)
-      : _coefficients(nmax + 1, 0.) {
+      : _normalisation_factor(1.), _coefficients(nmax + 1, 0.) {}
+
+  /**
+   * @brief Copy constructor.
+   *
+   * Note that distributions constructed using this constructor will not provide
+   * a valid operator() function.
+   *
+   * @param original Original OrientationDistribution that is being copied.
+   */
+  inline OrientationDistribution(const OrientationDistribution &original)
+      : _normalisation_factor(0.),
+        _coefficients(original._coefficients.size()) {
+
+    for (uint_fast32_t i = 0; i < _coefficients.size(); ++i) {
+      _coefficients[i] = original._coefficients[i];
+    }
+  }
+
+  virtual ~OrientationDistribution() {}
+
+  /**
+   * @brief Initialise the coefficients of the distribution.
+   *
+   * @param absolute_error Absolute error for numerical quadratures.
+   * @param relative_error Relative error for numerical quadratures.
+   */
+  inline void initialise(const float_type absolute_error = 1.e-10,
+                         const float_type relative_error = 1.e-5) {
 
     // compute the normalisation factor
     {
       IntegrandArguments arguments(0, *this);
       const float_type norm =
           SpecialFunctions::gauss_legendre_quadrature<float_type>(
-              normalisation_integrand, 0., M_PI, &arguments, 100, 1000, 1.e-10,
-              1.e-5);
+              normalisation_integrand, 0., M_PI, &arguments, 100, 1000,
+              absolute_error, relative_error);
       _normalisation_factor = 1. / norm;
     }
 
@@ -188,7 +217,7 @@ public:
       _coefficients[i] =
           SpecialFunctions::gauss_legendre_quadrature<float_type>(
               integrand, 0., M_PI, &arguments, 2 * (i + 1), 100 * (i + 1),
-              1.e-10, 1.e-5);
+              absolute_error, relative_error);
     }
   }
 
@@ -199,6 +228,7 @@ public:
    * @return Corresponding coefficient.
    */
   inline float_type get_coefficient(const uint_fast32_t n) const {
+    ctm_assert(n < _coefficients.size());
     return _coefficients[n];
   }
 
@@ -210,6 +240,13 @@ public:
   inline uint_fast32_t get_maximum_order() const {
     return _coefficients.size() - 1;
   }
+
+  /**
+   * @brief Compute alignment for this distribution?
+   *
+   * @return True if the alignment should be computed.
+   */
+  virtual bool compute_alignment() const { return true; }
 };
 
 #endif // ORIENTATIONDISTRIBUTION_HPP

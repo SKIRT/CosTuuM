@@ -151,6 +151,7 @@ if(MAX_NUM_THREADS GREATER 1)
     add_configuration_option(HAVE_OPENMP True)
     message(STATUS "OpenMP found. Shared memory parallelization will work.")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
   else(OPENMP_FOUND)
     add_configuration_option(HAVE_OPENMP False)
     message(WARNING
@@ -208,6 +209,18 @@ else(ACTIVATE_QUAD_PRECISION)
   message(STATUS "Using double precision.")
 endif(ACTIVATE_QUAD_PRECISION)
 
+if(ACTIVATE_TASKS)
+  add_configuration_option(HAVE_TASKS True)
+  set(LIBQUICKSCHED quicksched)
+  set(LIBQUICKSCHED_SHARED quicksched_shared)
+  include_directories(${PROJECT_SOURCE_DIR}/quicksched)
+  message(STATUS "Using task-based parallel algorithm.")
+else(ACTIVATE_TASKS)
+  add_configuration_option(HAVE_TASKS False)
+  message(STATUS "Not using task-based parallel algorithm.")
+  set(LIBQUICKSCHED "")
+endif(ACTIVATE_TASKS)
+
 ## Code configuration ##########################################################
 
 # Tell CMake that headers are in one of the src folders.
@@ -241,11 +254,47 @@ add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/src/CompilerInfo.cpp
 add_custom_target(CompilerInfo
                   DEPENDS ${PROJECT_BINARY_DIR}/src/CompilerInfo.cpp)
 
+# Find Python
+# Note the order as advised in the documentation:
+# If calling both find_package(PythonInterp) and find_package(PythonLibs), call
+# find_package(PythonInterp) first to get the currently active Python version by
+# default with a consistent version of PYTHON_LIBRARIES.
+find_package(PythonInterp 3.0)
+find_package(PythonLibs 3.0)
+if(PYTHONLIBS_FOUND AND PYTHONINTERP_FOUND)
+  # Check if NumPy can be found
+  execute_process(COMMAND ${PYTHON_EXECUTABLE} -c
+                              "import numpy; print(numpy.get_include())"
+                  RESULT_VARIABLE NUMPY_RESULT
+                  OUTPUT_VARIABLE NUMPY_OUTPUT
+                  ERROR_VARIABLE NUMPY_ERROR)
+  if(NUMPY_RESULT STREQUAL "0")
+    message(STATUS "Python and NumPy found. Building Python module.")
+    # Configure the build script for the Python module and the CMake wrapper
+    # script for the module installation
+    configure_file(${PROJECT_SOURCE_DIR}/setup.py.in
+                   ${PROJECT_BINARY_DIR}/setup.py @ONLY)
+    configure_file(${PROJECT_SOURCE_DIR}/install_python_module.cmake.in
+                   ${PROJECT_BINARY_DIR}/install_python_module.cmake @ONLY)
+    add_configuration_option(HAVE_PYTHON True)
+  else(NUMPY_RESULT STREQUAL "0")
+    message(WARNING "Could not find NumPy. Not building Python module.")
+    add_configuration_option(HAVE_PYTHON False)
+  endif(NUMPY_RESULT STREQUAL "0")
+else(PYTHONLIBS_FOUND AND PYTHONINTERP_FOUND)
+  message(WARNING "Python not found. Not building Python module.")
+  add_configuration_option(HAVE_PYTHON False)
+endif(PYTHONLIBS_FOUND AND PYTHONINTERP_FOUND)
+
 # Enter the folder containing the source files and configure the executables.
 add_subdirectory(src)
 
 # Enter the folder containing the unit tests
 add_subdirectory(test)
+
+if(HAVE_TASKS)
+  add_subdirectory(quicksched)
+endif(HAVE_TASKS)
 
 ## Documentation configuration #################################################
 

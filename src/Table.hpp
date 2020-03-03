@@ -8,6 +8,7 @@
 #ifndef TABLE_HPP
 #define TABLE_HPP
 
+#include "Configuration.hpp"
 #include "Error.hpp"
 
 #include <cinttypes>
@@ -141,6 +142,19 @@ public:
       _rows[i][COLUMN_NUMBER] *= factor;
     }
   }
+
+  /**
+   * @brief Add the given number to all elements in a column.
+   *
+   * @param term Additive term.
+   * @tparam COLUMN_NUMBER Column that needs to be incremented.
+   */
+  template <uint_fast8_t COLUMN_NUMBER>
+  inline void add_column(const DATA_TYPE term) {
+    for (uint_fast32_t i = 0; i < _rows.size(); ++i) {
+      _rows[i][COLUMN_NUMBER] += term;
+    }
+  }
 };
 
 /**
@@ -189,6 +203,11 @@ public:
           ihigh = inext;
         }
       }
+
+      ctm_assert_message(xvalue >= xlow, "%g %g %g", double(xvalue),
+                         double(xlow), double(xhigh));
+      ctm_assert_message(xvalue < xhigh, "%g %g %g", double(xvalue),
+                         double(xlow), double(xhigh));
     } else if (xlow > xhigh) {
       while (ilow + 1 != ihigh) {
         const size_t inext = (ilow + ihigh) >> 1;
@@ -203,6 +222,11 @@ public:
           ihigh = inext;
         }
       }
+
+      ctm_assert_message(xvalue <= xlow, "%g %g %g", double(xvalue),
+                         double(xlow), double(xhigh));
+      ctm_assert_message(xvalue > xhigh, "%g %g %g", double(xvalue),
+                         double(xlow), double(xhigh));
     } else {
       ctm_error("Table endpoints are the same!");
     }
@@ -211,8 +235,8 @@ public:
     TableRow<NUMBER_OF_COLUMNS, DATA_TYPE> result;
     for (uint_fast8_t i = 0; i < NUMBER_OF_COLUMNS; ++i) {
       result[i] =
-          xfac * Table<NUMBER_OF_COLUMNS, DATA_TYPE>::_rows[ilow][i] +
-          (1. - xfac) * Table<NUMBER_OF_COLUMNS, DATA_TYPE>::_rows[ihigh][i];
+          (1. - xfac) * Table<NUMBER_OF_COLUMNS, DATA_TYPE>::_rows[ilow][i] +
+          xfac * Table<NUMBER_OF_COLUMNS, DATA_TYPE>::_rows[ihigh][i];
     }
     return result;
   }

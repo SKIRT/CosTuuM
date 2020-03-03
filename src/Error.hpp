@@ -140,4 +140,74 @@
 #define ctm_assert_message(condition, s, ...)
 #endif
 
+/**
+ * @brief Assertion macro. Checks that the given value is not NaN, and throws
+ * an error if it is. Only works if ACTIVATE_ASSERTIONS=True was given to
+ * cmake during configuration.
+ */
+#ifdef HAVE_ASSERTIONS
+#define ctm_assert_not_nan(value)                                              \
+  {                                                                            \
+    if ((value) != (value)) {                                                  \
+      ctm_error("Assertion failed: \"" #value "\" is NaN!");                   \
+    }                                                                          \
+  }
+#else
+#define ctm_assert_not_nan(value)
+#endif
+
+/**
+ * @brief Assertion macro. Checks that the given value is not NaN, and throws
+ * an error if it is. Only works if ACTIVATE_ASSERTIONS=True was given to
+ * cmake during configuration.
+ */
+#ifdef HAVE_ASSERTIONS
+#define ctm_assert_message_not_nan(value, s, ...)                              \
+  {                                                                            \
+    if ((value) != (value)) {                                                  \
+      ctm_error("Assertion failed: \"" #value "\" is NaN (" s ")!",            \
+                ##__VA_ARGS__);                                                \
+    }                                                                          \
+  }
+#else
+#define ctm_assert_message_not_nan(value, s, ...)
+#endif
+
+/**
+ * @brief Assertion macro. Checks that the given array does not contain any NaN
+ * values.
+ */
+#ifdef HAVE_ASSERTIONS
+#define ctm_assert_no_nans(array, size)                                        \
+  {                                                                            \
+    for (uint_fast32_t i = 0; i < size; ++i) {                                 \
+      if (array[i] != array[i]) {                                              \
+        ctm_error("Assertion failed: \"" #array "[%" PRIuFAST32 "]\" is NaN!", \
+                  i);                                                          \
+      }                                                                        \
+    }                                                                          \
+  }
+#else
+#define ctm_assert_no_nans(array, size)
+#endif
+
+/**
+ * @brief Assertion macro. Checks that the given array does not contain any NaN
+ * values.
+ */
+#ifdef HAVE_ASSERTIONS
+#define ctm_assert_message_no_nans(array, size, s, ...)                        \
+  {                                                                            \
+    for (uint_fast32_t i = 0; i < size; ++i) {                                 \
+      if (array[i] != array[i]) {                                              \
+        ctm_error("Assertion failed: \"" #array "[%" PRIuFAST32                \
+                  "]\" is NaN (" s " )!",                                      \
+                  i, ##__VA_ARGS__);                                           \
+      }                                                                        \
+    }                                                                          \
+  }
+#else
+#define ctm_assert_message_no_nans(array, size, s, ...)
+#endif
+
 #endif // ERROR_HPP

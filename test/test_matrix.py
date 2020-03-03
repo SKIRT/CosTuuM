@@ -34,7 +34,7 @@ A = np.array(
 Ainv = np.linalg.inv(A)
 
 # compare the unit test result and the numpy library result
-for i in range(num_x):
-    for j in range(num_y):
+for i in range(3):
+    for j in range(3):
         reldiff = abs(data[i, j] - Ainv[i, j]) / abs(data[i, j] + Ainv[i, j])
         print("data:", data[i, j], "ref:", Ainv[i, j], "reldiff:", reldiff)
