@@ -154,8 +154,12 @@ public:
     // create the object
     self->_alignment_distribution = new SizeBasedAlignmentDistribution(
         minimum_size, aligned_orientation_distribution_type, maximum_order,
-        oblate_orientation_distribution->_orientation_distribution,
-        prolate_orientation_distribution->_orientation_distribution);
+        (oblate_orientation_distribution != nullptr)
+            ? oblate_orientation_distribution->_orientation_distribution
+            : nullptr,
+        (prolate_orientation_distribution != nullptr)
+            ? prolate_orientation_distribution->_orientation_distribution
+            : nullptr);
 
     return 0;
   }
