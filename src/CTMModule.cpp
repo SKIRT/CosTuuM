@@ -7,6 +7,7 @@
  */
 
 #include "Configuration.hpp"
+#include "DustProperties.hpp"
 #include "PyAlignmentDistribution.hpp"
 #include "PyDustProperties.hpp"
 #include "PyHelperFunctions.hpp"
@@ -492,8 +493,10 @@ PyMODINIT_FUNC PyInit_CosTuuM() {
   PyModule_AddIntConstant(m, "CUSTOM_ALIGNMENT", 3);
 
   // add constants for the different material types that can be used
-  PyModule_AddIntConstant(m, "CARBON", 0);
-  PyModule_AddIntConstant(m, "SILICON", 1);
+  PyModule_AddIntConstant(m, "CARBON_PARALLEL", DUSTGRAINTYPE_CARBON_PARALLEL);
+  PyModule_AddIntConstant(m, "CARBON_PERPENDICULAR",
+                          DUSTGRAINTYPE_CARBON_PERPENDICULAR);
+  PyModule_AddIntConstant(m, "SILICON", DUSTGRAINTYPE_SILICON);
 
   PySingleShapeShapeDistribution::initialize(m);
   PyDraineHensleyShapeDistribution::initialize(m);

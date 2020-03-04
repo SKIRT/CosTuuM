@@ -809,7 +809,7 @@ public:
    * The horizontal axis @f$a@f$ can be found from the definition of the equal
    * volume sphere radius:
    * @f[
-   *    V_S = \frac{4\pi{}}{3}R_V^2 = \frac{4\pi{}}{3}a^2b
+   *    V_S = \frac{4\pi{}}{3}R_V^3 = \frac{4\pi{}}{3}a^2b
    *        = \frac{4\pi{}}{3} \frac{a^3}{d} = V_{sph},
    * @f]
    * hence

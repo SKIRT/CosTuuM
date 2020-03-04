@@ -16,8 +16,12 @@
  * @brief Possible types of dust grains.
  */
 enum DustGrainTypes {
-  /*! @brief Carbon grains. */
-  DUSTGRAINTYPE_CARBON = 0,
+  /*! @brief Carbon grains with their dipole moment oriented parallel to the
+   *  incoming electromagnetic field. */
+  DUSTGRAINTYPE_CARBON_PARALLEL = 0,
+  /*! @brief Carbon grains with their dipole moment oriented perpendicular to
+   *  the incoming electromagnetic field. */
+  DUSTGRAINTYPE_CARBON_PERPENDICULAR,
   /*! @brief Silicon grains. */
   DUSTGRAINTYPE_SILICON,
   /*! @brief Number of dust grain types. */
