@@ -206,7 +206,7 @@ public:
 
       ctm_assert_message(xvalue >= xlow, "%g %g %g", double(xvalue),
                          double(xlow), double(xhigh));
-      ctm_assert_message(xvalue < xhigh, "%g %g %g", double(xvalue),
+      ctm_assert_message(xvalue <= xhigh, "%g %g %g", double(xvalue),
                          double(xlow), double(xhigh));
     } else if (xlow > xhigh) {
       while (ilow + 1 != ihigh) {
@@ -225,7 +225,7 @@ public:
 
       ctm_assert_message(xvalue <= xlow, "%g %g %g", double(xvalue),
                          double(xlow), double(xhigh));
-      ctm_assert_message(xvalue > xhigh, "%g %g %g", double(xvalue),
+      ctm_assert_message(xvalue >= xhigh, "%g %g %g", double(xvalue),
                          double(xlow), double(xhigh));
     } else {
       ctm_error("Table endpoints are the same!");

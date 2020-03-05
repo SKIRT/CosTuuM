@@ -144,6 +144,9 @@ public:
   /**
    * @brief init() function for a DraineDustProperties object.
    *
+   * Optional arguments are:
+   *  - dust_temperature: Temperature of the dust grains (in K; default: 20. K).
+   *
    * @param self DustProperties wrapper object that is being initialised.
    * @param args Positional arguments.
    * @param kwargs Keyword arguments.
@@ -151,7 +154,36 @@ public:
    */
   static int init(PyDustProperties *self, PyObject *args, PyObject *kwargs) {
 
-    self->_dust_properties = new DraineDustProperties();
+    // optional arguments
+    float_type dust_temperature = 20.;
+
+    /// parse arguments
+    // list of keywords (in the expected order)
+    // note that we need to use strdup because the Python API expects char*,
+    // while C++ strings are const char*
+    // not doing this results in compilation warnings
+    static char *kwlist[] = {strdup("dust_temperature"), nullptr};
+
+    // allocate temporary variables to store double precision arguments
+    double dust_temperature_d = dust_temperature;
+    // parse the keywords/positional arguments
+    // d is a double
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|d", kwlist,
+                                     &dust_temperature_d)) {
+      // PyArg_ParseTupleAndKeywords will return 0 if a required argument was
+      // missing, if an argument of the wrong type was provided or if the number
+      // of arguments does not match the expectation
+      // we use ctm_warning so that we can gracefully exit and let Python handle
+      // the exception
+      // ctm_error would call abort, which would kill the Python interpreter
+      ctm_warning("Wrong arguments provided!");
+      // exit code 1 signals to Python that something was wrong
+      return 1;
+    }
+    // unpack double precision arguments
+    dust_temperature = dust_temperature_d;
+
+    self->_dust_properties = new DraineDustProperties(dust_temperature);
 
     return 0;
   }

@@ -99,6 +99,8 @@ static PyObject *get_equal_volume_radius(PyObject *self, PyObject *args,
  *  - tolerance: Maximum allowed relative difference between two successive
  *  orders of T-matrix calculations that decides when the calculation is
  *  converged.
+ *  - number_of_quadrature_angles: Number of Gauss-Legendre quadrature points to
+ *  use for the calculation of directional averages.
  *  - maximum_memory_size: Maximum allowed memory usage of the algorithm (in
  *  bytes).
  *  - number_of_threads: Number of shared-memory threads to use to run the
@@ -141,6 +143,7 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   uint_fast32_t input_nmax = 100;
   uint_fast32_t input_glfac = 2;
   float_type input_tolerance = 1.e-4;
+  uint_fast32_t input_ngauss = 20;
   size_t input_memory_size = 1e10;
   int_fast32_t input_nthread = 4;
   const char *input_graph_log_name = nullptr;
@@ -165,6 +168,7 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
                            strdup("maximum_order"),
                            strdup("gauss_legendre_factor"),
                            strdup("tolerance"),
+                           strdup("number_of_quadrature_angles"),
                            strdup("maximum_memory_size"),
                            strdup("number_of_threads"),
                            strdup("quicksched_graph_log"),
@@ -184,6 +188,7 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   unsigned int input_nmin_i = input_nmin;
   unsigned int input_nmax_i = input_nmax;
   unsigned int input_glfac_i = input_glfac;
+  unsigned int input_ngauss_i = input_ngauss;
   unsigned long input_memory_size_i = input_memory_size;
   int input_nthread_i = input_nthread;
   // placeholders for bool arguments
@@ -194,16 +199,17 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   int verbose_b = verbose;
   // parse positional and keyword arguments
   if (!PyArg_ParseTupleAndKeywords(
-          args, kwargs, "O&O&O&O&OOO|IIIdkizzzzppppp", kwlist,
+          args, kwargs, "O&O&O&O&OOO|IIIdIkizzzzppppp", kwlist,
           PyArray_Converter, &input_types, PyArray_Converter, &input_sizes,
           PyArray_Converter, &input_wavelengths, PyArray_Converter,
           &input_thetas, &shape_distribution_object,
           &alignment_distribution_object, &dust_properties_object,
           &input_nmin_i, &input_nmax_i, &input_glfac_i, &input_tolerance_d,
-          &input_memory_size_i, &input_nthread_i, &input_graph_log_name,
-          &input_task_log_name, &input_task_type_log_name,
-          &input_memory_log_name, &do_absorption_b, &do_extinction_b,
-          &do_scattering_b, &account_for_scattering_b, &verbose_b)) {
+          &input_ngauss_i, &input_memory_size_i, &input_nthread_i,
+          &input_graph_log_name, &input_task_log_name,
+          &input_task_type_log_name, &input_memory_log_name, &do_absorption_b,
+          &do_extinction_b, &do_scattering_b, &account_for_scattering_b,
+          &verbose_b)) {
     // again, we do not call ctm_error to avoid killing the Python interpreter
     ctm_warning("Wrong arguments provided!");
     // this time, a nullptr return will signal an error to Python
@@ -215,6 +221,7 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   input_nmin = input_nmin_i;
   input_nmax = input_nmax_i;
   input_glfac = input_glfac_i;
+  input_ngauss = input_ngauss_i;
   input_memory_size = input_memory_size_i;
   input_nthread = input_nthread_i;
   // convert bool arguments
@@ -276,7 +283,7 @@ static PyObject *get_table(PyObject *self, PyObject *args, PyObject *kwargs) {
   std::vector<Result *> results;
   TMatrixAuxiliarySpaceManager *space_manager = nullptr;
   task_manager.generate_tasks(
-      thetas, 20, quicksched, tasks, resources, result_key, results,
+      thetas, input_ngauss, quicksched, tasks, resources, result_key, results,
       space_manager, do_extinction, do_absorption, do_scattering,
       account_for_scattering, verbose, input_memory_log_name != nullptr,
       input_memory_log);
