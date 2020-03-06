@@ -18,9 +18,6 @@
 
 /// ShapeDistribution object
 
-/*! @brief Methods exposed to Python. */
-static PyMethodDef ShapeDistributionMethods[] = {{nullptr}};
-
 /*! @brief Type for SingleShapeShapeDistribution wrapper objects. */
 static PyTypeObject PySingleShapeShapeDistributionType = {
     PyVarObject_HEAD_INIT(nullptr, 0)};
@@ -74,7 +71,34 @@ public:
     self->_shape_distribution = nullptr;
     return reinterpret_cast<PyObject *>(self);
   }
+
+  /**
+   * @brief Get the limits for the shape distribution.
+   *
+   * @param self PyDustProperties object.
+   * @param args Positional arguments.
+   * @param kwargs Keyword arguments.
+   * @return Nothing.
+   */
+  static PyObject *get_limits(PyShapeDistribution *self, PyObject *args,
+                              PyObject *kwargs) {
+
+    return Py_BuildValue(
+        "dd",
+        static_cast<double>(
+            self->_shape_distribution->get_minimum_axis_ratio()),
+        static_cast<double>(
+            self->_shape_distribution->get_maximum_axis_ratio()));
+  }
 };
+
+/*! @brief Methods exposed to Python. */
+static PyMethodDef ShapeDistributionMethods[] = {
+    {"get_limits",
+     reinterpret_cast<PyCFunction>(PyShapeDistribution::get_limits),
+     METH_VARARGS | METH_KEYWORDS,
+     "Get the limits for the shape distribution."},
+    {nullptr}};
 
 /**
  * @brief C wrapper for the SingleShapeShapeDistribution implementation.
