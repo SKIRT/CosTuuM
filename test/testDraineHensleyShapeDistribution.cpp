@@ -26,14 +26,30 @@ using namespace std;
  */
 int main(int argc, char **argv) {
 
-  DraineHensleyShapeDistribution distribution(100);
-  const float_type dmin = distribution.get_minimum_axis_ratio();
-  const float_type dint = distribution.get_maximum_axis_ratio() - dmin;
-  std::ofstream ofile("test_draine_hensley_shape_distribution.txt");
-  ofile << "# d\tP(d)\n";
-  for (uint_fast32_t i = 0; i < 100; ++i) {
-    const float_type d = dmin + 0.01 * (i + 0.5) * dint;
-    ofile << d << "\t" << distribution(d) << "\n";
+  // test the default cutoff scheme
+  {
+    DraineHensleyShapeDistribution distribution(100);
+    const float_type dmin = distribution.get_minimum_axis_ratio();
+    const float_type dint = distribution.get_maximum_axis_ratio() - dmin;
+    std::ofstream ofile("test_draine_hensley_shape_distribution.txt");
+    ofile << "# d\tP(d)\n";
+    for (uint_fast32_t i = 0; i < 100; ++i) {
+      const float_type d = dmin + 0.01 * (i + 0.5) * dint;
+      ofile << d << "\t" << distribution(d) << "\n";
+    }
+  }
+
+  // test the advanced fraction scheme
+  {
+    DraineHensleyShapeDistribution distribution(100, 0., 0.9);
+    const float_type dmin = distribution.get_minimum_axis_ratio();
+    const float_type dint = distribution.get_maximum_axis_ratio() - dmin;
+    std::ofstream ofile("test_draine_hensley_shape_distribution_fraction.txt");
+    ofile << "# d\tP(d)\n";
+    for (uint_fast32_t i = 0; i < 100; ++i) {
+      const float_type d = dmin + 0.01 * (i + 0.5) * dint;
+      ofile << d << "\t" << distribution(d) << "\n";
+    }
   }
 
   return 0;

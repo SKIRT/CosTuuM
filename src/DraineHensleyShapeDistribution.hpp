@@ -172,6 +172,19 @@ private:
     return 12. * L * Lm1 * Lm1;
   }
 
+  /**
+   * @brief Evaluate the cde2 distribution without any checks.
+   *
+   * @param axis_ratio Axis ratio.
+   * @param additional_arguments Additional arguments for the function
+   * (ignored).
+   * @return Corresponding value of the distribution.
+   */
+  inline static float_type evaluate_cde2(const float_type axis_ratio,
+                                         void *additional_arguments) {
+    return cde2(get_shape_factor(axis_ratio)) * get_jacobian(axis_ratio);
+  }
+
 public:
   /**
    * @brief Virtual shape distribution function.
@@ -194,81 +207,159 @@ public:
    *
    * @param npoints Number of evaluation points.
    * @param cutoff Probability value at which the distribution is cut off.
+   * @param fraction Fraction of the distribution that is sampled.
    */
   inline DraineHensleyShapeDistribution(const uint_fast32_t npoints,
-                                        const float_type cutoff = 0.15) {
+                                        const float_type cutoff = 0.15,
+                                        const float_type fraction = -1.) {
 
-    ctm_assert(cutoff > 0.);
-    ctm_assert(cutoff < 0.5);
+    // check if we use a cutoff or a fractional selection criterion
+    if (fraction > 0.) {
 
-    // the values for _minimum_axis_ratio and _maximum_axis_ratio are used
-    // in operator() function calls, so we need to set them to sensible initial
-    // values
-    _minimum_axis_ratio = 1.;
-    _maximum_axis_ratio = 1.;
+      // fractional criterion: check that the fraction is valid
+      ctm_assert(fraction < 1.);
 
-    // starting from a safe guess (axis_ratio = 1), we decrease the value
-    // of _minimum_axis_ratio until it is below the target probability
-    float_type valmin = operator()(_minimum_axis_ratio) - cutoff;
-    while (valmin > 0.) {
-      _minimum_axis_ratio *= 0.5;
-      valmin = operator()(_minimum_axis_ratio) - cutoff;
-    }
-
-    // we know have a bracket [_minimum_axis_ratio, upper_bound] that contains
-    // the root that determines the minimum axis ratio
-    // we use bisection to find a reasonable approximation (relative error
-    // 0.1 %) for the root
-    float_type upper_bound = 1.;
-    float_type valmax = operator()(upper_bound) - cutoff;
-    // sensibility checks for the initial bracket values
-    ctm_assert_message(valmin < 0., "p(%g) = %g", double(_minimum_axis_ratio),
-                       double(valmin));
-    ctm_assert(valmax > 0.);
-    ctm_assert_message(valmax > 0., "p(%g) = %g", double(upper_bound),
-                       double(valmax));
-    while (fabs(_minimum_axis_ratio - upper_bound) >
-           0.005 * fabs(_minimum_axis_ratio + upper_bound)) {
-      const float_type mid = 0.5 * (_minimum_axis_ratio + upper_bound);
-      const float_type valmid = operator()(mid) - cutoff;
-      if (valmid < 0.) {
-        _minimum_axis_ratio = mid;
-        valmin = valmid;
-      } else {
-        upper_bound = mid;
-        valmax = valmid;
+      // compute the total prolate fraction for the distribution
+      const float_type prolate_fraction =
+          SpecialFunctions::gauss_legendre_quadrature<float_type>(
+              evaluate_cde2, 0., 1., nullptr, 10, 1000, 1.e-10, 1.e-10);
+      // set the prolate target fraction
+      const float_type prolate_target = fraction * prolate_fraction;
+      // now find the lower limit axis ratio that guarantees this prolate
+      // fraction
+      // we use a bisection algorithm to do the search
+      float_type lower_limit = 0.;
+      float_type upper_limit = 1.;
+      float_type half = 0.5;
+      float_type integral =
+          SpecialFunctions::gauss_legendre_quadrature<float_type>(
+              evaluate_cde2, half, 1., nullptr, 10, 1000, 1.e-10, 1.e-10);
+      while (fabs(integral - prolate_target) >
+             0.005 * fabs(integral + prolate_target)) {
+        ctm_assert(half > 0.);
+        if (integral > prolate_target) {
+          lower_limit = half;
+        } else {
+          upper_limit = half;
+        }
+        half = 0.5 * (lower_limit + upper_limit);
+        integral = SpecialFunctions::gauss_legendre_quadrature<float_type>(
+            evaluate_cde2, half, 1., nullptr, 10, 1000, 1.e-10, 1.e-10);
       }
-    }
+      _minimum_axis_ratio = half;
 
-    // starting from a safe guess (axis_ratio = 1), we increase the value
-    // of _maximum_axis_ratio until it is above the target probability
-    valmax = operator()(_maximum_axis_ratio) - cutoff;
-    while (valmax > 0.) {
-      _maximum_axis_ratio += 1.;
+      // now do the same for the upper limit
+      // since the distribution goes up to an infinite axis ratio, we do not
+      // try to compute the oblate fraction numerically and instead use a
+      // shortcut
+      const float_type oblate_fraction = 1. - prolate_fraction;
+      const float_type oblate_target = fraction * oblate_fraction;
+      lower_limit = 1.;
+      // we start with a guess for the upper limit and increase it until we
+      // found a bracket for bisection
+      upper_limit = 2.;
+      integral = SpecialFunctions::gauss_legendre_quadrature<float_type>(
+          evaluate_cde2, 1., upper_limit, nullptr, 10, 1000, 1.e-10, 1.e-10);
+      while (integral < oblate_target) {
+        upper_limit *= 2.;
+        integral = SpecialFunctions::gauss_legendre_quadrature<float_type>(
+            evaluate_cde2, 1., upper_limit, nullptr, 10, 1000, 1.e-10, 1.e-10);
+      }
+      // once the bracket has been found, we bisect away
+      half = 0.5 * (lower_limit + upper_limit);
+      integral = SpecialFunctions::gauss_legendre_quadrature<float_type>(
+          evaluate_cde2, 1., half, nullptr, 10, 1000, 1.e-10, 1.e-10);
+      while (fabs(integral - oblate_target) >
+             1.e-5 * fabs(integral + oblate_target)) {
+        ctm_assert(half > 0.);
+        if (integral > oblate_target) {
+          upper_limit = half;
+        } else {
+          lower_limit = half;
+        }
+        half = 0.5 * (lower_limit + upper_limit);
+        integral = SpecialFunctions::gauss_legendre_quadrature<float_type>(
+            evaluate_cde2, 1., half, nullptr, 10, 1000, 1.e-10, 1.e-10);
+      }
+      _maximum_axis_ratio = half;
+
+    } else {
+
+      // check that the cutoff is valid
+      ctm_assert(cutoff > 0.);
+      ctm_assert(cutoff < 0.5);
+
+      // the values for _minimum_axis_ratio and _maximum_axis_ratio are used
+      // in operator() function calls, so we need to set them to sensible
+      // initial values
+      _minimum_axis_ratio = 1.;
+      _maximum_axis_ratio = 1.;
+
+      // starting from a safe guess (axis_ratio = 1), we decrease the value
+      // of _minimum_axis_ratio until it is below the target probability
+      float_type valmin = operator()(_minimum_axis_ratio) - cutoff;
+      while (valmin > 0.) {
+        _minimum_axis_ratio *= 0.5;
+        valmin = operator()(_minimum_axis_ratio) - cutoff;
+      }
+
+      // we know have a bracket [_minimum_axis_ratio, upper_bound] that contains
+      // the root that determines the minimum axis ratio
+      // we use bisection to find a reasonable approximation (relative error
+      // 0.1 %) for the root
+      float_type upper_bound = 1.;
+      float_type valmax = operator()(upper_bound) - cutoff;
+      // sensibility checks for the initial bracket values
+      ctm_assert_message(valmin < 0., "p(%g) = %g", double(_minimum_axis_ratio),
+                         double(valmin));
+      ctm_assert(valmax > 0.);
+      ctm_assert_message(valmax > 0., "p(%g) = %g", double(upper_bound),
+                         double(valmax));
+      while (fabs(_minimum_axis_ratio - upper_bound) >
+             0.005 * fabs(_minimum_axis_ratio + upper_bound)) {
+        const float_type mid = 0.5 * (_minimum_axis_ratio + upper_bound);
+        const float_type valmid = operator()(mid) - cutoff;
+        if (valmid < 0.) {
+          _minimum_axis_ratio = mid;
+          valmin = valmid;
+        } else {
+          upper_bound = mid;
+          valmax = valmid;
+        }
+      }
+
+      // starting from a safe guess (axis_ratio = 1), we increase the value
+      // of _maximum_axis_ratio until it is above the target probability
       valmax = operator()(_maximum_axis_ratio) - cutoff;
-    }
+      while (valmax > 0.) {
+        _maximum_axis_ratio += 1.;
+        valmax = operator()(_maximum_axis_ratio) - cutoff;
+      }
 
-    // we now repeat the bisection procedure for the bracket [lower_bound,
-    // _maximum_axis_ratio]
-    float_type lower_bound = 1.;
-    valmin = operator()(lower_bound) - cutoff;
-    ctm_assert_message(valmin > 0., "p(%g) = %g", double(lower_bound),
-                       double(valmin));
-    ctm_assert_message(valmax < 0., "p(%g) = %g", double(_maximum_axis_ratio),
-                       double(valmax));
-    while (fabs(_maximum_axis_ratio - lower_bound) >
-           0.005 * fabs(_maximum_axis_ratio + lower_bound)) {
-      const float_type mid = 0.5 * (lower_bound + _maximum_axis_ratio);
-      const float_type valmid = operator()(mid) - cutoff;
-      if (valmid > 0.) {
-        lower_bound = mid;
-        valmin = valmid;
-      } else {
-        _maximum_axis_ratio = mid;
-        valmax = valmid;
+      // we now repeat the bisection procedure for the bracket [lower_bound,
+      // _maximum_axis_ratio]
+      float_type lower_bound = 1.;
+      valmin = operator()(lower_bound) - cutoff;
+      ctm_assert_message(valmin > 0., "p(%g) = %g", double(lower_bound),
+                         double(valmin));
+      ctm_assert_message(valmax < 0., "p(%g) = %g", double(_maximum_axis_ratio),
+                         double(valmax));
+      while (fabs(_maximum_axis_ratio - lower_bound) >
+             0.005 * fabs(_maximum_axis_ratio + lower_bound)) {
+        const float_type mid = 0.5 * (lower_bound + _maximum_axis_ratio);
+        const float_type valmid = operator()(mid) - cutoff;
+        if (valmid > 0.) {
+          lower_bound = mid;
+          valmin = valmid;
+        } else {
+          _maximum_axis_ratio = mid;
+          valmax = valmid;
+        }
       }
     }
 
+    // once the minimum and maximum ratios have been set, we can precompute the
+    // quadrature points that are used to evaluate the distribution
     evaluate(npoints);
   }
 
