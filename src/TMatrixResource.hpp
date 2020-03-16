@@ -749,6 +749,8 @@ public:
     }
 
     if (_Tmatrix._dQscattering > 0.) {
+      _converged_size._dQs = _Tmatrix._dQscattering;
+      _converged_size._dQe = _Tmatrix._dQextinction;
       if (_Tmatrix._dQscattering <= _tolerance &&
           _Tmatrix._dQextinction <= _tolerance) {
         _converged_size._is_converged = true;
@@ -876,10 +878,11 @@ public:
     // make sure the T-matrix was actually converged
     ctm_assert_message(
         _converged_size.is_converged(),
-        "size: %g, wavelength: %g, axis_ratio: %g",
+        "size: %g, wavelength: %g, axis_ratio: %g, dQs: %g, dQe: %g",
         double(_interaction_variables.get_equal_volume_radius()),
         double(2. * M_PI / _interaction_variables.get_wavenumber()),
-        double(_converged_size.get_geometry()->get_axis_ratio()));
+        double(_converged_size.get_geometry()->get_axis_ratio()),
+        double(_converged_size.get_dQs()), double(_converged_size.get_dQe()));
 
     // since we don't know how many elements the T matrix will have before
     // we create the tasks, we might have tasks for elements of the T matrix
