@@ -272,30 +272,6 @@ class TMatrixAuxiliarySpace {
   friend class AlignmentAverageTask;
 
 private:
-  /*! @brief Q factor terms involving MM interactions. */
-  Matrix<std::complex<float_type>> _J11;
-
-  /*! @brief Q factor terms involving MN interactions. */
-  Matrix<std::complex<float_type>> _J12;
-
-  /*! @brief Q factor terms involving NM interactions. */
-  Matrix<std::complex<float_type>> _J21;
-
-  /*! @brief Q factor terms involving NN interactions. */
-  Matrix<std::complex<float_type>> _J22;
-
-  /*! @brief Regular Q factor terms involving MM interactions. */
-  Matrix<std::complex<float_type>> _RgJ11;
-
-  /*! @brief Regular Q factor terms involving MN interactions. */
-  Matrix<std::complex<float_type>> _RgJ12;
-
-  /*! @brief Regular Q factor terms involving NM interactions. */
-  Matrix<std::complex<float_type>> _RgJ21;
-
-  /*! @brief Regular Q factor terms involving NN interactions. */
-  Matrix<std::complex<float_type>> _RgJ22;
-
   /*! @brief Q matrix. */
   Matrix<std::complex<float_type>> _Q;
 
@@ -325,13 +301,7 @@ public:
    * from this resource, used to initialise the internal storage space.
    */
   inline TMatrixAuxiliarySpace(const uint_fast32_t maximum_order)
-      : _J11(maximum_order, maximum_order), _J12(maximum_order, maximum_order),
-        _J21(maximum_order, maximum_order), _J22(maximum_order, maximum_order),
-        _RgJ11(maximum_order, maximum_order),
-        _RgJ12(maximum_order, maximum_order),
-        _RgJ21(maximum_order, maximum_order),
-        _RgJ22(maximum_order, maximum_order),
-        _Q(2 * maximum_order, 2 * maximum_order),
+      : _Q(2 * maximum_order, 2 * maximum_order),
         _RgQ(2 * maximum_order, 2 * maximum_order),
         _pivot_array(2 * maximum_order), _work(2 * maximum_order),
         _wigner_d(maximum_order), _dwigner_d(maximum_order),
@@ -347,10 +317,6 @@ public:
   static inline size_t get_memory_size(const uint_fast32_t maximum_order) {
     // storage space for class variables
     size_t size = sizeof(TMatrixAuxiliarySpace);
-    // Js
-    size += 8 * maximum_order * maximum_order * sizeof(float_type);
-    // RgJs
-    size += 8 * maximum_order * maximum_order * sizeof(float_type);
     // Q
     size += 8 * maximum_order * maximum_order * sizeof(float_type);
     // RgQ
@@ -370,14 +336,6 @@ public:
    * @brief Clear the entire contents of the matrices.
    */
   inline void reset() {
-    _J11.reset();
-    _J12.reset();
-    _J21.reset();
-    _J22.reset();
-    _RgJ11.reset();
-    _RgJ12.reset();
-    _RgJ21.reset();
-    _RgJ22.reset();
     _Q.reset();
     _RgQ.reset();
     for (uint_fast32_t i = 0; i < _pivot_array.size(); ++i) {
@@ -617,16 +575,31 @@ public:
 
     std::vector<float_type> &wigner_d = aux._wigner_d;
     std::vector<float_type> &dwigner_d = aux._dwigner_d;
+
+    const std::complex<float_type> k2mr =
+        _interaction_variables.get_material_wavenumber_times_wavenumber();
+    const float_type k2 = _interaction_variables.get_wavenumber_squared();
+    const std::complex<float_type> icompl(0., 1.);
+
     for (uint_fast32_t ig = 1; ig < _ngauss + 1; ++ig) {
 
       _wigner.get_wigner_functions(0, ig - 1, wigner_d, dwigner_d);
 
       for (uint_fast32_t n1 = 1; n1 < _nmax + 1; ++n1) {
+
         // n1 * (n1 + 1)
         const float_type n1n1p1 = n1 * (n1 + 1.);
+
+        const uint_fast32_t i1 = n1;
+        const uint_fast32_t ii1 = i1 + _nmax;
+
         for (uint_fast32_t n2 = 1; n2 < _nmax + 1; ++n2) {
+
           // n2 * (n2 + 1)
           const float_type n2n2p1 = n2 * (n2 + 1.);
+
+          const uint_fast32_t i2 = n2;
+          const uint_fast32_t ii2 = i2 + _nmax;
 
           // filter out half the components because of symmetry
           if ((n1 + n2) % 2 == 0) {
@@ -685,66 +658,36 @@ public:
             //    ([kr*hn1(kr)]'/kr)
             // + r^2 * dr/rdtheta * n1 * (n1 + 1) * dn1_0m * ddn1_0m/dtheta *
             //    jn2(krmr) * hn1(kr) / kr
-            aux._J12(n1 - 1, n2 - 1) += an12 * (f1 * b2 + f2 * b3);
+            const std::complex<float_type> this_J12 =
+                -icompl * an12 * (f1 * b2 + f2 * b3);
             // r^2 * ddn1_0m/dtheta * ddn2_0m/dtheta * jn2(krmr) *
             //    ([kr*jn1(kr)]'/kr)
             // + r^2 * dr/rdtheta * n1 * (n1 + 1) * dn1_0m * ddn1_0m/dtheta *
             //    jn2(krmr) * jn1(kr) / kr
-            aux._RgJ12(n1 - 1, n2 - 1) += an12 * (f1 * c2 + f2 * c3);
+            const std::complex<float_type> this_RgJ12 =
+                -icompl * an12 * (f1 * c2 + f2 * c3);
 
             const float_type f3 = wr2i * dr_over_ri * n2n2p1 * dwn1wn2;
             // r^2 * ddn1_0m/dtheta * ddn2_0m/dtheta * hn1(kr) *
             //    ([krmr*jn2(krmr)]'/krmr)
             // + r^2 * dr/rdtheta * n2 * (n2 + 1) * ddn1_0m/dtheta * dn2_0m *
             //    jn2(krmr) * hn1(kr) / krmr
-            aux._J21(n1 - 1, n2 - 1) += an12 * (f1 * b4 + f3 * b5);
+            const std::complex<float_type> this_J21 =
+                icompl * an12 * (f1 * b4 + f3 * b5);
             // r^2 * ddn1_0m/dtheta * ddn2_0m/dtheta * jn1(kr) *
             //    ([krmr*jn2(krmr)]'/krmr)
             // + r^2 * dr/rdtheta * n2 * (n2 + 1) * ddn1_0m/dtheta * dn2_0m *
             //    jn2(krmr) * jn1(kr) / krmr
-            aux._RgJ21(n1 - 1, n2 - 1) += an12 * (f1 * c4 + f3 * c5);
+            const std::complex<float_type> this_RgJ21 =
+                icompl * an12 * (f1 * c4 + f3 * c5);
+
+            aux._Q(i1 - 1, i2 - 1) += k2mr * this_J21 + k2 * this_J12;
+            aux._RgQ(i1 - 1, i2 - 1) += k2mr * this_RgJ21 + k2 * this_RgJ12;
+
+            aux._Q(ii1 - 1, ii2 - 1) += k2mr * this_J12 + k2 * this_J21;
+            aux._RgQ(ii1 - 1, ii2 - 1) += k2mr * this_RgJ12 + k2 * this_RgJ21;
           }
         }
-      }
-    }
-    for (uint_fast32_t n1 = 1; n1 < _nmax + 1; ++n1) {
-      const uint_fast32_t k1 = n1;
-      const uint_fast32_t kk1 = k1 + _nmax;
-      for (uint_fast32_t n2 = 1; n2 < _nmax + 1; ++n2) {
-        const uint_fast32_t k2 = n2;
-        const uint_fast32_t kk2 = k2 + _nmax;
-
-        const std::complex<float_type> icompl(0., 1.);
-        // no idea why we multiply with i: completely unnecessary...
-        // (code also works if you leave out the i factor)
-        // sign differences are due to a sign difference between the
-        // implementation and documentation
-        const std::complex<float_type> this_J12 =
-            -icompl * aux._J12(n1 - 1, n2 - 1);
-        const std::complex<float_type> this_RgJ12 =
-            -icompl * aux._RgJ12(n1 - 1, n2 - 1);
-        const std::complex<float_type> this_J21 =
-            icompl * aux._J21(n1 - 1, n2 - 1);
-        const std::complex<float_type> this_RgJ21 =
-            icompl * aux._RgJ21(n1 - 1, n2 - 1);
-
-        aux._Q(k1 - 1, k2 - 1) =
-            _interaction_variables.get_material_wavenumber_times_wavenumber() *
-                this_J21 +
-            _interaction_variables.get_wavenumber_squared() * this_J12;
-        aux._RgQ(k1 - 1, k2 - 1) =
-            _interaction_variables.get_material_wavenumber_times_wavenumber() *
-                this_RgJ21 +
-            _interaction_variables.get_wavenumber_squared() * this_RgJ12;
-
-        aux._Q(kk1 - 1, kk2 - 1) =
-            _interaction_variables.get_material_wavenumber_times_wavenumber() *
-                this_J12 +
-            _interaction_variables.get_wavenumber_squared() * this_J21;
-        aux._RgQ(kk1 - 1, kk2 - 1) =
-            _interaction_variables.get_material_wavenumber_times_wavenumber() *
-                this_RgJ12 +
-            _interaction_variables.get_wavenumber_squared() * this_RgJ21;
       }
     }
 
@@ -962,14 +905,29 @@ public:
 
     std::vector<float_type> &wigner_ds = aux._wigner_d;
     std::vector<float_type> &dwigner_ds = aux._dwigner_d;
+
+    const std::complex<float_type> k2mr =
+        _interaction_variables.get_material_wavenumber_times_wavenumber();
+    const float_type k2 = _interaction_variables.get_wavenumber_squared();
+    const std::complex<float_type> icompl(0., 1.);
+
     for (uint_fast32_t ig = 0; ig < ngauss; ++ig) {
       wigner_d.get_wigner_functions(_m, ig, wigner_ds, dwigner_ds);
       for (uint_fast32_t n1 = _m; n1 < nmax + 1; ++n1) {
+
         // n1 * (n1 + 1)
         const float_type n1n1p1 = n1 * (n1 + 1.);
+
+        const uint_fast32_t i1 = n1 + 1 - _m;
+        const uint_fast32_t ii1 = i1 + nm;
+
         for (uint_fast32_t n2 = _m; n2 < nmax + 1; ++n2) {
+
           // n2 * (n2 + 1)
           const float_type n2n2p1 = n2 * (n2 + 1.);
+
+          const uint_fast32_t i2 = n2 + 1 - _m;
+          const uint_fast32_t ii2 = i2 + nm;
 
           const int_fast8_t sign = ((n1 + n2) % 2 == 0) ? 1 : -1;
           const float_type wigner_n1 = wigner_ds[n1 - 1];
@@ -1032,10 +990,10 @@ public:
             const float_type e1 = dsi * (wn1dwn2 + dwn1wn2);
             // (m / sintheta) * jn2(krmr) * hn1(kr) *
             // (dn1_0m * ddn2_0m/dtheta + ddn1_0m/dtheta * dn2_0m)
-            aux._J11(n1 - 1, n2 - 1) += an12 * (e1 * b1);
+            const std::complex<float_type> this_J11 = -an12 * (e1 * b1);
             // (m / sintheta) * jn2(krmr) * jn1(kr) *
             // (dn1_0m * ddn2_0m/dtheta + ddn1_0m/dtheta * dn2_0m)
-            aux._RgJ11(n1 - 1, n2 - 1) += an12 * (e1 * c1);
+            const std::complex<float_type> this_RgJ11 = -an12 * (e1 * c1);
 
             const float_type factor = dsi * dr_over_ri * wn1wn2;
             const float_type e2 = factor * n1n1p1;
@@ -1046,14 +1004,23 @@ public:
             //    * ([krmr*jn2(krmr)]'/krmr) * hn1(kr) / kr
             // + (m / sintheta) * dr/rdtheta * dn1_0m * dn2_0m * n2 * (n2 + 1)
             //    * jn2(krmr) * ([kr*hn1(kr]'/kr) / krmr
-            aux._J22(n1 - 1, n2 - 1) += an12 * (e1 * b6 + e2 * b7 + e3 * b8);
+            const std::complex<float_type> this_J22 =
+                -an12 * (e1 * b6 + e2 * b7 + e3 * b8);
             // (m / sintheta) * ([krmr*kn2(krmr)]'/krmr) * ([kr*jn1(kr)]'/kr)
             //    * (dn1_0m * ddn2_0m/dtheta + ddn1_0m/dtheta * dn2_0m)
             // + (m / sintheta) * dr/rdtheta * dn1_0m * dn2_0m * n1 * (n1 + 1)
             //    * ([krmr*jn2(krmr)]'/krmr) * jn1(kr) / kr
             // + (m / sintheta) * dr/rdtheta * dn1_0m * dn2_0m * n2 * (n2 + 1)
             //    * jn2(krmr) * ([kr*jn1(kr]'/kr) / krmr
-            aux._RgJ22(n1 - 1, n2 - 1) += an12 * (e1 * c6 + e2 * c7 + e3 * c8);
+            const std::complex<float_type> this_RgJ22 =
+                -an12 * (e1 * c6 + e2 * c7 + e3 * c8);
+
+            aux._Q(i1 - 1, ii2 - 1) += k2mr * this_J11 + k2 * this_J22;
+            aux._RgQ(i1 - 1, ii2 - 1) += k2mr * this_RgJ11 + k2 * this_RgJ22;
+
+            aux._Q(ii1 - 1, i2 - 1) += k2mr * this_J22 + k2 * this_J11;
+            aux._RgQ(ii1 - 1, i2 - 1) += k2mr * this_RgJ22 + k2 * this_RgJ11;
+
           } else {
             // note that r2 here actually is (r2/R_V^2)
             // this is okay, since this factor appears in all elements of the
@@ -1075,13 +1042,15 @@ public:
             //    ([kr*hn1(kr)]'/kr)
             // + r^2 * dr/rdtheta * n1 * (n1 + 1) * dn1_0m * ddn1_0m/dtheta *
             //    jn2(krmr) * hn1(kr) / kr
-            aux._J12(n1 - 1, n2 - 1) += an12 * (f1 * b2 + f2 * b3);
+            const std::complex<float_type> this_J12 =
+                -icompl * an12 * (f1 * b2 + f2 * b3);
             // r^2 * (m^2 / sintheta * dn1_0m * dn2_0m +
             //        ddn1_0m/dtheta * ddn2_0m/dtheta) * jn2(krmr) *
             //    ([kr*jn1(kr)]'/kr)
             // + r^2 * dr/rdtheta * n1 * (n1 + 1) * dn1_0m * ddn1_0m/dtheta *
             //    jn2(krmr) * jn1(kr) / kr
-            aux._RgJ12(n1 - 1, n2 - 1) += an12 * (f1 * c2 + f2 * c3);
+            const std::complex<float_type> this_RgJ12 =
+                -icompl * an12 * (f1 * c2 + f2 * c3);
 
             const float_type f3 = wr2i * dr_over_ri * n2n2p1 * dwn1wn2;
             // r^2 * (m^2 / sintheta * dn1_0m * dn2_0m +
@@ -1089,57 +1058,23 @@ public:
             //    ([krmr*jn2(krmr)]'/krmr)
             // + r^2 * dr/rdtheta * n2 * (n2 + 1) * ddn1_0m/dtheta * dn2_0m *
             //    jn2(krmr) * hn1(kr) / krmr
-            aux._J21(n1 - 1, n2 - 1) += an12 * (f1 * b4 + f3 * b5);
+            const std::complex<float_type> this_J21 =
+                icompl * an12 * (f1 * b4 + f3 * b5);
             // r^2 * (m^2 / sintheta * dn1_0m * dn2_0m +
             //        ddn1_0m/dtheta * ddn2_0m/dtheta) * jn1(kr) *
             //    ([krmr*jn2(krmr)]'/krmr)
             // + r^2 * dr/rdtheta * n2 * (n2 + 1) * ddn1_0m/dtheta * dn2_0m *
             //    jn2(krmr) * jn1(kr) / krmr
-            aux._RgJ21(n1 - 1, n2 - 1) += an12 * (f1 * c4 + f3 * c5);
+            const std::complex<float_type> this_RgJ21 =
+                icompl * an12 * (f1 * c4 + f3 * c5);
+
+            aux._Q(i1 - 1, i2 - 1) += k2mr * this_J21 + k2 * this_J12;
+            aux._RgQ(i1 - 1, i2 - 1) += k2mr * this_RgJ21 + k2 * this_RgJ12;
+
+            aux._Q(ii1 - 1, ii2 - 1) += k2mr * this_J12 + k2 * this_J21;
+            aux._RgQ(ii1 - 1, ii2 - 1) += k2mr * this_RgJ12 + k2 * this_RgJ21;
           }
         }
-      }
-    }
-
-    const std::complex<float_type> k2mr =
-        _interaction_variables.get_material_wavenumber_times_wavenumber();
-    const float_type k2 = _interaction_variables.get_wavenumber_squared();
-    for (uint_fast32_t n1 = _m; n1 < nmax + 1; ++n1) {
-      const uint_fast32_t ki1 = n1 + 1 - _m;
-      const uint_fast32_t kki1 = ki1 + nm;
-      for (uint_fast32_t n2 = _m; n2 < nmax + 1; ++n2) {
-        const uint_fast32_t ki2 = n2 + 1 - _m;
-        const uint_fast32_t kki2 = ki2 + nm;
-
-        const std::complex<float_type> icompl(0., 1.);
-        // a factor -i is missing in J11 and J22
-        // to compensate for this, we multiply J12 and J21 with -i too
-        // we then multiply J11 and J22 with -1, so that it is wrong again?
-        // not sure how to make sense of this...
-        const std::complex<float_type> this_J11 = -aux._J11(n1 - 1, n2 - 1);
-        const std::complex<float_type> this_RgJ11 = -aux._RgJ11(n1 - 1, n2 - 1);
-        const std::complex<float_type> this_J12 =
-            -icompl * aux._J12(n1 - 1, n2 - 1);
-        const std::complex<float_type> this_RgJ12 =
-            -icompl * aux._RgJ12(n1 - 1, n2 - 1);
-        const std::complex<float_type> this_J21 =
-            icompl * aux._J21(n1 - 1, n2 - 1);
-        const std::complex<float_type> this_RgJ21 =
-            icompl * aux._RgJ21(n1 - 1, n2 - 1);
-        const std::complex<float_type> this_J22 = -aux._J22(n1 - 1, n2 - 1);
-        const std::complex<float_type> this_RgJ22 = -aux._RgJ22(n1 - 1, n2 - 1);
-
-        aux._Q(ki1 - 1, ki2 - 1) = k2mr * this_J21 + k2 * this_J12;
-        aux._RgQ(ki1 - 1, ki2 - 1) = k2mr * this_RgJ21 + k2 * this_RgJ12;
-
-        aux._Q(ki1 - 1, kki2 - 1) = k2mr * this_J11 + k2 * this_J22;
-        aux._RgQ(ki1 - 1, kki2 - 1) = k2mr * this_RgJ11 + k2 * this_RgJ22;
-
-        aux._Q(kki1 - 1, ki2 - 1) = k2mr * this_J22 + k2 * this_J11;
-        aux._RgQ(kki1 - 1, ki2 - 1) = k2mr * this_RgJ22 + k2 * this_RgJ11;
-
-        aux._Q(kki1 - 1, kki2 - 1) = k2mr * this_J12 + k2 * this_J21;
-        aux._RgQ(kki1 - 1, kki2 - 1) = k2mr * this_RgJ12 + k2 * this_RgJ21;
       }
     }
 
