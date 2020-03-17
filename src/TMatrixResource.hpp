@@ -579,7 +579,6 @@ public:
     const std::complex<float_type> k2mr =
         _interaction_variables.get_material_wavenumber_times_wavenumber();
     const float_type k2 = _interaction_variables.get_wavenumber_squared();
-    const std::complex<float_type> icompl(0., 1.);
 
     for (uint_fast32_t ig = 1; ig < _ngauss + 1; ++ig) {
 
@@ -659,13 +658,13 @@ public:
             // + r^2 * dr/rdtheta * n1 * (n1 + 1) * dn1_0m * ddn1_0m/dtheta *
             //    jn2(krmr) * hn1(kr) / kr
             const std::complex<float_type> this_J12 =
-                -icompl * an12 * (f1 * b2 + f2 * b3);
+                -an12 * (f1 * b2 + f2 * b3);
             // r^2 * ddn1_0m/dtheta * ddn2_0m/dtheta * jn2(krmr) *
             //    ([kr*jn1(kr)]'/kr)
             // + r^2 * dr/rdtheta * n1 * (n1 + 1) * dn1_0m * ddn1_0m/dtheta *
             //    jn2(krmr) * jn1(kr) / kr
             const std::complex<float_type> this_RgJ12 =
-                -icompl * an12 * (f1 * c2 + f2 * c3);
+                -an12 * (f1 * c2 + f2 * c3);
 
             const float_type f3 = wr2i * dr_over_ri * n2n2p1 * dwn1wn2;
             // r^2 * ddn1_0m/dtheta * ddn2_0m/dtheta * hn1(kr) *
@@ -673,13 +672,13 @@ public:
             // + r^2 * dr/rdtheta * n2 * (n2 + 1) * ddn1_0m/dtheta * dn2_0m *
             //    jn2(krmr) * hn1(kr) / krmr
             const std::complex<float_type> this_J21 =
-                icompl * an12 * (f1 * b4 + f3 * b5);
+                an12 * (f1 * b4 + f3 * b5);
             // r^2 * ddn1_0m/dtheta * ddn2_0m/dtheta * jn1(kr) *
             //    ([krmr*jn2(krmr)]'/krmr)
             // + r^2 * dr/rdtheta * n2 * (n2 + 1) * ddn1_0m/dtheta * dn2_0m *
             //    jn2(krmr) * jn1(kr) / krmr
             const std::complex<float_type> this_RgJ21 =
-                icompl * an12 * (f1 * c4 + f3 * c5);
+                an12 * (f1 * c4 + f3 * c5);
 
             aux._Q(i1 - 1, i2 - 1) += k2mr * this_J21 + k2 * this_J12;
             aux._RgQ(i1 - 1, i2 - 1) += k2mr * this_RgJ21 + k2 * this_RgJ12;
@@ -993,10 +992,11 @@ public:
             const float_type e1 = dsi * (wn1dwn2 + dwn1wn2);
             // (m / sintheta) * jn2(krmr) * hn1(kr) *
             // (dn1_0m * ddn2_0m/dtheta + ddn1_0m/dtheta * dn2_0m)
-            const std::complex<float_type> this_J11 = -an12 * (e1 * b1);
+            const std::complex<float_type> this_J11 = icompl * an12 * (e1 * b1);
             // (m / sintheta) * jn2(krmr) * jn1(kr) *
             // (dn1_0m * ddn2_0m/dtheta + ddn1_0m/dtheta * dn2_0m)
-            const std::complex<float_type> this_RgJ11 = -an12 * (e1 * c1);
+            const std::complex<float_type> this_RgJ11 =
+                icompl * an12 * (e1 * c1);
 
             const float_type factor = dsi * dr_over_ri * wn1wn2;
             const float_type e2 = factor * n1n1p1;
@@ -1008,7 +1008,7 @@ public:
             // + (m / sintheta) * dr/rdtheta * dn1_0m * dn2_0m * n2 * (n2 + 1)
             //    * jn2(krmr) * ([kr*hn1(kr]'/kr) / krmr
             const std::complex<float_type> this_J22 =
-                -an12 * (e1 * b6 + e2 * b7 + e3 * b8);
+                icompl * an12 * (e1 * b6 + e2 * b7 + e3 * b8);
             // (m / sintheta) * ([krmr*kn2(krmr)]'/krmr) * ([kr*jn1(kr)]'/kr)
             //    * (dn1_0m * ddn2_0m/dtheta + ddn1_0m/dtheta * dn2_0m)
             // + (m / sintheta) * dr/rdtheta * dn1_0m * dn2_0m * n1 * (n1 + 1)
@@ -1016,7 +1016,7 @@ public:
             // + (m / sintheta) * dr/rdtheta * dn1_0m * dn2_0m * n2 * (n2 + 1)
             //    * jn2(krmr) * ([kr*jn1(kr]'/kr) / krmr
             const std::complex<float_type> this_RgJ22 =
-                -an12 * (e1 * c6 + e2 * c7 + e3 * c8);
+                icompl * an12 * (e1 * c6 + e2 * c7 + e3 * c8);
 
             aux._Q(i1 - 1, ii2 - 1) += k2mr * this_J11 + k2 * this_J22;
             aux._RgQ(i1 - 1, ii2 - 1) += k2mr * this_RgJ11 + k2 * this_RgJ22;
@@ -1046,14 +1046,14 @@ public:
             // + r^2 * dr/rdtheta * n1 * (n1 + 1) * dn1_0m * ddn1_0m/dtheta *
             //    jn2(krmr) * hn1(kr) / kr
             const std::complex<float_type> this_J12 =
-                -icompl * an12 * (f1 * b2 + f2 * b3);
+                -an12 * (f1 * b2 + f2 * b3);
             // r^2 * (m^2 / sintheta * dn1_0m * dn2_0m +
             //        ddn1_0m/dtheta * ddn2_0m/dtheta) * jn2(krmr) *
             //    ([kr*jn1(kr)]'/kr)
             // + r^2 * dr/rdtheta * n1 * (n1 + 1) * dn1_0m * ddn1_0m/dtheta *
             //    jn2(krmr) * jn1(kr) / kr
             const std::complex<float_type> this_RgJ12 =
-                -icompl * an12 * (f1 * c2 + f2 * c3);
+                -an12 * (f1 * c2 + f2 * c3);
 
             const float_type f3 = wr2i * dr_over_ri * n2n2p1 * dwn1wn2;
             // r^2 * (m^2 / sintheta * dn1_0m * dn2_0m +
@@ -1062,14 +1062,14 @@ public:
             // + r^2 * dr/rdtheta * n2 * (n2 + 1) * ddn1_0m/dtheta * dn2_0m *
             //    jn2(krmr) * hn1(kr) / krmr
             const std::complex<float_type> this_J21 =
-                icompl * an12 * (f1 * b4 + f3 * b5);
+                an12 * (f1 * b4 + f3 * b5);
             // r^2 * (m^2 / sintheta * dn1_0m * dn2_0m +
             //        ddn1_0m/dtheta * ddn2_0m/dtheta) * jn1(kr) *
             //    ([krmr*jn2(krmr)]'/krmr)
             // + r^2 * dr/rdtheta * n2 * (n2 + 1) * ddn1_0m/dtheta * dn2_0m *
             //    jn2(krmr) * jn1(kr) / krmr
             const std::complex<float_type> this_RgJ21 =
-                icompl * an12 * (f1 * c4 + f3 * c5);
+                an12 * (f1 * c4 + f3 * c5);
 
             aux._Q(i1 - 1, i2 - 1) += k2mr * this_J21 + k2 * this_J12;
             aux._RgQ(i1 - 1, i2 - 1) += k2mr * this_RgJ21 + k2 * this_RgJ12;
