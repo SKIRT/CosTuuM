@@ -59,13 +59,20 @@ private:
    *  converged. */
   bool _is_converged;
 
+  /*! @brief Relative difference for the scattering factor. */
+  float_type _dQs;
+
+  /*! @brief Relative difference for the extinction factor. */
+  float_type _dQe;
+
 public:
   /**
    * @brief Empty constructor.
    */
   inline ConvergedSizeResources()
       : _iteration(0), _nmax(0), _ngauss(0), _quadrature_points(nullptr),
-        _geometry(nullptr), _wigner_d(nullptr), _is_converged(false) {}
+        _geometry(nullptr), _wigner_d(nullptr), _is_converged(false), _dQs(-1.),
+        _dQe(-1.) {}
 
   /**
    * @brief Get the size in memory of a hypothetical ConvergedSizeResources
@@ -123,6 +130,20 @@ public:
    * @return True if the calculation is converged.
    */
   inline bool is_converged() const { return _is_converged; }
+
+  /**
+   * @brief Get the relative difference for the scattering factor.
+   *
+   * @return Relative difference for the scattering factor.
+   */
+  inline float_type get_dQs() const { return _dQs; }
+
+  /**
+   * @brief Get the relative difference for the extinction factor.
+   *
+   * @return Relative difference for the extinction factor.
+   */
+  inline float_type get_dQe() const { return _dQe; }
 };
 
 #endif // CONVERGEDSIZERESOURCES_HPP
