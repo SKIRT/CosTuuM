@@ -209,17 +209,11 @@ else(ACTIVATE_QUAD_PRECISION)
   message(STATUS "Using double precision.")
 endif(ACTIVATE_QUAD_PRECISION)
 
-if(ACTIVATE_TASKS)
-  add_configuration_option(HAVE_TASKS True)
-  set(LIBQUICKSCHED quicksched)
-  set(LIBQUICKSCHED_SHARED quicksched_shared)
-  include_directories(${PROJECT_SOURCE_DIR}/quicksched)
-  message(STATUS "Using task-based parallel algorithm.")
-else(ACTIVATE_TASKS)
-  add_configuration_option(HAVE_TASKS False)
-  message(STATUS "Not using task-based parallel algorithm.")
-  set(LIBQUICKSCHED "")
-endif(ACTIVATE_TASKS)
+add_configuration_option(HAVE_TASKS True)
+set(LIBQUICKSCHED quicksched)
+set(LIBQUICKSCHED_SHARED quicksched_shared)
+include_directories(${PROJECT_SOURCE_DIR}/quicksched)
+message(STATUS "Using task-based parallel algorithm.")
 
 ## Code configuration ##########################################################
 

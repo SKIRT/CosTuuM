@@ -42,6 +42,7 @@ def main():
                 library_dirs=["@PROJECT_BINARY_DIR@/lib"],
                 runtime_library_dirs=["@PROJECT_BINARY_DIR@/lib"],
                 depends=header_dependencies,
+                extra_compile_args=["-std=c++11"],
             )
         ],
         install_requires=["numpy"],
