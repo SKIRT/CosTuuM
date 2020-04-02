@@ -179,7 +179,7 @@ public:
       std::vector<float_type> dwigner_d(distribution.get_maximum_order(), 0.);
       // we have to manually compute the zeroth order value
       wigner_d[0] = 1.;
-      SpecialFunctions::wigner_dn_0m(std::cos(thetas[i]),
+      SpecialFunctions::wigner_dn_0m(cos(thetas[i]),
                                      distribution.get_maximum_order() - 1, 0,
                                      &wigner_d[1], &dwigner_d[1]);
 

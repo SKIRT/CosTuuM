@@ -55,8 +55,10 @@ int main(int argc, char **argv) {
     dfile << wavelength << "\t" << mr.real() << "\t" << mr.imag() << "\t"
           << mr_ref.real() << "\t" << mr_ref.imag() << "\t" << reldiff_real
           << "\t" << reldiff_imag << "\n";
-    assert_values_equal_rel(mr.real(), mr_ref.real(), 0.002);
-    assert_values_equal_rel(mr.imag(), mr_ref.imag(), 0.002);
+    assert_values_equal_rel(static_cast<double>(mr.real()),
+                            static_cast<double>(mr_ref.real()), 0.002);
+    assert_values_equal_rel(static_cast<double>(mr.imag()),
+                            static_cast<double>(mr_ref.imag()), 0.002);
   }
 
   return 0;

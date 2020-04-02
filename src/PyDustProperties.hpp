@@ -165,7 +165,7 @@ public:
     static char *kwlist[] = {strdup("dust_temperature"), nullptr};
 
     // allocate temporary variables to store double precision arguments
-    double dust_temperature_d = dust_temperature;
+    double dust_temperature_d = static_cast<double>(dust_temperature);
     // parse the keywords/positional arguments
     // d is a double
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|d", kwlist,

@@ -225,8 +225,8 @@ public:
     // placeholders for integer arguments
     unsigned int npoints_i = npoints;
     // placeholders for float arguments
-    double cutoff_d = cutoff;
-    double fraction_d = fraction;
+    double cutoff_d = static_cast<double>(cutoff);
+    double fraction_d = static_cast<double>(fraction);
     // parse the keywords/positional arguments
     // I is an unsigned integer
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|Idd", kwlist, &npoints_i,
