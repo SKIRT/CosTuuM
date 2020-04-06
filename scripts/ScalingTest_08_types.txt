@@ -1,0 +1,15 @@
+# type	label
+8	13TMatrixM0Task
+7	15InteractionTask
+0	15NBasedResources
+13	15TMatrixMAllTask
+4	16WignerDResources
+1	19GaussBasedResources
+9	20AlignmentAverageTask
+5	24ParticleGeometryResource
+11	24ResetTMatrixResourceTask
+2	25AbsorptionCoefficientGrid
+10	25AbsorptionCoefficientTask
+6	28AbsorptionShapeAveragingTask
+12	28ResetInteractionResourceTask
+3	33AbsorptionSpecialWignerDResources

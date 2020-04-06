@@ -1,0 +1,94 @@
+CATEGORY="plots"
+CORES=1
+DISK=1000
+MEMORY=1000
+
+ScatteringCorrection.png ScatteringCorrection.pdf ScatteringCorrection_convergence.png ScatteringCorrection_convergence.pdf : ScatteringCorrection_plot.py ScatteringCorrection_n01_oblate.dat ScatteringCorrection_n01_prolate.dat ScatteringCorrection_n02_oblate.dat ScatteringCorrection_n02_prolate.dat ScatteringCorrection_n03_oblate.dat ScatteringCorrection_n03_prolate.dat ScatteringCorrection_n04_oblate.dat ScatteringCorrection_n04_prolate.dat ScatteringCorrection_n05_oblate.dat ScatteringCorrection_n05_prolate.dat ScatteringCorrection_n06_oblate.dat ScatteringCorrection_n06_prolate.dat ScatteringCorrection_n07_oblate.dat ScatteringCorrection_n07_prolate.dat ScatteringCorrection_n08_oblate.dat ScatteringCorrection_n08_prolate.dat ScatteringCorrection_n09_oblate.dat ScatteringCorrection_n09_prolate.dat ScatteringCorrection_n10_oblate.dat ScatteringCorrection_n10_prolate.dat ScatteringCorrection_n11_oblate.dat ScatteringCorrection_n11_prolate.dat ScatteringCorrection_n12_oblate.dat ScatteringCorrection_n12_prolate.dat ScatteringCorrection_n13_oblate.dat ScatteringCorrection_n13_prolate.dat ScatteringCorrection_n14_oblate.dat ScatteringCorrection_n14_prolate.dat ScatteringCorrection_n15_oblate.dat ScatteringCorrection_n15_prolate.dat ScatteringCorrection_n16_oblate.dat ScatteringCorrection_n16_prolate.dat ScatteringCorrection_n17_oblate.dat ScatteringCorrection_n17_prolate.dat ScatteringCorrection_n18_oblate.dat ScatteringCorrection_n18_prolate.dat ScatteringCorrection_n19_oblate.dat ScatteringCorrection_n19_prolate.dat ScatteringCorrection_n20_oblate.dat ScatteringCorrection_n20_prolate.dat 
+	python3 ScatteringCorrection_plot.py
+
+shapes.png shapes.pdf : ShapeDistribution.py 
+	python3 ShapeDistribution.py
+
+ShapeQuadrature.png ShapeQuadrature.pdf ShapeQuadrature_convergence.png ShapeQuadrature_convergence.pdf : ShapeQuadrature_plot.py ShapeQuadrature_n01.dat ShapeQuadrature_n02.dat ShapeQuadrature_n03.dat ShapeQuadrature_n04.dat ShapeQuadrature_n05.dat ShapeQuadrature_n06.dat ShapeQuadrature_n07.dat ShapeQuadrature_n08.dat ShapeQuadrature_n09.dat ShapeQuadrature_n10.dat ShapeQuadrature_n11.dat ShapeQuadrature_n12.dat ShapeQuadrature_n13.dat ShapeQuadrature_n14.dat ShapeQuadrature_n15.dat ShapeQuadrature_n16.dat ShapeQuadrature_n17.dat ShapeQuadrature_n18.dat ShapeQuadrature_n19.dat ShapeQuadrature_n20.dat 
+	python3 ShapeQuadrature_plot.py
+
+ShapeBounds_fraction.png ShapeBounds_fraction.pdf ShapeBounds_fraction_convergence.png ShapeBounds_fraction_convergence.pdf : ShapeBounds_plot.py ShapeBounds_i00.dat ShapeBounds_i01.dat ShapeBounds_i02.dat ShapeBounds_i03.dat ShapeBounds_i04.dat ShapeBounds_i05.dat ShapeBounds_i06.dat ShapeBounds_i07.dat ShapeBounds_i08.dat 
+	python3 ShapeBounds_plot.py
+
+1991Mishchenko.png 1991Mishchenko.pdf : Mishchenko_plot.py 1991Mishchenko_oblate_ia.txt Mishchenko_oblate_ia.dat 1991Mishchenko_oblate_pdg.txt Mishchenko_oblate_pdg.dat 1991Mishchenko_oblate_ro.txt Mishchenko_oblate_ro.dat 1991Mishchenko_prolate_ia.txt Mishchenko_prolate_ia.dat 1991Mishchenko_prolate_pdg.txt Mishchenko_prolate_pdg.dat 1991Mishchenko_prolate_ro.txt Mishchenko_prolate_ro.dat 
+	python3 Mishchenko_plot.py
+
+1993Draine_spherical.png 1993Draine_spherical.pdf : DraineScattering_plot.py 1993Draine_optical_properties.txt Draine_with_scattering.dat Draine_without_scattering.dat 
+	python3 DraineScattering_plot.py
+
+1993Draine_shapes.png 1993Draine_shapes.pdf : DraineShapes_plot.py 1993Draine_optical_properties.txt Draine_d1.dat Draine_d05.dat Draine_d2.dat Draine_CDE.dat 
+	python3 DraineShapes_plot.py
+
+1993Draine_correction.png 1993Draine_correction.pdf : DraineCorrection_plot.py 1993Draine_optical_properties.txt 1993Draine_dielectric_function.txt Draine_mrconst_d1.dat Draine_mrconst_d05.dat Draine_mrconst_d2.dat 
+	python3 DraineCorrection_plot.py
+
+1993Draine_all.png 1993Draine_all.pdf : DraineAll_plot.py 1993Draine_optical_properties.txt 1993Draine_optical_properties_SiC.txt 1993Draine_optical_properties_suvSil.txt DraineAll_Astronomical_Silicate.dat DraineAll_Silicon_Carbide.dat DraineAll_Smoothed_UV_Astronomical_Silicate.dat 
+	python3 DraineAll_plot.py
+
+1993Draine_carbon.png 1993Draine_carbon.pdf : DraineCarbon_plot.py 1993Draine_optical_properties_C.txt DraineCarbon_parallel.dat DraineCarbon_perpendicular.dat 
+	python3 DraineCarbon_plot.py
+
+FullPlot.png FullPlot.pdf : BBOPResult_plot.py BBOPResult.dat 
+	python3 BBOPResult_plot.py
+
+AlignmentChecks_average.png AlignmentChecks_average.pdf : AlignmentChecks_average_plot.py AlignmentChecks_d0.5_raw.dat AlignmentChecks_d0.5_mish.dat AlignmentChecks_d0.5_perf.dat AlignmentChecks_d0.5_rand.dat AlignmentChecks_d2.0_raw.dat AlignmentChecks_d2.0_mish.dat AlignmentChecks_d2.0_perf.dat AlignmentChecks_d2.0_rand.dat 
+	python3 AlignmentChecks_average_plot.py
+
+AlignmentChecks_zenith.png AlignmentChecks_zenith.pdf : AlignmentChecks_zenith_plot.py AlignmentChecks_d0.5_raw.dat AlignmentChecks_d0.5_mish.dat AlignmentChecks_d0.5_perf.dat AlignmentChecks_d0.5_rand.dat AlignmentChecks_d2.0_raw.dat AlignmentChecks_d2.0_mish.dat AlignmentChecks_d2.0_perf.dat AlignmentChecks_d2.0_rand.dat 
+	python3 AlignmentChecks_zenith_plot.py
+
+ShapeComparison.png ShapeComparison.pdf : ShapeComparison_plot.py ShapeComparison.dat 
+	python3 ShapeComparison_plot.py
+
+taskplot.png taskplot.pdf : TaskPlot.py ScalingTest_08_tasks.txt ScalingTest_08_types.txt 
+	python3 TaskPlot.py
+
+ScalingTest.png ScalingTest.pdf : ScalingPlot.py timings_gandalf_bind.dat timings_gandalf_nobind.dat timings_stormy_bind.dat timings_stormy_nobind.dat 
+	python3 ScalingPlot.py
+
+CATEGORY="simulations"
+CORES=4
+DISK=1000
+MEMORY=50000
+
+ScatteringCorrection_n01_oblate.dat ScatteringCorrection_n01_prolate.dat ScatteringCorrection_n02_oblate.dat ScatteringCorrection_n02_prolate.dat ScatteringCorrection_n03_oblate.dat ScatteringCorrection_n03_prolate.dat ScatteringCorrection_n04_oblate.dat ScatteringCorrection_n04_prolate.dat ScatteringCorrection_n05_oblate.dat ScatteringCorrection_n05_prolate.dat ScatteringCorrection_n06_oblate.dat ScatteringCorrection_n06_prolate.dat ScatteringCorrection_n07_oblate.dat ScatteringCorrection_n07_prolate.dat ScatteringCorrection_n08_oblate.dat ScatteringCorrection_n08_prolate.dat ScatteringCorrection_n09_oblate.dat ScatteringCorrection_n09_prolate.dat ScatteringCorrection_n10_oblate.dat ScatteringCorrection_n10_prolate.dat ScatteringCorrection_n11_oblate.dat ScatteringCorrection_n11_prolate.dat ScatteringCorrection_n12_oblate.dat ScatteringCorrection_n12_prolate.dat ScatteringCorrection_n13_oblate.dat ScatteringCorrection_n13_prolate.dat ScatteringCorrection_n14_oblate.dat ScatteringCorrection_n14_prolate.dat ScatteringCorrection_n15_oblate.dat ScatteringCorrection_n15_prolate.dat ScatteringCorrection_n16_oblate.dat ScatteringCorrection_n16_prolate.dat ScatteringCorrection_n17_oblate.dat ScatteringCorrection_n17_prolate.dat ScatteringCorrection_n18_oblate.dat ScatteringCorrection_n18_prolate.dat ScatteringCorrection_n19_oblate.dat ScatteringCorrection_n19_prolate.dat ScatteringCorrection_n20_oblate.dat ScatteringCorrection_n20_prolate.dat : ScatteringCorrection_sim.py 
+	python3 ScatteringCorrection_sim.py
+
+ShapeQuadrature_n01.dat ShapeQuadrature_n02.dat ShapeQuadrature_n03.dat ShapeQuadrature_n04.dat ShapeQuadrature_n05.dat ShapeQuadrature_n06.dat ShapeQuadrature_n07.dat ShapeQuadrature_n08.dat ShapeQuadrature_n09.dat ShapeQuadrature_n10.dat ShapeQuadrature_n11.dat ShapeQuadrature_n12.dat ShapeQuadrature_n13.dat ShapeQuadrature_n14.dat ShapeQuadrature_n15.dat ShapeQuadrature_n16.dat ShapeQuadrature_n17.dat ShapeQuadrature_n18.dat ShapeQuadrature_n19.dat ShapeQuadrature_n20.dat : ShapeQuadrature_sim.py 
+	python3 ShapeQuadrature_sim.py
+
+ShapeBounds_i00.dat ShapeBounds_i01.dat ShapeBounds_i02.dat ShapeBounds_i03.dat ShapeBounds_i04.dat ShapeBounds_i05.dat ShapeBounds_i06.dat ShapeBounds_i07.dat ShapeBounds_i08.dat : ShapeBounds_sim.py 
+	python3 ShapeBounds_sim.py
+
+Mishchenko_oblate_ia.dat Mishchenko_oblate_pdg.dat Mishchenko_oblate_ro.dat Mishchenko_prolate_ia.dat Mishchenko_prolate_pdg.dat Mishchenko_prolate_ro.dat : Mishchenko_sim.py 1985Draine.txt 
+	python3 Mishchenko_sim.py
+
+Draine_with_scattering.dat Draine_without_scattering.dat : DraineScattering_sim.py 1993Draine_optical_properties.txt 1993Draine_dielectric_function.txt 
+	python3 DraineScattering_sim.py
+
+Draine_d1.dat Draine_d05.dat Draine_d2.dat Draine_CDE.dat : DraineShapes_sim.py 1993Draine_optical_properties.txt 1993Draine_dielectric_function.txt 
+	python3 DraineShapes_sim.py
+
+Draine_mrconst_d1.dat Draine_mrconst_d05.dat Draine_mrconst_d2.dat : DraineCorrection_sim.py 1993Draine_optical_properties.txt 1993Draine_dielectric_function.txt 
+	python3 DraineCorrection_sim.py
+
+DraineAll_Astronomical_Silicate.dat DraineAll_Silicon_Carbide.dat DraineAll_Smoothed_UV_Astronomical_Silicate.dat : DraineAll_sim.py 1993Draine_optical_properties.txt 1993Draine_optical_properties_SiC.txt 1993Draine_optical_properties_suvSil.txt 1993Draine_dielectric_function.txt 1993Draine_dielectric_function_SiC.txt 1993Draine_dielectric_function_suvSil.txt 
+	python3 DraineAll_sim.py
+
+DraineCarbon_parallel.dat DraineCarbon_perpendicular.dat : DraineCarbon_sim.py 1993Draine_optical_properties_C.txt 
+	python3 DraineCarbon_sim.py
+
+BBOPResult.dat : BBOPResult_sim.py 
+	python3 BBOPResult_sim.py
+
+AlignmentChecks_d0.5_raw.dat AlignmentChecks_d0.5_mish.dat AlignmentChecks_d0.5_perf.dat AlignmentChecks_d0.5_rand.dat AlignmentChecks_d2.0_raw.dat AlignmentChecks_d2.0_mish.dat AlignmentChecks_d2.0_perf.dat AlignmentChecks_d2.0_rand.dat : AlignmentChecks_sim.py 
+	python3 AlignmentChecks_sim.py
+
+ShapeComparison.dat : ShapeComparison_sim.py 
+	python3 ShapeComparison_sim.py
+
