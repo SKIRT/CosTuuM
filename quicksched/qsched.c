@@ -1,6 +1,7 @@
 /*******************************************************************************
  * This file is part of QuickSched.
- * Coypright (c) 2013 Pedro Gonnet (pedro.gonnet@durham.ac.uk)
+ * Copyright (c) 2013 Pedro Gonnet (pedro.gonnet@durham.ac.uk)
+ *               2019, 2020 Bert Vandenbroucke (bert.vandenbroucke@gmail.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published
@@ -15,6 +16,15 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
+ ******************************************************************************/
+
+/*******************************************************************************
+ * CHANGELOG
+ *  - 05/02/2020, Bert Vandenbroucke
+ *    added return argument for qsched_ensure to facilitate memory bookkeeping
+ *  - 22/10/2019, Bert Vandenbroucke
+ *    changed names of error macros to avoid conflicts with existing functions
+ *    with the same name
  ******************************************************************************/
 
 /* Config parameters. */
