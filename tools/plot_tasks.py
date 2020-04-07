@@ -1,27 +1,31 @@
 ################################################################################
-# This file is part of CMacIonize
-# Copyright (C) 2018, 2019 Bert Vandenbroucke (bert.vandenbroucke@gmail.com)
-#
-# CMacIonize is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# CMacIonize is distributed in the hope that it will be useful,
-# but WITOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU Affero General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with CMacIonize. If not, see <http://www.gnu.org/licenses/>.
-################################################################################
+ # This file is part of CosTuuM
+ # Copyright (C) 2018, 2019 Bert Vandenbroucke (bert.vandenbroucke@gmail.com)
+ #
+ # CosTuuM is free software: you can redistribute it and/or modify it under the
+ # terms of the GNU Affero General Public License as published by the Free
+ # Software Foundation, either version 3 of the License, or (at your option) any
+ # later version.
+ #
+ # CosTuuM is distributed in the hope that it will be useful, but WITOUT ANY
+ # WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+ # A PARTICULAR PURPOSE. See the GNU Affero General Public License for more
+ # details.
+ #
+ # You should have received a copy of the GNU Affero General Public License
+ # along with CosTuuM. If not, see <http://www.gnu.org/licenses/>.
+ ###############################################################################
 
 ##
 # @file plot_tasks.py
 #
 # @brief Script to plot the task plot for a given file with task output.
 #
+# This file was originally part of the photoionization code CMacIonize
+# (https://github.com/bwvdnbro/CMacIonize).
+#
 # @author Bert Vandenbroucke (bv7@st-andrews.ac.uk)
+# @author Bert Vandenbroucke (bert.vandenbroucke@ugent.be)
 ##
 
 # import modules
