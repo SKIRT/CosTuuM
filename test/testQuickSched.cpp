@@ -173,9 +173,8 @@ int main(int argc, char **argv) {
   }
 
   {
-    const uint_fast32_t auxsize = 100;
-    const uint_fast32_t maxgauss = 200;
-    const uint_fast32_t maximum_order = 100;
+    const uint_fast32_t maxgauss = 100;
+    const uint_fast32_t maximum_order = 50;
 
     size_t size = 0;
 
@@ -184,12 +183,6 @@ int main(int argc, char **argv) {
     ctm_warning("NBasedResources: %s",
                 Utilities::human_readable_bytes(nbasedresourcessize).c_str());
     size += nbasedresourcessize;
-
-    const size_t auxiliarysize =
-        TMatrixAuxiliarySpace::get_memory_size(maximum_order);
-    ctm_warning("TMatrixAuxiliarySpace: %s",
-                Utilities::human_readable_bytes(auxiliarysize).c_str());
-    size += auxsize * auxiliarysize;
 
     const size_t gaussresourcesize =
         GaussBasedResources::get_memory_size(maxgauss);
