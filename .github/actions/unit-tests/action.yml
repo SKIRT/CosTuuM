@@ -1,0 +1,5 @@
+name: "CosTuuM unit tests"
+description: "Action to automatically configure and compile CosTuuM and run its units tests"
+runs:
+  using: 'docker'
+  image: 'Dockerfile'

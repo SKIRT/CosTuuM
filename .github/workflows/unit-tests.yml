@@ -1,0 +1,10 @@
+on: [push, pull_request]
+jobs:
+  unit_test_job:
+    runs-on: ubuntu-latest
+    name: Unit tests
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+    - name: Unit testing
+      uses: ./.github/actions/unit-tests
