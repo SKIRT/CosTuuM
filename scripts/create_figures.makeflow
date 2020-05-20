@@ -18,6 +18,15 @@ ShapeBounds_fraction.png ShapeBounds_fraction.pdf ShapeBounds_fraction_convergen
 1991Mishchenko.png 1991Mishchenko.pdf : Mishchenko_plot.py 1991Mishchenko_oblate_ia.txt Mishchenko_oblate_ia.dat 1991Mishchenko_oblate_pdg.txt Mishchenko_oblate_pdg.dat 1991Mishchenko_oblate_ro.txt Mishchenko_oblate_ro.dat 1991Mishchenko_prolate_ia.txt Mishchenko_prolate_ia.dat 1991Mishchenko_prolate_pdg.txt Mishchenko_prolate_pdg.dat 1991Mishchenko_prolate_ro.txt Mishchenko_prolate_ro.dat 
 	python3 Mishchenko_plot.py
 
+Voshchinnikov_fig3.pdf : VoshchinnikovFig3_plot.py 1993Voshchinnikov_fig3.npz VoshchinnikovFig3.npz 
+	python3 VoshchinnikovFig3_plot.py
+
+Voshchinnikov_fig4.pdf : VoshchinnikovFig4_plot.py 1993Voshchinnikov_fig4.npz VoshchinnikovFig4.npz 
+	python3 VoshchinnikovFig4_plot.py
+
+Voshchinnikov_fig5.pdf : VoshchinnikovFig5_plot.py 1993Voshchinnikov_fig5.npz VoshchinnikovFig5.npz 
+	python3 VoshchinnikovFig5_plot.py
+
 1993Draine_spherical.png 1993Draine_spherical.pdf : DraineScattering_plot.py 1993Draine_optical_properties.txt Draine_with_scattering.dat Draine_without_scattering.dat 
 	python3 DraineScattering_plot.py
 
@@ -67,6 +76,15 @@ ShapeBounds_i00.dat ShapeBounds_i01.dat ShapeBounds_i02.dat ShapeBounds_i03.dat 
 
 Mishchenko_oblate_ia.dat Mishchenko_oblate_pdg.dat Mishchenko_oblate_ro.dat Mishchenko_prolate_ia.dat Mishchenko_prolate_pdg.dat Mishchenko_prolate_ro.dat : Mishchenko_sim.py 1985Draine.txt 
 	python3 Mishchenko_sim.py
+
+VoshchinnikovFig3.npz : VoshchinnikovFig3_sim.py 1993Voshchinnikov_fig3.npz 
+	python3 VoshchinnikovFig3_sim.py
+
+VoshchinnikovFig4.npz : VoshchinnikovFig4_sim.py 1993Voshchinnikov_fig4.npz 
+	python3 VoshchinnikovFig4_sim.py
+
+VoshchinnikovFig5.npz : VoshchinnikovFig5_sim.py 1993Voshchinnikov_fig5.npz 
+	python3 VoshchinnikovFig5_sim.py
 
 Draine_with_scattering.dat Draine_without_scattering.dat : DraineScattering_sim.py 1993Draine_optical_properties.txt 1993Draine_dielectric_function.txt 
 	python3 DraineScattering_sim.py
