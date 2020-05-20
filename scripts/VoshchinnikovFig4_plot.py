@@ -64,7 +64,7 @@ for id in range(4, 8):
 ax[1].legend(loc="best", ncol=2, handlelength=0.5, labelspacing=0.1)
 
 ax[0].plot([], [], "k-", label="\\textsc{CosTuuM}")
-ax[0].plot([], [], "kx", label="Voshchinnikov \& Faranov (1993)")
+ax[0].plot([], [], "kx", label="Voshchinnikov \& Farafonov (1993)")
 ax[0].legend(loc="best", handlelength=0.5, labelspacing=0.1)
 
 pl.tight_layout()
