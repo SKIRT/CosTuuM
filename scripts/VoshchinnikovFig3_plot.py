@@ -81,7 +81,6 @@ ax[0].legend(loc="best", handlelength=0.5, labelspacing=0.1)
 
 ax[0].set_ylim(-0.1, 3.5)
 ax[1].set_ylim(-0.1, 3.5)
-ax[1].set_yticklabels([])
 
 pl.tight_layout()
 pl.savefig("VoshchinnikovFig3.pdf", dpi=300, bbox_inches="tight")

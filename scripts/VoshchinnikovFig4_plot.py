@@ -62,7 +62,6 @@ ax[0].set_ylabel("$|Q_{ext,pol}|$")
 
 ax[1].set_ylim(-0.01, 0.3)
 ax[0].set_ylim(ax[1].get_ylim())
-ax[1].set_yticklabels([])
 
 ax[2].set_ylim(-0.01, 1.0)
 
