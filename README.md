@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3842422.svg)](https://doi.org/10.5281/zenodo.3842422)
+
 # C++ T-Matrix code
 Based on the T-matrix code by Mishchenko (https://www.giss.nasa.gov/staff/mmishchenko/t_matrix.html).
 
