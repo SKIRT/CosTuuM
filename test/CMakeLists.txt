@@ -157,6 +157,13 @@ if(HAVE_TASKS)
                 LIBS ${LIBQUICKSCHED})
 endif(HAVE_TASKS)
 
+## Unit test for RefractionEvent
+set(TESTREFRACTIONEVENT_SOURCES
+    testRefractionEvent.cpp
+)
+add_unit_test(NAME testRefractionEvent
+             SOURCES ${TESTREFRACTIONEVENT_SOURCES})
+
 ### Done adding unit tests. Create the 'make check' target #####################
 ### Do not touch these lines unless you know what you're doing! ################
 add_custom_target(buildTests DEPENDS ${TESTNAMES})
