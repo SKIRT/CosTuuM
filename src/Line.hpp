@@ -63,6 +63,17 @@ public:
    * @return Direction (that is stored internally).
    */
   inline Direction get_direction() const { return _direction; }
+
+  /**
+   * @brief Evaluate the line for the given parameter value.
+   *
+   * @param t Line parameter.
+   * @return Position for that parameter value.
+   */
+  inline Point evaluate(const double t) const {
+
+    return _point.translate(t, _direction);
+  }
 };
 
 #endif // LINE_HPP

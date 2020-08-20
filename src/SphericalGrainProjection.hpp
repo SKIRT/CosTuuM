@@ -74,7 +74,7 @@ public:
     if (theta < 0.) {
       theta = -theta;
     }
-    if (theta >= M_PI) {
+    if (theta > M_PI) {
       theta = 2. * M_PI - theta;
     }
 

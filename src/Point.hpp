@@ -26,6 +26,8 @@
 #ifndef POINT_HPP
 #define POINT_HPP
 
+#include "Direction.hpp"
+
 #include <cmath>
 
 /**
@@ -84,6 +86,19 @@ public:
       theta = 0.;
       phi = 0.;
     }
+  }
+
+  /**
+   * @brief Return a new Point that is obtained by translating this point over
+   * the given distance along the given direction.
+   *
+   * @param t Distance.
+   * @param direction Direction.
+   * @return New point.
+   */
+  inline Point translate(const double t, const Direction direction) const {
+    return Point(_x[0] + t * direction.nx(), _x[1] + t * direction.ny(),
+                 _x[2] + t * direction.nz());
   }
 };
 

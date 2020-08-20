@@ -26,6 +26,8 @@
 #ifndef DIRECTION_HPP
 #define DIRECTION_HPP
 
+#include <cmath>
+
 /**
  * @brief 3D direction vector.
  */
@@ -37,6 +39,9 @@ private:
   /*! @brief Azimuth angle. */
   double _phi;
 
+  /*! @brief Direction vector. */
+  double _n[3];
+
 public:
   /**
    * @brief Constructor.
@@ -45,7 +50,13 @@ public:
    * @param phi Azimuth angle.
    */
   inline Direction(const double theta, const double phi)
-      : _theta(theta), _phi(phi) {}
+      : _theta(theta), _phi(phi) {
+
+    const double sintheta = std::sin(theta);
+    _n[0] = sintheta * std::cos(phi);
+    _n[1] = sintheta * std::sin(phi);
+    _n[2] = std::cos(theta);
+  }
 
   /**
    * @brief Get the zenith angle.
@@ -60,6 +71,27 @@ public:
    * @return Azimuth angle.
    */
   inline double get_azimuth_angle() const { return _phi; }
+
+  /**
+   * @brief Get the x-component of the direction vector.
+   *
+   * @return X-component of the direction vector.
+   */
+  inline double nx() const { return _n[0]; }
+
+  /**
+   * @brief Get the y-component of the direction vector.
+   *
+   * @return Y-component of the direction vector.
+   */
+  inline double ny() const { return _n[1]; }
+
+  /**
+   * @brief Get the z-component of the direction vector.
+   *
+   * @return Z-component of the direction vector.
+   */
+  inline double nz() const { return _n[2]; }
 };
 
 #endif // DIRECTION_HPP

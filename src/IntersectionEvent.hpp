@@ -27,11 +27,44 @@
 #ifndef INTERSECTIONEVENT_HPP
 #define INTERSECTIONEVENT_HPP
 
+#include "Direction.hpp"
+#include "Point.hpp"
+
 /**
- * @brief General interface for dust grains.
+ * @brief Object storing information about the intersection of a Grain with a
+ * Line.
  */
 class IntersectionEvent {
+private:
+  /*! @brief Intersection point. */
+  const Point _point;
+
+  /*! @brief Normal at the intersection point. */
+  const Direction _normal;
+
 public:
+  /**
+   * @brief Constructor.
+   *
+   * @param point Intersection point.
+   * @param normal Normal at the intersection point.
+   */
+  inline IntersectionEvent(const Point point, const Direction normal)
+      : _point(point), _normal(normal) {}
+
+  /**
+   * @brief Get the intersection point.
+   *
+   * @return Intersection point.
+   */
+  inline Point get_intersection_point() const { return _point; }
+
+  /**
+   * @brief Get the normal at the intersection point.
+   *
+   * @return Normal.
+   */
+  inline Direction get_normal() const { return _normal; }
 };
 
 #endif // INTERSECTIONEVENT_HPP

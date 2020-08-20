@@ -44,15 +44,17 @@ public:
    * @param direction Direction.
    * @return Projection perpendicular to this direction.
    */
-  virtual GrainProjection get_projection(const Direction direction) const = 0;
+  virtual GrainProjection *get_projection(const Direction direction) const = 0;
 
   /**
    * @brief Get the intersection of this grain with the given line.
    *
    * @param line Line.
+   * @param front Do we want the forward intersection point (default: true)?
    * @return IntersectionEvent for the intersection of this grain with the line.
    */
-  virtual IntersectionEvent get_intersection(const Line line) const = 0;
+  virtual IntersectionEvent get_intersection(const Line line,
+                                             const bool front = true) const = 0;
 };
 
 #endif // GRAIN_HPP

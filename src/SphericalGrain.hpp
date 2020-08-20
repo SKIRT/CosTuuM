@@ -26,6 +26,7 @@
 #ifndef SPHERICALGRAIN_HPP
 #define SPHERICALGRAIN_HPP
 
+#include "Error.hpp"
 #include "Grain.hpp"
 #include "SphericalGrainProjection.hpp"
 
@@ -41,8 +42,53 @@ public:
    * @param direction Direction.
    * @return Projection perpendicular to this direction.
    */
-  virtual GrainProjection get_projection(const Direction direction) const {
-    return SphericalGrainProjection();
+  virtual GrainProjection *get_projection(const Direction direction) const {
+    return new SphericalGrainProjection(direction);
+  }
+
+  /**
+   * @brief Get the intersection of this grain with the given line.
+   *
+   * @param line Line.
+   * @param front Do we want the forward intersection point (default: true)?
+   * @return IntersectionEvent for the intersection of this grain with the line.
+   */
+  virtual IntersectionEvent get_intersection(const Line line,
+                                             const bool front) const {
+
+    const Point p0 = line.get_base_point();
+    const Direction d = line.get_direction();
+    const double xnx = p0.x() * d.nx();
+    const double yny = p0.y() * d.ny();
+    const double znz = p0.z() * d.nz();
+    const double discriminant = xnx * xnx + yny * yny + znz * znz +
+                                2. * (xnx * yny + xnx * znz + yny * znz) -
+                                p0.x() * p0.x() - p0.y() * p0.y() -
+                                p0.z() * p0.z() + 1.;
+    double t;
+    if (discriminant < 0.) {
+      ctm_error("No valid intersection point!");
+      t = 0.;
+    } else if (discriminant == 0.) {
+      // only 1 intersection point
+      t = -xnx - yny - znz;
+    } else {
+      if (front) {
+        t = std::sqrt(discriminant) - xnx - yny - znz;
+      } else {
+        t = -std::sqrt(discriminant) - xnx - yny - znz;
+      }
+    }
+
+    const Point intersection_point = line.evaluate(t);
+
+    // the normal in the intersection point happens to be the direction of the
+    // intersection point (since this is already a unit sphere)
+    double r, theta, phi;
+    intersection_point.spherical_coordinates(r, theta, phi);
+    const Direction normal(theta, phi);
+
+    return IntersectionEvent(intersection_point, normal);
   }
 };
 
