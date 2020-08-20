@@ -27,8 +27,6 @@
 #include "Assert.hpp"
 #include "SphericalGrain.hpp"
 
-#include <fstream>
-
 /**
  * @brief Unit test for the SphericalGrain class.
  *
