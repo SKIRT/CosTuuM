@@ -164,6 +164,13 @@ set(TESTREFRACTIONEVENT_SOURCES
 add_unit_test(NAME testRefractionEvent
              SOURCES ${TESTREFRACTIONEVENT_SOURCES})
 
+## Unit test for SphericalGrainProjection
+set(TESTSPHERICALGRAINPROJECTION_SOURCES
+    testSphericalGrainProjection.cpp
+)
+add_unit_test(NAME testSphericalGrainProjection
+              SOURCES ${TESTSPHERICALGRAINPROJECTION_SOURCES})
+
 ### Done adding unit tests. Create the 'make check' target #####################
 ### Do not touch these lines unless you know what you're doing! ################
 add_custom_target(buildTests DEPENDS ${TESTNAMES})
