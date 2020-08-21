@@ -45,7 +45,11 @@ int main() {
 
     /// "normal direction"
     {
+      // projection direction
       const Direction direction(M_PI / 3., M_PI / 3.);
+      // normal to the projection plane (just the reverse of the projection
+      // direction)
+      const Direction normal = direction.reverse();
 
       std::ofstream ofile("test_spherical_grain.txt");
       ofile << "# x\ty\tz\n";
@@ -55,15 +59,14 @@ int main() {
         const Point base_point = line.get_base_point();
         ofile << base_point.x() << "\t" << base_point.y() << "\t"
               << base_point.z() << "\n";
-        //        double r, theta, phi;
-        //        base_point.spherical_coordinates(r, theta, phi);
-        //        assert_condition(r <= 1.);
-        //        if (r != 0.) {
-        //          assert_values_equal_rel(theta, M_PI / 6., 1.e-15);
-        //        }
-        //        const Direction direction = line.get_direction();
-        //        assert_condition(direction.get_zenith_angle() == M_PI / 3.);
-        //        assert_condition(direction.get_azimuth_angle() == M_PI / 3.);
+        // check that the point is actually on the projection plane
+        const double nr = normal.nx() * base_point.x() +
+                          normal.ny() * base_point.y() +
+                          normal.nz() * base_point.z();
+        assert_condition(std::abs(nr) < 1.e-15);
+        const Direction direction = line.get_direction();
+        assert_condition(direction.get_zenith_angle() == M_PI / 3.);
+        assert_condition(direction.get_azimuth_angle() == M_PI / 3.);
       }
       ofile.close();
     }
@@ -71,17 +74,19 @@ int main() {
     /// direction with theta > pi/2
     {
       const Direction direction(2. * M_PI / 3., M_PI / 3.);
+      // normal to the projection plane (just the reverse of the projection
+      // direction)
+      const Direction normal = direction.reverse();
 
       for (uint_fast32_t i = 0; i < 100000u; ++i) {
         const Line line =
             grain.generate_random_line(direction, random_generator);
         const Point base_point = line.get_base_point();
-        double r, theta, phi;
-        base_point.spherical_coordinates(r, theta, phi);
-        assert_condition(r <= 1.);
-        if (r != 0.) {
-          assert_values_equal_rel(theta, M_PI / 6., 1.e-15);
-        }
+        // check that the point is actually on the projection plane
+        const double nr = normal.nx() * base_point.x() +
+                          normal.ny() * base_point.y() +
+                          normal.nz() * base_point.z();
+        assert_condition(std::abs(nr) < 1.e-15);
         const Direction direction = line.get_direction();
         assert_condition(direction.get_zenith_angle() == 2. * M_PI / 3.);
         assert_condition(direction.get_azimuth_angle() == M_PI / 3.);

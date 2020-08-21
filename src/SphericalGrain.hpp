@@ -64,8 +64,8 @@ public:
     const Point point(x, y, z);
 
     // now rotate: the rotation axis is perpendicular to both the projection
-    // direction and the z-axis and is hence given by d x z
-    const Direction rotation_axis = direction.cross(Direction(0., 0., 1.));
+    // direction and the z-axis and is hence given by z x d
+    const Direction rotation_axis = Direction(0., 0., 1.).cross(direction);
     const Point base_point =
         point.rotate(rotation_axis, direction.get_zenith_angle());
 
