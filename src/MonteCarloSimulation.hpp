@@ -53,7 +53,7 @@ private:
   uint_fast64_t _number_of_rays;
 
   /*! @brief HEALPix recorder. */
-  HEALPixRecorder<1u> _recorder;
+  HEALPixRecorder<2u> _recorder;
 
   /*! @brief Random number generator. */
   RandomGenerator _random_generator;
@@ -88,17 +88,19 @@ public:
   inline void run() {
 
     for (uint_fast64_t iray = 0; iray < _number_of_rays; ++iray) {
-      double I[1] = {1.};
+      double I[2] = {1., 0.};
       const Line line =
           _grain->generate_random_line(_direction, _random_generator);
       const IntersectionEvent intersection_event =
           _grain->get_intersection(line, false);
-      //      const Point intersection_point =
-      //          intersection_event.get_intersection_point();
-      //      const Direction intersection_direction(intersection_point.x(),
-      //                                             intersection_point.y(),
-      //                                             intersection_point.z());
-      //      _recorder.bin(intersection_direction, I);
+      const Point intersection_point =
+          intersection_event.get_intersection_point();
+      const Direction intersection_direction(intersection_point.x(),
+                                             intersection_point.y(),
+                                             intersection_point.z());
+      _recorder.bin(intersection_direction, I);
+      I[0] = 0.;
+      I[1] = 1.;
       const Direction normal = intersection_event.get_normal();
       const Direction reverse_direction = _direction.reverse();
       const double incident_angle = reverse_direction.angle(normal);
@@ -108,8 +110,7 @@ public:
       const Direction scatter_plane_normal = normal.cross(_direction);
       const Direction out = reverse_direction.rotate_perpendicular(
           scatter_plane_normal, incident_angle + reflection_angle);
-      //      (void)out;
-      I[0] *= refraction_event.get_average_reflection_coefficient() *
+      I[1] *= refraction_event.get_average_reflection_coefficient() *
               refraction_event.get_average_reflection_coefficient();
       _recorder.bin(out, I);
     }
