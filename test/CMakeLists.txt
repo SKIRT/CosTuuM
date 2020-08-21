@@ -164,13 +164,6 @@ set(TESTREFRACTIONEVENT_SOURCES
 add_unit_test(NAME testRefractionEvent
              SOURCES ${TESTREFRACTIONEVENT_SOURCES})
 
-## Unit test for SphericalGrainProjection
-set(TESTSPHERICALGRAINPROJECTION_SOURCES
-    testSphericalGrainProjection.cpp
-)
-add_unit_test(NAME testSphericalGrainProjection
-              SOURCES ${TESTSPHERICALGRAINPROJECTION_SOURCES})
-
 ## Unit test for SphericalGrain
 set(TESTSPHERICALGRAIN_SOURCES
     testSphericalGrain.cpp

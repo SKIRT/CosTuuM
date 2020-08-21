@@ -27,6 +27,8 @@
 #include "Assert.hpp"
 #include "SphericalGrain.hpp"
 
+#include <fstream>
+
 /**
  * @brief Unit test for the SphericalGrain class.
  *
@@ -36,7 +38,58 @@ int main() {
 
   SphericalGrain grain;
 
-  /// known, simple test case
+  /// projection test
+  {
+
+    RandomGenerator random_generator(42);
+
+    /// "normal direction"
+    {
+      const Direction direction(M_PI / 3., M_PI / 3.);
+
+      std::ofstream ofile("test_spherical_grain.txt");
+      ofile << "# x\ty\tz\n";
+      for (uint_fast32_t i = 0; i < 100000u; ++i) {
+        const Line line =
+            grain.generate_random_line(direction, random_generator);
+        const Point base_point = line.get_base_point();
+        ofile << base_point.x() << "\t" << base_point.y() << "\t"
+              << base_point.z() << "\n";
+        double r, theta, phi;
+        base_point.spherical_coordinates(r, theta, phi);
+        assert_condition(r <= 1.);
+        if (r != 0.) {
+          assert_values_equal_rel(theta, M_PI / 6., 1.e-15);
+        }
+        const Direction direction = line.get_direction();
+        assert_condition(direction.get_zenith_angle() == M_PI / 3.);
+        assert_condition(direction.get_azimuth_angle() == M_PI / 3.);
+      }
+      ofile.close();
+    }
+
+    /// direction with theta > pi/2
+    {
+      const Direction direction(2. * M_PI / 3., M_PI / 3.);
+
+      for (uint_fast32_t i = 0; i < 100000u; ++i) {
+        const Line line =
+            grain.generate_random_line(direction, random_generator);
+        const Point base_point = line.get_base_point();
+        double r, theta, phi;
+        base_point.spherical_coordinates(r, theta, phi);
+        assert_condition(r <= 1.);
+        if (r != 0.) {
+          assert_values_equal_rel(theta, M_PI / 6., 1.e-15);
+        }
+        const Direction direction = line.get_direction();
+        assert_condition(direction.get_zenith_angle() == 2. * M_PI / 3.);
+        assert_condition(direction.get_azimuth_angle() == M_PI / 3.);
+      }
+    }
+  }
+
+  /// simple intersection test
   {
     const Point point(0.5, 0.5, 0.);
     const Direction direction(M_PI, 0.);
@@ -64,7 +117,7 @@ int main() {
     }
   }
 
-  /// more elaborate test
+  /// more elaborate intersection test
   {
     RandomGenerator random_generator(32);
     for (uint_fast32_t i = 0; i < 100000u; ++i) {
@@ -73,8 +126,7 @@ int main() {
           -M_PI + 2. * M_PI * random_generator.get_uniform_random_double());
       ctm_warning("direction: %g %g", direction.get_zenith_angle(),
                   direction.get_azimuth_angle());
-      const GrainProjection *projection = grain.get_projection(direction);
-      const Line line = projection->generate_random_line(random_generator);
+      const Line line = grain.generate_random_line(direction, random_generator);
       const IntersectionEvent event = grain.get_intersection(line, true);
       const Point intersection_point = event.get_intersection_point();
       ctm_warning("intersection: %g %g %g", intersection_point.x(),

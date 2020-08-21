@@ -27,10 +27,10 @@
 #define GRAIN_HPP
 
 #include "Direction.hpp"
-#include "GrainProjection.hpp"
 #include "IntersectionEvent.hpp"
 #include "Line.hpp"
 #include "Point.hpp"
+#include "RandomGenerator.hpp"
 
 /**
  * @brief General interface for dust grains.
@@ -38,13 +38,16 @@
 class Grain {
 public:
   /**
-   * @brief Get the projection of this grain perpendicular to the given
-   * direction.
+   * @brief Generate a random line that will intersect with the grain and that
+   * travels in the given direction.
    *
    * @param direction Direction.
-   * @return Projection perpendicular to this direction.
+   * @param random_generator RandomGenerator to use.
+   * @return Random line.
    */
-  virtual GrainProjection *get_projection(const Direction direction) const = 0;
+  virtual Line
+  generate_random_line(const Direction direction,
+                       RandomGenerator &random_generator) const = 0;
 
   /**
    * @brief Get the intersection of this grain with the given line.
