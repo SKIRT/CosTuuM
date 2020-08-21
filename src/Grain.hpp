@@ -38,6 +38,11 @@
 class Grain {
 public:
   /**
+   * @brief Virtual destructor.
+   */
+  virtual ~Grain() {}
+
+  /**
    * @brief Generate a random line that will intersect with the grain and that
    * travels in the given direction.
    *

@@ -35,6 +35,11 @@
 class SphericalGrain : public Grain {
 public:
   /**
+   * @brief Virtual destructor.
+   */
+  virtual ~SphericalGrain() {}
+
+  /**
    * @brief Generate a random line that will intersect with the grain and that
    * travels in the given direction.
    *
@@ -50,37 +55,21 @@ public:
     const double r = std::sqrt(random_generator.get_uniform_random_double());
     const double phi = 2. * M_PI * random_generator.get_uniform_random_double();
 
-    // now convert these to spherical coordinates
-    // the radius (distance between sphere/circle origin and random point) stays
-    // the same
-    // the zenith angle is fixed by the requirement that the plane is
-    // perpendicular to the projection direction
-    // the azimuth angle can be chosen arbitrary in this plane, since we have
-    // azimuthal symmetry
+    // compute the cartesian coordinates of the projection in the XY plane
+    const double x = r * std::cos(phi);
+    const double y = r * std::sin(phi);
+    const double z = 0.;
 
-    // compute the fixed zenith angle
-    double theta = 0.5 * M_PI - direction.get_zenith_angle();
-    // make sure theta \in [0, pi[
-    // note that each of these theta flips would in principle require a
-    // corresponding rotation of the azimuth angle over an angle pi
-    // however, due to azimuthal symmetry, we do not actually need to perform
-    // these rotations
-    if (theta < 0.) {
-      theta = -theta;
-    }
-    if (theta > M_PI) {
-      theta = 2. * M_PI - theta;
-    }
-
-    // now compute the cartesian coordinates
-    const double sintheta = std::sin(theta);
-    const double x = r * sintheta * std::cos(phi);
-    const double y = r * sintheta * std::sin(phi);
-    const double z = r * std::cos(theta);
-
-    // construct the line
+    // construct the projection point in the XY plane
     const Point point(x, y, z);
-    return Line(point, direction);
+
+    // now rotate: the rotation axis is perpendicular to both the projection
+    // direction and the z-axis and is hence given by d x z
+    const Direction rotation_axis = direction.cross(Direction(0., 0., 1.));
+    const Point base_point =
+        point.rotate(rotation_axis, direction.get_zenith_angle());
+
+    return Line(base_point, direction);
   }
 
   /**

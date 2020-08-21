@@ -178,6 +178,20 @@ set(TESTHEALPIXRECORDER_SOURCES
 add_unit_test(NAME testHEALPixRecorder
               SOURCES ${TESTHEALPIXRECORDER_SOURCES})
 
+## Unit test for MonteCarloSimulation
+set(TESTMONTECARLOSIMULATION_SOURCES
+    testMonteCarloSimulation.cpp
+)
+add_unit_test(NAME testMonteCarloSimulation
+              SOURCES ${TESTMONTECARLOSIMULATION_SOURCES})
+
+## Unit test for Point
+set(TESTPOINT_SOURCES
+    testPoint.cpp
+)
+add_unit_test(NAME testPoint
+              SOURCES ${TESTPOINT_SOURCES})
+
 ### Done adding unit tests. Create the 'make check' target #####################
 ### Do not touch these lines unless you know what you're doing! ################
 add_custom_target(buildTests DEPENDS ${TESTNAMES})

@@ -100,6 +100,57 @@ public:
     return Point(_x[0] + t * direction.nx(), _x[1] + t * direction.ny(),
                  _x[2] + t * direction.nz());
   }
+
+  /**
+   * @brief Get the cross product of the point vector with the given direction.
+   *
+   * @param direction Direction.
+   * @return Cross product.
+   */
+  inline Point cross(const Direction direction) const {
+
+    const double x = _x[1] * direction.nz() - _x[2] * direction.ny();
+    const double y = _x[2] * direction.nx() - _x[0] * direction.nz();
+    const double z = _x[0] * direction.ny() - _x[1] * direction.nx();
+
+    return Point(x, y, z);
+  }
+
+  /**
+   * @brief Get the dot product of the point vector and the given direction.
+   *
+   * @param direction Direction.
+   * @return Dot product.
+   */
+  inline double dot(const Direction direction) const {
+    return _x[0] * direction.nx() + _x[1] * direction.ny() +
+           _x[2] * direction.nz();
+  }
+
+  /**
+   * @brief Rotate the point vector over the given angle around the given axis,
+   * according to the right hand rule.
+   *
+   * It is assumed that the axis is perpendicular to the point vector.
+   *
+   * @param axis Rotation axis.
+   * @param angle Rotation angle.
+   * @return Rotated direction.
+   */
+  inline Point rotate(const Direction axis, const double angle) const {
+
+    const Point p_cross_a = cross(axis);
+    const double pdota = dot(axis);
+    const double cosa = std::cos(angle);
+    const double sina = std::sin(angle);
+    const double factor = pdota * (1. - cosa);
+
+    const double x = _x[0] * cosa - p_cross_a._x[0] * sina + axis.nx() * factor;
+    const double y = _x[1] * cosa - p_cross_a._x[1] * sina + axis.ny() * factor;
+    const double z = _x[2] * cosa - p_cross_a._x[2] * sina + axis.nz() * factor;
+
+    return Point(x, y, z);
+  }
 };
 
 #endif // POINT_HPP

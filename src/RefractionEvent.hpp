@@ -144,6 +144,15 @@ public:
   }
 
   /**
+   * @brief Get the average reflection coefficient.
+   *
+   * @return Average reflection coefficient.
+   */
+  inline double get_average_reflection_coefficient() const {
+    return 0.5 * (_reflection_coefficient[0] + _reflection_coefficient[1]);
+  }
+
+  /**
    * @brief Get the transmission coefficient for the given polarisation mode.
    *
    * @param polarisation_mode Valid RefractionPolarisationState.

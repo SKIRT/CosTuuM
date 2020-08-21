@@ -59,6 +59,25 @@ public:
   }
 
   /**
+   * @brief Constructor.
+   *
+   * @param nx X-component.
+   * @param ny Y-component.
+   * @param nz Z-component.
+   */
+  inline Direction(const double nx, const double ny, const double nz)
+      : _n{nx, ny, nz} {
+
+    const double norm = std::sqrt(nx * nx + ny * ny + nz * nz);
+    _n[0] /= norm;
+    _n[1] /= norm;
+    _n[2] /= norm;
+
+    _theta = std::acos(_n[2]);
+    _phi = std::atan2(_n[1], _n[0]);
+  }
+
+  /**
    * @brief Get the zenith angle.
    *
    * @return Zenith angle.
@@ -92,6 +111,64 @@ public:
    * @return Z-component of the direction vector.
    */
   inline double nz() const { return _n[2]; }
+
+  /**
+   * @brief Get the angle between this direction and the given direction.
+   *
+   * @param direction Other direction.
+   * @return Angle between the two directions.
+   */
+  inline double angle(const Direction direction) const {
+    return std::acos(_n[0] * direction._n[0] + _n[1] * direction._n[1] +
+                     _n[2] * direction._n[2]);
+  }
+
+  /**
+   * @brief Get the cross product of this direction with the given direction.
+   *
+   * @param direction Other direction.
+   * @return Cross product.
+   */
+  inline Direction cross(const Direction direction) const {
+
+    const double nx = _n[1] * direction._n[2] - _n[2] * direction._n[1];
+    const double ny = _n[2] * direction._n[0] - _n[0] * direction._n[2];
+    const double nz = _n[0] * direction._n[1] - _n[1] * direction._n[0];
+
+    return Direction(nx, ny, nz);
+  }
+
+  /**
+   * @brief Return the reverse direction.
+   *
+   * @return Reverse direction.
+   */
+  inline Direction reverse() const { return Direction(-_n[0], -_n[1], -_n[2]); }
+
+  /**
+   * @brief Rotate the direction over the given angle around the given axis,
+   * according to the right hand rule.
+   *
+   * It is assumed that the axis is perpendicular to the direction.
+   *
+   * @param axis Rotation axis.
+   * @param angle Rotation angle.
+   * @return Rotated direction.
+   */
+  inline Direction rotate_perpendicular(const Direction axis,
+                                        const double angle) const {
+
+    const Direction d_cross_s = cross(axis);
+
+    const double cosa = std::cos(angle);
+    const double sina = std::sin(angle);
+
+    const double nx = _n[0] * cosa - d_cross_s._n[0] * sina;
+    const double ny = _n[1] * cosa - d_cross_s._n[1] * sina;
+    const double nz = _n[2] * cosa - d_cross_s._n[2] * sina;
+
+    return Direction(nx, ny, nz);
+  }
 };
 
 #endif // DIRECTION_HPP

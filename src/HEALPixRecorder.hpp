@@ -28,6 +28,7 @@
 #define HEALPIXRECORDER_HPP
 
 #include "Direction.hpp"
+#include "Error.hpp"
 
 #include <cinttypes>
 #include <fstream>
@@ -75,6 +76,14 @@ public:
 
     double theta = direction.get_zenith_angle();
     double phi = direction.get_azimuth_angle();
+
+    // make sure theta and phi are in the right range
+    if (theta < 0.) {
+      theta += M_PI;
+    }
+    if (phi < 0.) {
+      phi += 2. * M_PI;
+    }
 
     // the code below was mostly copied from healpix_base.cc in the official
     // HEALPix repository
@@ -134,6 +143,7 @@ public:
    */
   inline void bin(const Direction direction, const double *values) {
     const uint_fast32_t ibin = ring_index(direction);
+    ctm_assert(ibin < 12 * _Nside * _Nside);
     for (uint_fast32_t i = 0; i < _cell_size_; ++i) {
       _pixel_values[ibin * _cell_size_ + i] += values[i];
     }
