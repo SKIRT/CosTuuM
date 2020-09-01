@@ -43,11 +43,20 @@ private:
   /*! @brief Grain. */
   Grain *_grain;
 
+  /*! @brief Wavelength of the incoming radiation (in m). */
+  double _wavelength;
+
+  /*! @brief Equal volume radius of the grain (in m). */
+  double _grain_size;
+
   /*! @brief Refractive index of the grain. */
   std::complex<double> _refractive_index;
 
   /*! @brief Direction of incident radiation. */
   Direction _direction;
+
+  /*! @brief Number of integration points to use. */
+  uint_fast64_t _number_of_points;
 
   /*! @brief Number of rays to shoot. */
   uint_fast64_t _number_of_rays;
@@ -62,20 +71,27 @@ public:
   /**
    * @brief Constructor.
    *
+   * @param wavelength Wavelength of the incoming radiation (in m).
+   * @param grain_size Equal volume radius of the grain (in m).
    * @param refractive_index Refractive index of the material.
    * @param direction Direction of incoming radiation.
+   * @param number_of_points Number of integration points to use.
    * @param number_of_rays Number of rays to shoot.
    * @param healpix_order Order of the HEALPix grid used to record intensities.
    * @param random_seed Seed for the random number generator.
    */
-  inline MonteCarloSimulation(const std::complex<double> refractive_index,
+  inline MonteCarloSimulation(const double wavelength, const double grain_size,
+                              const std::complex<double> refractive_index,
                               const Direction direction,
+                              const uint_fast64_t number_of_points,
                               const uint_fast64_t number_of_rays,
                               const uint_fast8_t healpix_order,
                               const int_fast32_t random_seed = 42)
-      : _grain(new SphericalGrain()), _refractive_index(refractive_index),
-        _direction(direction), _number_of_rays(number_of_rays),
-        _recorder(healpix_order), _random_generator(random_seed) {}
+      : _grain(new SphericalGrain()), _wavelength(wavelength),
+        _grain_size(grain_size), _refractive_index(refractive_index),
+        _direction(direction), _number_of_points(number_of_points),
+        _number_of_rays(number_of_rays), _recorder(healpix_order),
+        _random_generator(random_seed) {}
 
   /**
    * @brief Destructor.
@@ -86,6 +102,28 @@ public:
    * @brief Run the Monte Carlo simulation.
    */
   inline void run() {
+
+    const double k = 2. * M_PI / _wavelength;
+    for (uint_fast32_t ipix = 0; ipix < _recorder.get_number_of_pixels();
+         ++ipix) {
+      const Direction direction = _recorder.direction(ipix);
+      std::complex<double> integral(0., 0.);
+      for (uint_fast32_t i = 0; i < _number_of_points; ++i) {
+        const Point random_point = _grain->generate_random_cross_section_point(
+            _direction, _random_generator);
+        const Point point = random_point.scale(_grain_size);
+        const double exponent =
+            k * std::sin(direction.get_zenith_angle()) *
+            (point.x() * std::cos(direction.get_azimuth_angle()) +
+             point.y() * std::sin(direction.get_azimuth_angle()));
+        const std::complex<double> integrand(std::cos(exponent),
+                                             -std::sin(exponent));
+        integral += integrand;
+      }
+      integral /= _number_of_points;
+      const double values[2] = {0., std::abs(integral)};
+      _recorder.bin(direction, values);
+    }
 
     for (uint_fast64_t iray = 0; iray < _number_of_rays; ++iray) {
       double I[2] = {1., 0.};

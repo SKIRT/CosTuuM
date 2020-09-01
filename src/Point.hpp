@@ -102,6 +102,17 @@ public:
   }
 
   /**
+   * @brief Scale the point coordinates with the given scale factor.
+   *
+   * @param scale_factor Scale factor.
+   * @return Scaled point.
+   */
+  inline Point scale(const double scale_factor) const {
+    return Point(scale_factor * _x[0], scale_factor * _x[1],
+                 scale_factor * _x[2]);
+  }
+
+  /**
    * @brief Get the cross product of the point vector with the given direction.
    *
    * @param direction Direction.

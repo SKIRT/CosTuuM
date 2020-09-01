@@ -43,6 +43,19 @@ public:
   virtual ~Grain() {}
 
   /**
+   * @brief Generate a random point on the cross section of the grain as seen
+   * from the given direction.
+   *
+   * Per convention, the randomly generated point lies in the @f$z=0@f$ plane.
+   *
+   * @param direction Direction.
+   * @param random_generator RandomGenerator to use.
+   * @return Random point on the cross section.
+   */
+  virtual Point generate_random_cross_section_point(
+      const Direction direction, RandomGenerator &random_generator) const = 0;
+
+  /**
    * @brief Generate a random line that will intersect with the grain and that
    * travels in the given direction.
    *

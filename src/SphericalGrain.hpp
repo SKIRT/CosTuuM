@@ -40,15 +40,18 @@ public:
   virtual ~SphericalGrain() {}
 
   /**
-   * @brief Generate a random line that will intersect with the grain and that
-   * travels in the given direction.
+   * @brief Generate a random point on the cross section of the grain as seen
+   * from the given direction.
+   *
+   * Per convention, the randomly generated point lies in the @f$z=0@f$ plane.
    *
    * @param direction Direction.
    * @param random_generator RandomGenerator to use.
-   * @return Random line.
+   * @return Random point on the cross section.
    */
-  virtual Line generate_random_line(const Direction direction,
-                                    RandomGenerator &random_generator) const {
+  virtual Point
+  generate_random_cross_section_point(const Direction direction,
+                                      RandomGenerator &random_generator) const {
 
     // first generate a random radius and polar angle in the plane perpendicular
     // to the projection direction
@@ -61,7 +64,22 @@ public:
     const double z = 0.;
 
     // construct the projection point in the XY plane
-    const Point point(x, y, z);
+    return Point(x, y, z);
+  }
+
+  /**
+   * @brief Generate a random line that will intersect with the grain and that
+   * travels in the given direction.
+   *
+   * @param direction Direction.
+   * @param random_generator RandomGenerator to use.
+   * @return Random line.
+   */
+  virtual Line generate_random_line(const Direction direction,
+                                    RandomGenerator &random_generator) const {
+
+    const Point point =
+        generate_random_cross_section_point(direction, random_generator);
 
     // now rotate: the rotation axis is perpendicular to both the projection
     // direction and the z-axis and is hence given by z x d
