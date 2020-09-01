@@ -110,8 +110,7 @@ public:
       const Direction scatter_plane_normal = normal.cross(_direction);
       const Direction out = reverse_direction.rotate_perpendicular(
           scatter_plane_normal, incident_angle + reflection_angle);
-      I[1] *= refraction_event.get_average_reflection_coefficient() *
-              refraction_event.get_average_reflection_coefficient();
+      I[1] *= refraction_event.get_average_reflection_coefficient();
       _recorder.bin(out, I);
     }
   }
