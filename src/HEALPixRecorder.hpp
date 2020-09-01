@@ -66,6 +66,66 @@ public:
   }
 
   /**
+   * @brief Get the number of pixels in the HEALPix grid.
+   *
+   * @return Number of pixels.
+   */
+  inline uint_fast32_t get_number_of_pixels() const {
+    return 12 * _Nside * _Nside;
+  }
+
+  /**
+   * @brief Get the direction corresponding to the given RING index.
+   *
+   * @param ring_index Index in RING ordering.
+   * @return Corresponding direction (centre of the corresponding pixel).
+   */
+  inline Direction direction(const uint_fast32_t ring_index) const {
+
+    const uint_fast32_t npix = 12 * _Nside * _Nside;
+    if (ring_index < _Npixel_pole) {
+      // North pole
+      const int_fast32_t iring = (1 + static_cast<int_fast32_t>(std::floor(
+                                          std::sqrt(1. + 2. * ring_index)))) >>
+                                 1;
+      const int_fast32_t iphi = (ring_index + 1) - 2 * iring * (iring - 1);
+
+      const double tmp = (iring * iring) * 4. / npix;
+      const double z = 1.0 - tmp;
+      const double theta = std::acos(z);
+      const double phi = (iphi - 0.5) * 0.5 * M_PI / iring;
+      return Direction(theta, phi);
+    } else if (ring_index < (npix - _Npixel_pole)) {
+      // equator
+      const int_fast32_t nl4 = 4 * _Nside;
+      const int_fast32_t ip = ring_index - _Npixel_pole;
+      const int_fast32_t tmp = (_order >= 0) ? ip >> (_order + 2) : ip / nl4;
+      const int_fast32_t iring = tmp + _Nside;
+      const int_fast32_t iphi = ip - nl4 * tmp + 1;
+      const double fodd = ((iring + _Nside) & 1) ? 1 : 0.5;
+
+      const double z = (2. * _Nside - iring) * 2. / (3. * _Nside);
+      const double theta = std::acos(z);
+      const double phi = (iphi - fodd) * M_PI * 0.5 / _Nside;
+      return Direction(theta, phi);
+    } else {
+      // South pole
+      const int_fast32_t ip = npix - ring_index;
+      const int_fast32_t iring =
+          (1 +
+           static_cast<int_fast32_t>(std::floor(std::sqrt(2. * ip - 1.)))) >>
+          1;
+      const int_fast32_t iphi = 4 * iring + 1 - (ip - 2 * iring * (iring - 1));
+
+      const double tmp = (iring * iring) * 4. / npix;
+      const double z = tmp - 1.0;
+      const double theta = std::acos(z);
+      const double phi = (iphi - 0.5) * 0.5 * M_PI / iring;
+      return Direction(theta, phi);
+    }
+  }
+
+  /**
    * @brief Get the RING index of the HEALPix pixel that contains the given
    * direction.
    *

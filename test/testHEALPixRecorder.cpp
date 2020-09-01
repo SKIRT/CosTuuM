@@ -65,5 +65,15 @@ int main() {
   }
   healpix.dump("test_healpix_output.dat");
 
+  std::ofstream pfile("test_healpix_angles.dat");
+  for (uint_fast32_t i = 0; i < healpix.get_number_of_pixels(); ++i) {
+    const Direction direction = healpix.direction(i);
+    const double theta = direction.get_zenith_angle();
+    const double phi = direction.get_azimuth_angle();
+    pfile.write(reinterpret_cast<const char *>(&theta), sizeof(double));
+    pfile.write(reinterpret_cast<const char *>(&phi), sizeof(double));
+  }
+  pfile.close();
+
   return 0;
 }
