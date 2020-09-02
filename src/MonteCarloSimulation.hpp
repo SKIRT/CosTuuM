@@ -104,29 +104,35 @@ public:
   inline void run() {
 
     const double k = 2. * M_PI / _wavelength;
-    for (uint_fast32_t ipix = 0; ipix < _recorder.get_number_of_pixels();
-         ++ipix) {
-      const Direction direction = _recorder.direction(ipix);
-      std::complex<double> integral(0., 0.);
-      for (uint_fast32_t i = 0; i < _number_of_points; ++i) {
-        const Point random_point = _grain->generate_random_cross_section_point(
-            _direction, _random_generator);
-        const Point point = random_point.scale(_grain_size);
-        const double exponent =
-            k * std::sin(direction.get_zenith_angle()) *
-            (point.x() * std::cos(direction.get_azimuth_angle()) +
-             point.y() * std::sin(direction.get_azimuth_angle()));
-        const std::complex<double> integrand(std::cos(exponent),
-                                             -std::sin(exponent));
-        integral += integrand;
-      }
-      integral /= _number_of_points;
-      const double values[2] = {0., std::abs(integral)};
-      _recorder.bin(direction, values);
-    }
+    const double norm =
+        0.25 * k * k * _grain_size * _grain_size * _grain_size * _grain_size;
+    // add the central part of the diffraction pattern
+    double values[2] = {0., norm};
+    _recorder.bin(_direction, values);
+    //    for (uint_fast32_t ipix = 0; ipix < _recorder.get_number_of_pixels();
+    //         ++ipix) {
+    //      const Direction direction = _recorder.direction(ipix);
+    //      std::complex<double> integral(0., 0.);
+    //      for (uint_fast32_t i = 0; i < _number_of_points; ++i) {
+    //        const Point random_point =
+    //        _grain->generate_random_cross_section_point(
+    //            _direction, _random_generator);
+    //        const Point point = random_point.scale(_grain_size);
+    //        const double exponent =
+    //            k * std::sin(direction.get_zenith_angle()) *
+    //            (point.x() * std::cos(direction.get_azimuth_angle()) +
+    //             point.y() * std::sin(direction.get_azimuth_angle()));
+    //        const std::complex<double> integrand(std::cos(exponent),
+    //                                             -std::sin(exponent));
+    //        integral += integrand;
+    //      }
+    //      integral /= _number_of_points;
+    //      values[1] = norm*std::norm(integral);
+    //      _recorder.bin(direction, values);
+    //    }
 
     for (uint_fast64_t iray = 0; iray < _number_of_rays; ++iray) {
-      double I[2] = {1., 0.};
+      double I[2] = {M_PI * _grain_size * _grain_size / _number_of_rays, 0.};
       const Line line =
           _grain->generate_random_line(_direction, _random_generator);
       const IntersectionEvent intersection_event =
@@ -138,7 +144,10 @@ public:
                                              intersection_point.z());
       _recorder.bin(intersection_direction, I);
       I[0] = 0.;
-      I[1] = 1.;
+      // we need to divide the intensities by the recorder pixel size to
+      // normalise them properly
+      I[1] = M_PI * _grain_size * _grain_size /
+             (_number_of_rays * 4. * M_PI / _recorder.get_number_of_pixels());
       const Direction normal = intersection_event.get_normal();
       const Direction reverse_direction = _direction.reverse();
       const double incident_angle = reverse_direction.angle(normal);

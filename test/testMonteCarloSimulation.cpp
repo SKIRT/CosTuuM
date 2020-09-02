@@ -35,8 +35,7 @@
 int main() {
 
   MonteCarloSimulation simulation(0.1, 1., std::complex<double>(2., 0.04),
-                                  Direction(0.5 * M_PI, 0.), 10000u, 1000000u,
-                                  4, 42);
+                                  Direction(0.01, 0.), 10000u, 1000000u, 4, 42);
   simulation.run();
   simulation.output("test_monte_carlo_simulation.dat");
 
